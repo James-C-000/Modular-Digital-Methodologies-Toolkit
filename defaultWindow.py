@@ -1,10 +1,10 @@
 #!/usr/bin/python3
-import pathlib
+import os
 import tkinter as tk
 import pygubu
 
-PROJECT_PATH = pathlib.Path(__file__).parent
-PROJECT_UI = PROJECT_PATH / "defaultWindow.ui"
+PROJECT_PATH = os.getcwd()
+PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
 
 
 class defaultWindow:
@@ -13,8 +13,7 @@ class defaultWindow:
         builder.add_resource_path(PROJECT_PATH)
         builder.add_from_file(PROJECT_UI)
         # Main widget
-        self.mainwindow: tk.Toplevel = builder.get_object(
-            "defaultWindow", master)
+        self.mainwindow: tk.Toplevel = builder.get_object("defaultWindow", master)
         # Create dialog references
         self.aboutDialog = builder.get_object("aboutDialog", self.mainwindow)
         self.licenseDialog = builder.get_object("licenseDialog", self.mainwindow)
