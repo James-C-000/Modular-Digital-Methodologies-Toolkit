@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 import os
-import pathlib
 import tkinter as tk
 import ocrmypdf
 import pygubu
 
-PROJECT_PATH = pathlib.Path(__file__).parent
-PROJECT_UI = PROJECT_PATH / "ocrWindow.ui"
+PROJECT_PATH = os.getcwd()
+PROJECT_UI = os.path.join(PROJECT_PATH, 'ocrWindow.ui')
 
 
 class ocrWindow:
@@ -26,15 +25,13 @@ class ocrWindow:
         builder.connect_callbacks(self)
 
     def on_runOCR_item_clicked(self):
-        # Get working dir (system agnostic)
-        cwd = os.getcwd()
         # Set Tesseract env. variable for tessdata path (system agnostic)
-        os.environ["TESSDATA_PREFIX"] = os.path.join(cwd, 'OCR', 'tessdata')
+        os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
         # Set tessconfigs path (system agnostic)
-        tesseractConfig = os.path.join(cwd, 'OCR', 'tessdata', 'tessconfigs')
+        tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs')
         # Set OCR'd file inputs and outputs (will eventually be removed and replaced with a file picker)
-        ocrInput = os.path.join(cwd, 'OCR', 'input.pdf')
-        ocrOutput = os.path.join(cwd, 'OCR', 'output.pdf')
+        ocrInput = os.path.join(PROJECT_PATH, 'OCR', 'input.pdf')
+        ocrOutput = os.path.join(PROJECT_PATH, 'OCR', 'output.pdf')
 
         # OCR the PDF using OCRmyPDF
         ocrmypdf.ocr(ocrInput, ocrOutput,
