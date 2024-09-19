@@ -1,24 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<interface version="1.4" author="PygubuDesigner 0.39.3">
+<interface version="1.4">
   <project>
-    <settings>
-      <setting id="name">ocrWindow</setting>
-      <setting id="description">OCR Window</setting>
-      <setting id="module_name">ocrWindow</setting>
-      <setting id="template">application</setting>
-      <setting id="main_widget">ocrWindow</setting>
-      <setting id="main_classname">ocrWindow</setting>
-      <setting id="main_menu">menu1</setting>
-      <setting id="output_dir" />
-      <setting id="output_dir2" />
-      <setting id="import_tkvariables">False</setting>
-      <setting id="use_ttk_styledefinition_file">True</setting>
-      <setting id="use_i18n">False</setting>
-      <setting id="all_ids_attributes">False</setting>
-      <setting id="generate_code_onsave">False</setting>
-      <setting id="use_window_centering_code">False</setting>
-      <setting id="ttk_style_definition_file" />
-    </settings>
+    <settings />
     <customwidgets />
   </project>
   <object class="tk.Toplevel" id="ocrWindow" named="True">
@@ -130,7 +113,7 @@ Contact: James.Caldwell.000@gmail.com</property>
     <child>
       <object class="ttk.Label" id="OSSLicenseAcknowledgementLabel">
         <property name="text" translatable="yes">MDMT uses the following open source libraries:
-Matplotlib - Copyright © 2012 - 2022 The Matplotlib Development Team
+Matplotlib - Copyright © 2012 Matplotlib Development Team
 pdftotext - Copyright © 2017 Jason Alan Palmer
 pygubu - Copyright © 2020 Alejandro Autalán</property>
         <property name="wraplength">420</property>
