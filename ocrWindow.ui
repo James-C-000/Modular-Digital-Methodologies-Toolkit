@@ -537,10 +537,12 @@ SOFTWARE.</property>
         <property name="state">disabled</property>
         <property name="text" translatable="yes">Program Documentation
 =========================================================
-PROGRAM DOCUMENTATION
+STUFF
 =========================================================
 to-do: write documentation
 to-do: update frame packing for about dialog
+to-do: multithreaded OCR with associated progress bar
+to-do: lock "Run OCR" button until input+output dirs and languages are selected
 Note: OCR won't work with password protected PDFs and will invalidate any PDFs signed with a digital certificate.
 Note: Unless "Redo Existing OCR" is ticked, files which are already text selectable will not be copied from input dir to output dir.
 </property>
