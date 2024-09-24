@@ -2,6 +2,7 @@
 import os
 import tkinter as tk
 import pygubu
+from ocrWindow import ocrWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -24,7 +25,8 @@ class defaultWindow:
         builder.connect_callbacks(self)
 
     def on_ocr_item_clicked(self):
-        pass
+        # Instantiate the OCR class, creating a new window for the OCR (child to parent process)
+        ocrWindow(master=self.mainwindow)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window
