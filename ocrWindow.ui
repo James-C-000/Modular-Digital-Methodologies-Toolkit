@@ -1,9 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<interface version="1.4">
-  <project>
-    <settings />
-    <customwidgets />
-  </project>
+<interface version="1.3">
   <object class="tk.Toplevel" id="ocrWindow" named="True">
     <property name="geometry">480x680</property>
     <property name="height">200</property>
@@ -12,6 +8,7 @@
     <property name="width">200</property>
     <child>
       <object class="ttk.Label" id="label_title" named="True">
+        <property name="font">TkHeadingFont</property>
         <property name="text" translatable="yes">OCR</property>
         <layout manager="place">
           <property name="anchor">center</property>
@@ -28,8 +25,222 @@
         <property name="text" translatable="yes">Run OCR</property>
         <layout manager="place">
           <property name="anchor">center</property>
+          <property name="relheight">0.08</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.9</property>
+          <property name="rely">0.88</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="selectPDFDirLabel">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select PDF Directory</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.25</property>
+          <property name="rely">0.1</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Separator" id="separator2">
+        <property name="orient">vertical</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.1</property>
+          <property name="relx">0.50</property>
+          <property name="rely">0.15</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Separator" id="separator3">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.4</property>
+          <property name="relx">0.25</property>
+          <property name="rely">0.2</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Separator" id="separator4">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.4</property>
+          <property name="relx">0.75</property>
+          <property name="rely">0.2</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="pygubu.builder.widgets.pathchooserinput" id="PDFInputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="title" translatable="yes">Select Directory Containing PDFs</property>
+        <property name="type">directory</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.4</property>
+          <property name="relx">0.25</property>
+          <property name="rely">0.15</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="selectOutputDirLabel" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Output Directory</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.75</property>
+          <property name="rely">0.1</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="pygubu.builder.widgets.pathchooserinput" id="PDFOutputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="title" translatable="yes">Select Output Directory</property>
+        <property name="type">directory</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.4</property>
+          <property name="relx">0.75</property>
+          <property name="rely">0.15</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="tk.Listbox" id="langSelection_Listbox" named="True">
+        <property name="selectmode">multiple</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.25</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.4</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="tk.Label" id="selectLangLabel" named="True">
+        <property name="text" translatable="yes">Select PDF Language(s)</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.24</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Separator" id="separator5">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.55</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Checkbutton" id="PDFA_Checkbox" named="True">
+        <property name="text" translatable="yes">PDF/A Output (Archive Ready)</property>
+        <property name="variable">int:PDFACheckboxState</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.6</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Checkbutton" id="rotatePages_Checkbox" named="True">
+        <property name="text" translatable="yes">Correct Page Rotation</property>
+        <property name="variable">int:rotatePagesCheckboxState</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.65</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Checkbutton" id="deskew_Checkbox" named="True">
+        <property name="text" translatable="yes">Correct Skewed Scans</property>
+        <property name="variable">int:deskewCheckboxState</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.7</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Checkbutton" id="extractToTextFile_Checkbox" named="True">
+        <property name="text" translatable="yes">Extract Text to Text File</property>
+        <property name="variable">int:textFileCheckboxState</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.75</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Checkbutton" id="redoOCR_Checkbox" named="True">
+        <property name="text" translatable="yes">Redo Existing OCR</property>
+        <property name="variable">int:redoOCRCheckboxState</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.8</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Progressbar" id="progressBar" named="True">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.95</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
@@ -326,9 +537,13 @@ SOFTWARE.</property>
         <property name="state">disabled</property>
         <property name="text" translatable="yes">Program Documentation
 =========================================================
-INPUT
+PROGRAM DOCUMENTATION
 =========================================================
-todo: update frame packing for about dialog</property>
+to-do: write documentation
+to-do: update frame packing for about dialog
+Note: OCR won't work with password protected PDFs and will invalidate any PDFs signed with a digital certificate.
+Note: Unless "Redo Existing OCR" is ticked, files which are already text selectable will not be copied from input dir to output dir.
+</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>

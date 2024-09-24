@@ -428,7 +428,7 @@ SOFTWARE.</property>
 =========================================================
 INPUT
 =========================================================
-todo: update frame packing for about dialog</property>
+to-do: update frame packing for about dialog</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>
