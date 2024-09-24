@@ -248,7 +248,27 @@ class ocrWindow:
             try:
                 inputDirStructure = os.path.relpath(i, pdfInputDir)
                 outputDirPreserveStructure = os.path.join(pdfOutputDir, 'MDMT-OCR-Output', inputDirStructure)
-                if bool(PDFACheckboxState) == True:
+                sidecarTextFile = os.path.splitext(outputDirPreserveStructure)[0]+'.txt'
+                if bool(PDFACheckboxState) == True and bool(textFileCheckboxState) == True:
+                    ocrmypdf.ocr(i, outputDirPreserveStructure,
+                                 language=pdfLanguageValsString,
+                                 tesseract_config=tesseractConfig,
+                                 redo_ocr=bool(redoOCRCheckboxState),
+                                 deskew=bool(deskewCheckboxState),
+                                 rotate_pages=bool(rotatePagesCheckboxState),
+                                 sidecar=sidecarTextFile,
+                                 invalidate_digital_signatures=True)
+                elif bool(PDFACheckboxState) == False and bool(textFileCheckboxState) == True:
+                    ocrmypdf.ocr(i, outputDirPreserveStructure,
+                                 language=pdfLanguageValsString,
+                                 tesseract_config=tesseractConfig,
+                                 redo_ocr=bool(redoOCRCheckboxState),
+                                 deskew=bool(deskewCheckboxState),
+                                 rotate_pages=bool(rotatePagesCheckboxState),
+                                 sidecar=sidecarTextFile,
+                                 output_type="pdf",
+                                 invalidate_digital_signatures=True)
+                elif bool(PDFACheckboxState) == True and bool(textFileCheckboxState) == False:
                     ocrmypdf.ocr(i, outputDirPreserveStructure,
                                  language=pdfLanguageValsString,
                                  tesseract_config=tesseractConfig,
@@ -256,7 +276,7 @@ class ocrWindow:
                                  deskew=bool(deskewCheckboxState),
                                  rotate_pages=bool(rotatePagesCheckboxState),
                                  invalidate_digital_signatures=True)
-                elif bool(PDFACheckboxState) == False:
+                elif bool(PDFACheckboxState) == False and bool(textFileCheckboxState) == False:
                     ocrmypdf.ocr(i, outputDirPreserveStructure,
                                  language=pdfLanguageValsString,
                                  tesseract_config=tesseractConfig,
