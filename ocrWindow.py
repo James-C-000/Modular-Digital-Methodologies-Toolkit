@@ -195,6 +195,11 @@ class ocrWindow:
         self.runOCRButton = builder.get_object("button_run_ocr", self.ocrWindow)
         self.progressBar = builder.get_object("progressBar", self.ocrWindow)
         self.langListBoxScrollbar = builder.get_object("langSelection_Scrollbar", self.ocrWindow)
+        self.rotateThresholdLowRadiobutton = builder.get_object("rotationConfidenceLow_RadioButton", self.ocrWindow)
+        self.rotateThresholdNormalRadiobutton = builder.get_object("rotationConfidenceNormal_RadioButton", self.ocrWindow)
+        self.rotateThresholdHighRadiobutton = builder.get_object("rotationConfidenceHigh_RadioButton", self.ocrWindow)
+        # Get rotate confidence threshold
+        self.rotateThresholdSelection = builder.get_variable("rotateThresholdSelection")
         # Link langbox with scrollbar
         self.langListbox['yscrollcommand'] = self.langListBoxScrollbar.set
         self.langListBoxScrollbar['command'] = self.langListbox.yview
@@ -210,6 +215,38 @@ class ocrWindow:
         ocrThread = threading.Thread(target=self.ocrmypdfThread, daemon=True)
         ocrThread.start()
 
+    def on_pageRotation_clicked(self):
+        rotatePageState = self.builder.get_variable('rotatePagesCheckboxState').get()
+        if rotatePageState == 0:
+            self.rotateThresholdLowRadiobutton.configure(state='disabled')
+            self.rotateThresholdNormalRadiobutton.configure(state='disabled')
+            self.rotateThresholdHighRadiobutton.configure(state='disabled')
+        elif rotatePageState == 1:
+            self.rotateThresholdLowRadiobutton.configure(state='normal')
+            self.rotateThresholdNormalRadiobutton.configure(state='normal')
+            self.rotateThresholdHighRadiobutton.configure(state='normal')
+            self.rotateThresholdNormalRadiobutton.invoke()
+
+    def on_redoOCR_clicked(self):
+        redoOCRState = self.builder.get_variable('redoOCRCheckboxState').get()
+        if redoOCRState == 0:
+            # enable skewed scans
+            self.deskewCheckbox.configure(state='normal')
+        elif redoOCRState == 1:
+            # disable skewed scans
+            self.deskewCheckbox.configure(state='disabled')
+            self.builder.get_variable('deskewCheckboxState').set(False)
+
+    def on_skewedScans_clicked(self):
+        skewedScansState = self.builder.get_variable('deskewCheckboxState').get()
+        if skewedScansState == 0:
+            # enable redo ocr
+            self.redoOCRCheckbox.configure(state='normal')
+        elif skewedScansState == 1:
+            # disable redo ocr
+            self.redoOCRCheckbox.configure(state='disabled')
+            self.builder.get_variable('redoOCRCheckboxState').set(False)
+
     def ocrmypdfThread(self):
         # Disable OCR Button
         self.runOCRButton.configure(state='disabled')
@@ -221,6 +258,7 @@ class ocrWindow:
         pdfInputDir = self.PDFInputDir.cget('path')
         pdfOutputDir = self.PDFOutputDir.cget('path')
         PDFACheckboxState = self.builder.get_variable('PDFACheckboxState').get()  # 0 = unchecked; 1 = checked
+        rotateThresholdSelection = self.rotateThresholdSelection.get()  # 30 = high; 15 = normal; 2 = low
         if bool(PDFACheckboxState):
             pdfType = 'pdfa'
         elif not bool(PDFACheckboxState):
@@ -276,7 +314,31 @@ class ocrWindow:
                     inputDirStructure = os.path.relpath(i, pdfInputDir)
                     outputDirPreserveStructure = os.path.join(pdfOutputDir, 'MDMT-OCR-Output', inputDirStructure)
                     sidecarTextFile = os.path.splitext(outputDirPreserveStructure)[0] + '.txt'
-                    if bool(textFileCheckboxState):
+                    if bool(textFileCheckboxState) == True and bool(rotatePagesCheckboxState) == True:
+                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
+                        ocrmypdf.ocr(i, outputDirPreserveStructure,
+                                     language=pdfLanguageValsString,
+                                     tesseract_config=tesseractConfig,
+                                     redo_ocr=bool(redoOCRCheckboxState),
+                                     skip_text=not (bool(redoOCRCheckboxState)),
+                                     deskew=bool(deskewCheckboxState),
+                                     rotate_pages=bool(rotatePagesCheckboxState),
+                                     rotate_pages_threshold=rotateThresholdSelection,
+                                     sidecar=sidecarTextFile,
+                                     output_type=pdfType,
+                                     invalidate_digital_signatures=True)
+                    elif bool(textFileCheckboxState) == False and bool(rotatePagesCheckboxState) == False:
+                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
+                        ocrmypdf.ocr(i, outputDirPreserveStructure,
+                                     language=pdfLanguageValsString,
+                                     tesseract_config=tesseractConfig,
+                                     redo_ocr=bool(redoOCRCheckboxState),
+                                     skip_text=not (bool(redoOCRCheckboxState)),
+                                     deskew=bool(deskewCheckboxState),
+                                     rotate_pages=bool(rotatePagesCheckboxState),
+                                     output_type=pdfType,
+                                     invalidate_digital_signatures=True)
+                    elif bool(textFileCheckboxState) == True and bool(rotatePagesCheckboxState) == False:
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
                                      language=pdfLanguageValsString,
@@ -288,7 +350,7 @@ class ocrWindow:
                                      sidecar=sidecarTextFile,
                                      output_type=pdfType,
                                      invalidate_digital_signatures=True)
-                    elif not bool(textFileCheckboxState):
+                    elif bool(textFileCheckboxState) == False and bool(rotatePagesCheckboxState) == True:
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
                                      language=pdfLanguageValsString,
@@ -297,15 +359,11 @@ class ocrWindow:
                                      skip_text=not (bool(redoOCRCheckboxState)),
                                      deskew=bool(deskewCheckboxState),
                                      rotate_pages=bool(rotatePagesCheckboxState),
+                                     rotate_pages_threshold=rotateThresholdSelection,
                                      output_type=pdfType,
                                      invalidate_digital_signatures=True)
                 except Exception as e:
-                    # Stop progress bar
-                    self.progressBar.configure(mode='determinate')  # Hide progress bar pip
-                    self.progressBar.stop()
-                    # Enable OCR Button
-                    self.runOCRButton.configure(state='normal')
-                    error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry."
+                    error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry.\nNot a fatal error, continuing..."
                     messagebox.showerror(title='Error', message=error)
             # Stop progress bar
             self.progressBar.configure(mode='determinate')  # Hide progress bar pip
