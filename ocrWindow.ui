@@ -155,71 +155,6 @@
       </object>
     </child>
     <child>
-      <object class="ttk.Checkbutton" id="PDFA_Checkbox" named="True">
-        <property name="text" translatable="yes">PDF/A Output (Archive Ready)</property>
-        <property name="variable">int:PDFACheckboxState</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.6</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Checkbutton" id="rotatePages_Checkbox" named="True">
-        <property name="text" translatable="yes">Correct Page Rotation</property>
-        <property name="variable">int:rotatePagesCheckboxState</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.65</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Checkbutton" id="deskew_Checkbox" named="True">
-        <property name="text" translatable="yes">Correct Skewed Scans</property>
-        <property name="variable">int:deskewCheckboxState</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.7</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Checkbutton" id="extractToTextFile_Checkbox" named="True">
-        <property name="text" translatable="yes">Extract Text to Text File</property>
-        <property name="variable">int:textFileCheckboxState</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.75</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Checkbutton" id="redoOCR_Checkbox" named="True">
-        <property name="text" translatable="yes">Redo Existing OCR</property>
-        <property name="variable">int:redoOCRCheckboxState</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.8</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
       <object class="ttk.Progressbar" id="progressBar" named="True">
         <property name="orient">horizontal</property>
         <layout manager="place">
@@ -259,6 +194,141 @@
               <property name="fill">both</property>
               <property name="side">right</property>
             </layout>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Frame" id="optionFrame" named="True">
+        <property name="height">200</property>
+        <property name="width">200</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.25</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.7</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+        <containerlayout manager="grid">
+          <property type="col" id="all" name="weight">1</property>
+          <property type="row" id="all" name="weight">1</property>
+        </containerlayout>
+        <child>
+          <object class="ttk.Checkbutton" id="PDFA_Checkbox" named="True">
+            <property name="text" translatable="yes">PDF/A Output (Archive Ready)</property>
+            <property name="variable">int:PDFACheckboxState</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="row">0</property>
+              <property name="sticky">nsew</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Checkbutton" id="rotatePages_Checkbox" named="True">
+            <property name="command" type="command" cbtype="simple">on_pageRotation_clicked</property>
+            <property name="text" translatable="yes">Correct Page Rotation</property>
+            <property name="variable">int:rotatePagesCheckboxState</property>
+            <layout manager="grid">
+              <property name="column">1</property>
+              <property name="row">0</property>
+              <property name="sticky">nsew</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Checkbutton" id="deskew_Checkbox" named="True">
+            <property name="command" type="command" cbtype="simple">on_skewedScans_clicked</property>
+            <property name="text" translatable="yes">Correct Skewed Scans</property>
+            <property name="variable">int:deskewCheckboxState</property>
+            <layout manager="grid">
+              <property name="column">1</property>
+              <property name="row">2</property>
+              <property name="sticky">nsew</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Checkbutton" id="extractToTextFile_Checkbox" named="True">
+            <property name="text" translatable="yes">Extract Text to Text File</property>
+            <property name="variable">int:textFileCheckboxState</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="row">1</property>
+              <property name="sticky">nsew</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Checkbutton" id="redoOCR_Checkbox" named="True">
+            <property name="command" type="command" cbtype="simple">on_redoOCR_clicked</property>
+            <property name="text" translatable="yes">Redo Existing OCR</property>
+            <property name="variable">int:redoOCRCheckboxState</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="row">2</property>
+              <property name="sticky">nsew</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Frame" id="rotationConfidenceFrame" named="True">
+            <layout manager="grid">
+              <property name="column">1</property>
+              <property name="row">1</property>
+              <property name="sticky">ns</property>
+            </layout>
+            <child>
+              <object class="ttk.Label" id="rotationConfidenceLabel" named="True">
+                <property name="text" translatable="yes">Confidence Threshold</property>
+                <layout manager="pack">
+                  <property name="anchor">center</property>
+                  <property name="expand">true</property>
+                  <property name="side">top</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Radiobutton" id="rotationConfidenceLow_RadioButton" named="True">
+                <property name="state">disabled</property>
+                <property name="text" translatable="yes">Low</property>
+                <property name="value">2</property>
+                <property name="variable">string:rotateThresholdSelection</property>
+                <layout manager="pack">
+                  <property name="expand">true</property>
+                  <property name="fill">both</property>
+                  <property name="side">top</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Radiobutton" id="rotationConfidenceNormal_RadioButton" named="True">
+                <property name="state">disabled</property>
+                <property name="text" translatable="yes">Normal</property>
+                <property name="value">15</property>
+                <property name="variable">string:rotateThresholdSelection</property>
+                <layout manager="pack">
+                  <property name="expand">true</property>
+                  <property name="fill">both</property>
+                  <property name="side">top</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Radiobutton" id="rotationConfidenceHigh_RadioButton" named="True">
+                <property name="state">disabled</property>
+                <property name="text" translatable="yes">High</property>
+                <property name="value">30</property>
+                <property name="variable">string:rotateThresholdSelection</property>
+                <layout manager="pack">
+                  <property name="expand">true</property>
+                  <property name="fill">both</property>
+                  <property name="side">top</property>
+                </layout>
+              </object>
+            </child>
           </object>
         </child>
       </object>
@@ -554,13 +624,55 @@ SOFTWARE.</property>
         <property name="state">disabled</property>
         <property name="text" translatable="yes">Program Documentation
 =========================================================
-STUFF
+GENERAL
 =========================================================
-to-do: write documentation
-to-do: update frame packing for about dialog
-to-do: verify deskew and rotation functions work
+to-do: Update frame packing for about dialog
+
 Note: OCR won't work with password protected PDFs and will invalidate any PDFs signed with a digital certificate.
+
 Note: Unless "Redo Existing OCR" is ticked, files which are already text selectable will not be copied from input dir to output dir.
+=========================================================
+INPUT
+=========================================================
+Select PDF Directory:
+
+Click the ellipsis icon to select a directory containing your corpus of PDFs. All documents of the filetype "pdf" will be selected for analysis. You may have directories and subdirectories within the input directory, and this directory structure will be duplicated in the output directory.
+=========================================================
+OUTPUT
+=========================================================
+Select Output Directory:
+
+Click the ellipsis icon to select a directory your OCR'd PDFs will be saved to. This directory cannot be your input directory.
+=========================================================
+LANGUAGES
+=========================================================
+Select any languages your PDFs contain in the "Select PDF Language(s)" list. When a language has a "(Script)" option, this means it will automatically select any languages which are written in that script. For example, "Ethiopic (Script)" will automatically select the Amharic and Tigrinya languages.
+=========================================================
+OPTIONS
+=========================================================
+PDF/A Output (Archive Ready):
+
+Directs the program to create an archive ready version of each PDF in the output directory. It is safe to leave this disabled unless you have a reason to enable it. See Adobe for more information: https://www.adobe.com/uk/acrobat/resources/document-files/pdf-types/pdf-a.html
+--------------------
+Extract Text to Text File:
+
+Directs the program to create an accompanying text file for each PDF which contains only the OCR'd text. Useful for qualitative computational analysis projects.
+--------------------
+Redo Existing OCR:
+
+Directs the program to discard any existing OCR and recreate the text selectable layer using Tesseract. If this checkbox is disabled, any PDFs in the input directory which are already OCR'd will be skipped.
+--------------------
+Correct Page Rotation:
+
+Directs the program to automatically rotate pages to an upright orientation based on the Confidence Threshold value selected (see below).
+--------------------
+Confidence Threshold:
+
+The confidence threshold is a measure of how sure the program must be that the PDF input is not upright before attempting to make it upright. Generally, a low confidence threshold will produce more false positives (rotating your PDF to an incorrect orientation) while a higher confidence threshold will reduce false positives and increase false negatives. You may want to select this option based on the quality of your PDF corpus: lower quality scans will need a lower confidence threshold. Keep in mind the general property of "garbge in, garbage out" -- the lower the quality of the scan, the higher the probability of an incorrect rotation and low quality OCR job.
+--------------------
+Correct Skewed Scans:
+
+Directs the program to automatically straighten the orientation of the page so the text is horizontal. Generally works best with text that is significantly skewed (&gt;4 degrees).
 </property>
         <property name="wrap">word</property>
         <layout manager="place">
