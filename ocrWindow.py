@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 import os
 import shutil
+import time
 import tkinter as tk
+from tkinter import messagebox
 import ocrmypdf
 import pygubu
+import threading
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'ocrWindow.ui')
@@ -200,6 +203,10 @@ class ocrWindow:
         builder.connect_callbacks(self)
 
     def on_runOCR_item_clicked(self):
+        ocrThread = threading.Thread(target=self.ocrmypdfThread, daemon=True)
+        ocrThread.start()
+
+    def ocrmypdfThread(self):
         # Generate list of needed language data
         pdfLanguageKeys = [self.langListbox.get(sel) for sel in self.langListbox.curselection()]
         pdfLanguageVals = [tesseractLanguages.get(i) for i in pdfLanguageKeys]
@@ -208,86 +215,93 @@ class ocrWindow:
         pdfInputDir = self.PDFInputDir.cget('path')
         pdfOutputDir = self.PDFOutputDir.cget('path')
         PDFACheckboxState = self.builder.get_variable('PDFACheckboxState').get()  # 0 = unchecked; 1 = checked
+        if bool(PDFACheckboxState):
+            pdfType = 'pdfa'
+        elif not bool(PDFACheckboxState):
+            pdfType = 'pdf'
         rotatePagesCheckboxState = self.builder.get_variable(
             'rotatePagesCheckboxState').get()  # 0 = unchecked; 1 = checked
         deskewCheckboxState = self.builder.get_variable('deskewCheckboxState').get()  # 0 = unchecked; 1 = checked
         textFileCheckboxState = self.builder.get_variable('textFileCheckboxState').get()  # 0 = unchecked; 1 = checked
         redoOCRCheckboxState = self.builder.get_variable('redoOCRCheckboxState').get()  # 0 = unchecked; 1 = checked
-        # Get a list of all files in input dir
-        filesInInputDir = []
-        try:
-            for dirPath, dirNames, filenames in os.walk(pdfInputDir):
-                filesInInputDir.extend([os.path.join(dirPath, filename) for filename in filenames])
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck PDFs and retry."
-            print(error)
-        # Get a list of PDFs in input dir
-        pdfsInInputDir = []
-        for i in filesInInputDir:
-            if i.endswith('.pdf'):
-                pdfsInInputDir.append(str(i))
 
-        # Duplicate folder structure of input folder to output folder without copying files
-        def shutilsIgnoreFiles(dir, files):
-            return [f for f in files if os.path.isfile(os.path.join(dir, f))]
-
-        try:
-            outputDirMDMT = os.path.join(pdfOutputDir, 'MDMT-OCR-Output')
-            if os.path.exists(outputDirMDMT) and os.path.isdir(outputDirMDMT):
-                shutil.rmtree(outputDirMDMT)
-            shutil.copytree(pdfInputDir, outputDirMDMT, ignore=shutilsIgnoreFiles)
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nDelete and recreate output directory then retry."
-            print(error)
-        # Set Tesseract env. variable for tessdata path (system agnostic)
-        os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
-        # Set tessconfigs path (system agnostic)
-        tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs')
-        # OCR the PDF using OCRmyPDF
-        for i in pdfsInInputDir:
+        if pdfInputDir == pdfOutputDir:
+            messagebox.showerror(title='Error', message='Input and output directory cannot be the same.')
+        elif pdfInputDir != '' and pdfOutputDir != '' and bool(pdfLanguageKeys):  # Go condition
+            # Start the progress bar
+            self.progressBar.configure(mode='indeterminate')
+            self.progressBar.start()
+            # Get a list of all files in input dir
+            filesInInputDir = []
             try:
-                inputDirStructure = os.path.relpath(i, pdfInputDir)
-                outputDirPreserveStructure = os.path.join(pdfOutputDir, 'MDMT-OCR-Output', inputDirStructure)
-                sidecarTextFile = os.path.splitext(outputDirPreserveStructure)[0]+'.txt'
-                if bool(PDFACheckboxState) == True and bool(textFileCheckboxState) == True:
-                    ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                 language=pdfLanguageValsString,
-                                 tesseract_config=tesseractConfig,
-                                 redo_ocr=bool(redoOCRCheckboxState),
-                                 deskew=bool(deskewCheckboxState),
-                                 rotate_pages=bool(rotatePagesCheckboxState),
-                                 sidecar=sidecarTextFile,
-                                 invalidate_digital_signatures=True)
-                elif bool(PDFACheckboxState) == False and bool(textFileCheckboxState) == True:
-                    ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                 language=pdfLanguageValsString,
-                                 tesseract_config=tesseractConfig,
-                                 redo_ocr=bool(redoOCRCheckboxState),
-                                 deskew=bool(deskewCheckboxState),
-                                 rotate_pages=bool(rotatePagesCheckboxState),
-                                 sidecar=sidecarTextFile,
-                                 output_type="pdf",
-                                 invalidate_digital_signatures=True)
-                elif bool(PDFACheckboxState) == True and bool(textFileCheckboxState) == False:
-                    ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                 language=pdfLanguageValsString,
-                                 tesseract_config=tesseractConfig,
-                                 redo_ocr=bool(redoOCRCheckboxState),
-                                 deskew=bool(deskewCheckboxState),
-                                 rotate_pages=bool(rotatePagesCheckboxState),
-                                 invalidate_digital_signatures=True)
-                elif bool(PDFACheckboxState) == False and bool(textFileCheckboxState) == False:
-                    ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                 language=pdfLanguageValsString,
-                                 tesseract_config=tesseractConfig,
-                                 redo_ocr=bool(redoOCRCheckboxState),
-                                 deskew=bool(deskewCheckboxState),
-                                 rotate_pages=bool(rotatePagesCheckboxState),
-                                 output_type="pdf",
-                                 invalidate_digital_signatures=True)
+                for dirPath, dirNames, filenames in os.walk(pdfInputDir):
+                    filesInInputDir.extend([os.path.join(dirPath, filename) for filename in filenames])
             except Exception as e:
-                error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry."
-                print(error)
+                error = "ERROR: " + str(e) + ".\nCheck PDFs and retry."
+                messagebox.showerror(title='Error', message=error)
+            # Get a list of PDFs in input dir
+            pdfsInInputDir = []
+            for i in filesInInputDir:
+                if i.endswith('.pdf'):
+                    pdfsInInputDir.append(str(i))
+
+            # Duplicate folder structure of input folder to output folder without copying files
+            def shutilsIgnoreFiles(dir, files):
+                return [f for f in files if os.path.isfile(os.path.join(dir, f))]
+
+            try:
+                outputDirMDMT = os.path.join(pdfOutputDir, 'MDMT-OCR-Output')
+                if os.path.exists(outputDirMDMT) and os.path.isdir(outputDirMDMT):
+                    shutil.rmtree(outputDirMDMT)
+                shutil.copytree(pdfInputDir, outputDirMDMT, ignore=shutilsIgnoreFiles)
+            except Exception as e:
+                error = "ERROR: " + str(e) + ".\nDelete and recreate output directory then retry."
+                messagebox.showerror(title='Error', message=error)
+            # Set Tesseract env. variable for tessdata path (system agnostic)
+            os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+            # Set tessconfigs path (system agnostic)
+            tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs')
+
+            # OCR the PDF using OCRmyPDF
+            for i in pdfsInInputDir:
+                try:
+                    inputDirStructure = os.path.relpath(i, pdfInputDir)
+                    outputDirPreserveStructure = os.path.join(pdfOutputDir, 'MDMT-OCR-Output', inputDirStructure)
+                    sidecarTextFile = os.path.splitext(outputDirPreserveStructure)[0] + '.txt'
+                    if bool(textFileCheckboxState):
+                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
+                        ocrmypdf.ocr(i, outputDirPreserveStructure,
+                                     language=pdfLanguageValsString,
+                                     tesseract_config=tesseractConfig,
+                                     redo_ocr=bool(redoOCRCheckboxState),
+                                     skip_text=not (bool(redoOCRCheckboxState)),
+                                     deskew=bool(deskewCheckboxState),
+                                     rotate_pages=bool(rotatePagesCheckboxState),
+                                     sidecar=sidecarTextFile,
+                                     output_type=pdfType,
+                                     invalidate_digital_signatures=True)
+                        # Stop progress bar
+                        self.progressBar.stop()
+                    elif not bool(textFileCheckboxState):
+                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
+                        ocrmypdf.ocr(i, outputDirPreserveStructure,
+                                     language=pdfLanguageValsString,
+                                     tesseract_config=tesseractConfig,
+                                     redo_ocr=bool(redoOCRCheckboxState),
+                                     skip_text=not (bool(redoOCRCheckboxState)),
+                                     deskew=bool(deskewCheckboxState),
+                                     rotate_pages=bool(rotatePagesCheckboxState),
+                                     output_type=pdfType,
+                                     invalidate_digital_signatures=True)
+                        # Stop progress bar
+                        self.progressBar.stop()
+                except Exception as e:
+                    # Stop progress bar
+                    self.progressBar.stop()
+                    error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry."
+                    messagebox.showerror(title='Error', message=error)
+        else:
+            messagebox.showerror(title='Error', message='Please enter all required fields.')
 
     def on_quit_item_clicked(self):
         # Quit on exit
