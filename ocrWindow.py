@@ -194,6 +194,10 @@ class ocrWindow:
         self.redoOCRCheckbox = builder.get_object("redoOCR_Checkbox", self.ocrWindow)
         self.runOCRButton = builder.get_object("button_run_ocr", self.ocrWindow)
         self.progressBar = builder.get_object("progressBar", self.ocrWindow)
+        self.langListBoxScrollbar = builder.get_object("langSelection_Scrollbar", self.ocrWindow)
+        # Link langbox with scrollbar
+        self.langListbox['yscrollcommand'] = self.langListBoxScrollbar.set
+        self.langListBoxScrollbar['command'] = self.langListbox.yview
         # Insert langs into listbox
         for lang in tesseractLanguages.keys():
             self.langListbox.insert("end", lang)

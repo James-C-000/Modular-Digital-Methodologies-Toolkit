@@ -130,20 +130,6 @@
       </object>
     </child>
     <child>
-      <object class="tk.Listbox" id="langSelection_Listbox" named="True">
-        <property name="selectmode">multiple</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.25</property>
-          <property name="relwidth">0.9</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.4</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
       <object class="tk.Label" id="selectLangLabel" named="True">
         <property name="text" translatable="yes">Select PDF Language(s)</property>
         <layout manager="place">
@@ -244,6 +230,37 @@
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Frame" id="langBoxFrame" named="True">
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.25</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.4</property>
+        </layout>
+        <child>
+          <object class="tk.Listbox" id="langSelection_Listbox" named="True">
+            <property name="selectmode">multiple</property>
+            <layout manager="pack">
+              <property name="expand">true</property>
+              <property name="fill">both</property>
+              <property name="side">left</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Scrollbar" id="langSelection_Scrollbar" named="True">
+            <property name="orient">vertical</property>
+            <layout manager="pack">
+              <property name="expand">false</property>
+              <property name="fill">both</property>
+              <property name="side">right</property>
+            </layout>
+          </object>
+        </child>
       </object>
     </child>
   </object>
@@ -542,7 +559,6 @@ STUFF
 to-do: write documentation
 to-do: update frame packing for about dialog
 to-do: verify deskew and rotation functions work
-to-do: add scrollbar to language selection pane
 Note: OCR won't work with password protected PDFs and will invalidate any PDFs signed with a digital certificate.
 Note: Unless "Redo Existing OCR" is ticked, files which are already text selectable will not be copied from input dir to output dir.
 </property>
