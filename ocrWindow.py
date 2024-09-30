@@ -207,6 +207,8 @@ class ocrWindow:
         ocrThread.start()
 
     def ocrmypdfThread(self):
+        # Disable OCR Button
+        self.runOCRButton.configure(state='disabled')
         # Generate list of needed language data
         pdfLanguageKeys = [self.langListbox.get(sel) for sel in self.langListbox.curselection()]
         pdfLanguageVals = [tesseractLanguages.get(i) for i in pdfLanguageKeys]
@@ -227,6 +229,8 @@ class ocrWindow:
 
         if pdfInputDir == pdfOutputDir:
             messagebox.showerror(title='Error', message='Input and output directory cannot be the same.')
+            # Enable OCR Button
+            self.runOCRButton.configure(state='normal')
         elif pdfInputDir != '' and pdfOutputDir != '' and bool(pdfLanguageKeys):  # Go condition
             # Start the progress bar
             self.progressBar.configure(mode='indeterminate')
@@ -280,8 +284,6 @@ class ocrWindow:
                                      sidecar=sidecarTextFile,
                                      output_type=pdfType,
                                      invalidate_digital_signatures=True)
-                        # Stop progress bar
-                        self.progressBar.stop()
                     elif not bool(textFileCheckboxState):
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
@@ -293,15 +295,23 @@ class ocrWindow:
                                      rotate_pages=bool(rotatePagesCheckboxState),
                                      output_type=pdfType,
                                      invalidate_digital_signatures=True)
-                        # Stop progress bar
-                        self.progressBar.stop()
                 except Exception as e:
                     # Stop progress bar
+                    self.progressBar.configure(mode='determinate')  # Hide progress bar pip
                     self.progressBar.stop()
+                    # Enable OCR Button
+                    self.runOCRButton.configure(state='normal')
                     error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry."
                     messagebox.showerror(title='Error', message=error)
+            # Stop progress bar
+            self.progressBar.configure(mode='determinate')  # Hide progress bar pip
+            self.progressBar.stop()
+            # Enable OCR Button
+            self.runOCRButton.configure(state='normal')
         else:
             messagebox.showerror(title='Error', message='Please enter all required fields.')
+            # Enable OCR Button
+            self.runOCRButton.configure(state='normal')
 
     def on_quit_item_clicked(self):
         # Quit on exit

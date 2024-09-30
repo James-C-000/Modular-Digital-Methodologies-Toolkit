@@ -541,7 +541,6 @@ STUFF
 =========================================================
 to-do: write documentation
 to-do: update frame packing for about dialog
-to-do: multithreaded OCR with associated progress bar
 to-do: verify deskew and rotation functions work
 to-do: add scrollbar to language selection pane
 Note: OCR won't work with password protected PDFs and will invalidate any PDFs signed with a digital certificate.
