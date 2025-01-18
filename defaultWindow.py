@@ -2,6 +2,7 @@
 import os
 import tkinter as tk
 import pygubu
+import webbrowser
 from ocrWindow import ocrWindow
 
 PROJECT_PATH = os.getcwd()
@@ -27,6 +28,9 @@ class defaultWindow:
     def on_ocr_item_clicked(self):
         # Instantiate the OCR class, creating a new window for the OCR (child to parent process)
         ocrWindow(master=self.mainwindow)
+
+    def on_Zotero_item_clicked(self):
+        webbrowser.open('https://www.zotero.org/download/', new=0, autoraise=True)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window
