@@ -12,6 +12,7 @@ returned by the API. A changelog is produced detailing every cell update, along 
 API responses are mapped to Bibliometrix field tags.
 """
 
+import time
 import pandas as pd
 import requests
 import json
@@ -21,7 +22,7 @@ import re
 # =====================================================
 # Global Configuration
 # =====================================================
-EMAIL = "your_email_here@example.com"  # Replace with your actual email address
+EMAIL = "jcaldw9@uwo.ca"  # Replace with your actual email address
 INPUT_FILE = "./records/mergedDataset.xlsx"
 OUTPUT_FILE = "./records/mergedDatasetEnhanced.xlsx"
 CHANGELOG_FILE = "changelog.txt"
@@ -42,6 +43,22 @@ openalex_cache = {}
 changelog_entries = []       # List of change log entries
 column_edit_counts = {}      # Dictionary: column -> count of edits
 rows_changed = set()         # Set of row indices that were changed
+
+# =====================================================
+# Robust GET Function
+# =====================================================
+def robust_get(url, **kwargs):
+    r"""
+    A wrapper around requests.get that catches connection-related errors and
+    retries indefinitely until a connection is re-established.
+    """
+    while True:
+        try:
+            response = requests.get(url, **kwargs)
+            return response
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            print(f"Connection error while accessing {url}: {e}. Retrying in 30 seconds...")
+            time.sleep(30)
 
 # =====================================================
 # Helper Functions
@@ -112,7 +129,7 @@ def get_openalex_citation(openalex_id):
         return openalex_cache[openalex_id]
     url = f"https://api.openalex.org/works/{openalex_id}"
     try:
-        resp = requests.get(url, headers=HEADERS)
+        resp = robust_get(url, headers=HEADERS)
         if resp.status_code == 200:
             data = resp.json()
             authors = []
@@ -219,7 +236,7 @@ def process_reference(value):
 def query_nih_occ_metadata(doi):
     url = f"https://api.ncbi.nlm.nih.gov/oc/v1/citations/{doi}"
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = robust_get(url, headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             citations = data.get("citations", [])
@@ -238,7 +255,7 @@ def query_pubmed_metadata(query):
     else:
         esearch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
         params = {"db": "pubmed", "term": query_str, "retmode": "json", "retmax": 1}
-        r = requests.get(esearch_url, params=params, headers=HEADERS)
+        r = robust_get(esearch_url, params=params, headers=HEADERS)
         if r.status_code == 200:
             idlist = r.json().get("esearchresult", {}).get("idlist", [])
             if idlist:
@@ -247,7 +264,7 @@ def query_pubmed_metadata(query):
             return False, None
     if pmid:
         ctxp_url = f"https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?format=csl&id={pmid}"
-        r = requests.get(ctxp_url, headers=HEADERS)
+        r = robust_get(ctxp_url, headers=HEADERS)
         if r.status_code == 200:
             try:
                 result = r.json()
@@ -264,7 +281,7 @@ def query_pubmed_metadata(query):
 def query_pmc_metadata(doi):
     conv_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?tool=BibliometrixMetadataEnhancer&email={EMAIL}&ids={doi}&format=json"
     try:
-        conv_response = requests.get(conv_url, headers=HEADERS)
+        conv_response = robust_get(conv_url, headers=HEADERS)
         if conv_response.status_code == 200:
             conv_data = conv_response.json()
             records = conv_data.get("records", [])
@@ -280,7 +297,7 @@ def query_pmc_metadata(doi):
 
     efetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id={pmcid}&retmode=xml"
     try:
-        efetch_response = requests.get(efetch_url, headers=HEADERS)
+        efetch_response = robust_get(efetch_url, headers=HEADERS)
         if efetch_response.status_code == 200:
             xml_data = efetch_response.text
             root = ET.fromstring(xml_data)
@@ -354,7 +371,7 @@ def query_pmc_metadata(doi):
 def query_openalex_metadata(doi):
     url = f"https://api.openalex.org/works/doi:{doi}"
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = robust_get(url, headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             meta = {}
@@ -385,7 +402,7 @@ def query_crossref_metadata(doi_or_query, use_direct_lookup=True, spreadsheet_ro
     # Only direct lookup (removed query for providing false positives)
     if use_direct_lookup and doi_or_query.startswith("10."):
         url = f"https://api.crossref.org/works/{doi_or_query}"
-        response = requests.get(url, headers=HEADERS)
+        response = robust_get(url, headers=HEADERS)
         if response.status_code == 200:
             return True, response.json().get("message", {})
         else:
@@ -398,7 +415,7 @@ def query_semantic_scholar_metadata(doi):
     fields = "title,authors,year,venue,abstract,reference"
     url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}?fields={fields}"
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = robust_get(url, headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
             meta = {}
