@@ -48,16 +48,24 @@ rows_changed = set()         # Set of row indices that were changed
 # Robust GET Function
 # =====================================================
 def robust_get(url, **kwargs):
-    r"""
-    A wrapper around requests.get that catches connection-related errors and
-    retries indefinitely until a connection is re-established.
+    """
+    A robust wrapper around requests.get that catches various transient errors
+    and retries indefinitely until a valid response is received.
+    It handles:
+      - ConnectionError
+      - Timeout (including ConnectTimeout and ReadTimeout)
+      - ChunkedEncodingError
+      - RequestException (covers any other requests-related errors)
     """
     while True:
         try:
             response = requests.get(url, **kwargs)
             return response
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            print(f"Connection error while accessing {url}: {e}. Retrying in 30 seconds...")
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.RequestException) as e:
+            print(f"Error accessing {url}: {e}. Retrying in 30 seconds...")
             time.sleep(30)
 
 # =====================================================
