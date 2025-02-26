@@ -22,7 +22,7 @@ import re
 # =====================================================
 # Global Configuration
 # =====================================================
-EMAIL = "jcaldw9@uwo.ca"  # Replace with your actual email address
+EMAIL = "your_email_here@example.com"  # Replace with your actual email address
 INPUT_FILE = "./records/mergedDataset.xlsx"
 OUTPUT_FILE = "./records/mergedDatasetEnhanced.xlsx"
 CHANGELOG_FILE = "changelog.txt"
@@ -45,7 +45,7 @@ column_edit_counts = {}      # Dictionary: column -> count of edits
 rows_changed = set()         # Set of row indices that were changed
 
 # =====================================================
-# Robust GET Function
+# Robust Network Functions
 # =====================================================
 def robust_get(url, **kwargs):
     """
@@ -68,8 +68,21 @@ def robust_get(url, **kwargs):
             print(f"Error accessing {url}: {e}. Retrying in 30 seconds...")
             time.sleep(30)
 
+def robust_json(url, **kwargs):
+    """
+    A helper that retrieves a URL using robust_get() and attempts to decode its JSON.
+    If a JSONDecodeError occurs, it waits 30 seconds and retries.
+    """
+    while True:
+        response = robust_get(url, **kwargs)
+        try:
+            return response.json()
+        except json.decoder.JSONDecodeError as e:
+            print(f"JSON decode error for {url}: {e}. Retrying in 30 seconds...")
+            time.sleep(30)
+
 # =====================================================
-# Helper Functions
+# Helper Functions to Process Metadata Fields
 # =====================================================
 
 def clean_citation(citation):
@@ -279,6 +292,10 @@ def query_pubmed_metadata(query):
                 if "DOI" in result and result["DOI"]:
                     result["DOI"] = result["DOI"].strip()
                 return True, result
+            except json.decoder.JSONDecodeError as e:
+                print(f"[PubMed] JSON decode error: {e}. Retrying in 30 seconds...")
+                time.sleep(30)
+                return query_pubmed_metadata(query)
             except Exception as e:
                 print(f"[PubMed] Error parsing response: {e}")
                 return False, None
@@ -308,7 +325,12 @@ def query_pmc_metadata(doi):
         efetch_response = robust_get(efetch_url, headers=HEADERS)
         if efetch_response.status_code == 200:
             xml_data = efetch_response.text
-            root = ET.fromstring(xml_data)
+            try:
+                root = ET.fromstring(xml_data)
+            except ET.ParseError as e:
+                print(f"[PMC EFetch] XML parse error: {e}. Retrying in 30 seconds...")
+                time.sleep(30)
+                return query_pmc_metadata(doi)
             meta = {}
             title_elem = root.find(".//article-title")
             if title_elem is not None:
