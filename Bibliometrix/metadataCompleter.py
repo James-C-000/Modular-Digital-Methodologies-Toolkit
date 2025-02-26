@@ -276,44 +276,29 @@ def query_pubmed_metadata(query):
     else:
         esearch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
         params = {"db": "pubmed", "term": query_str, "retmode": "json", "retmax": 1}
-        r = robust_get(esearch_url, params=params, headers=HEADERS)
-        if r.status_code == 200:
-            idlist = r.json().get("esearchresult", {}).get("idlist", [])
-            if idlist:
-                pmid = idlist[0]
-        else:
-            return False, None
+        data = robust_json(esearch_url, params=params, headers=HEADERS)
+        idlist = data.get("esearchresult", {}).get("idlist", [])
+        if idlist:
+            pmid = idlist[0]
     if pmid:
         ctxp_url = f"https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?format=csl&id={pmid}"
-        r = robust_get(ctxp_url, headers=HEADERS)
-        if r.status_code == 200:
-            try:
-                result = r.json()
-                if "DOI" in result and result["DOI"]:
-                    result["DOI"] = result["DOI"].strip()
-                return True, result
-            except json.decoder.JSONDecodeError as e:
-                print(f"[PubMed] JSON decode error: {e}. Retrying in 30 seconds...")
-                time.sleep(30)
-                return query_pubmed_metadata(query)
-            except Exception as e:
-                print(f"[PubMed] Error parsing response: {e}")
-                return False, None
-        else:
+        try:
+            result = robust_json(ctxp_url, headers=HEADERS)
+            if "DOI" in result and result["DOI"]:
+                result["DOI"] = result["DOI"].strip()
+            return True, result
+        except Exception as e:
+            print(f"[PubMed] Error: {e}")
             return False, None
     return False, None
 
 def query_pmc_metadata(doi):
     conv_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?tool=BibliometrixMetadataEnhancer&email={EMAIL}&ids={doi}&format=json"
     try:
-        conv_response = robust_get(conv_url, headers=HEADERS)
-        if conv_response.status_code == 200:
-            conv_data = conv_response.json()
-            records = conv_data.get("records", [])
-            if records and records[0].get("pmcid"):
-                pmcid = records[0]["pmcid"]
-            else:
-                return False, None
+        conv_data = robust_json(conv_url, headers=HEADERS)
+        records = conv_data.get("records", [])
+        if records and records[0].get("pmcid"):
+            pmcid = records[0]["pmcid"]
         else:
             return False, None
     except Exception as e:
