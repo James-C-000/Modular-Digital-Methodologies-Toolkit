@@ -1,28 +1,31 @@
+#!/usr/bin/env python3
 r"""
 Enrich exported bibliometric records by sequentially querying multiple APIs for metadata.
-For each record (row) in the input Excel file, the script queries the APIs with priority order:
+For each record (row) in the input Excel file, the script queries the APIs in strict priority order and fills in any metadata
+fields that are empty or contain the placeholder "none" (case-insensitive). The API priority order is:
     1. NIH Open Citation Collection (NIH-OCC)
     2. PubMed
     3. PubMed Central (PMC)
     4. OpenAlex
-    5. Crossref
+    5. Crossref (direct lookup only)
     6. Semantic Scholar
-For each record, any cell that is empty or contains "none" (case insensitive) is updated with data
-returned by the API. A changelog is produced detailing every cell update, along with a summary.
-API responses are mapped to Bibliometrix field tags.
+For the CR (cited references) field, if OpenAlex references are encountered, their IDs/URLs are converted into fully
+formatted citations (with authors, title, journal, volume, and year) by querying OpenAlex.
+A changelog is generated that details every update made to the spreadsheet.
 """
 
-import time
 import pandas as pd
 import requests
 import json
 import xml.etree.ElementTree as ET
 import re
+import time
+from openpyxl import Workbook  # Use openpyxl's write_only mode to save memory
 
 # =====================================================
 # Global Configuration
 # =====================================================
-EMAIL = "your_email_here@example.com"  # Replace with your actual email address
+EMAIL = "your_email@example.com"  # Replace with your actual email address
 INPUT_FILE = "./records/mergedDataset.xlsx"
 OUTPUT_FILE = "./records/mergedDatasetEnhanced.xlsx"
 CHANGELOG_FILE = "changelog.txt"
@@ -36,26 +39,26 @@ HEADERS = {
 if SEMANTIC_SCHOLAR_API_KEY:
     HEADERS["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
 
-# Global cache for OpenAlex citation lookups
+# Global cache for OpenAlex citation lookups.
 openalex_cache = {}
 
-# Global changelog structures
-changelog_entries = []       # List of change log entries
-column_edit_counts = {}      # Dictionary: column -> count of edits
-rows_changed = set()         # Set of row indices that were changed
+# Global changelog structures.
+changelog_entries = []       # Detailed change messages.
+column_edit_counts = {}      # Counts of edits per column.
+rows_changed = set()         # Set of row indices that were updated.
 
 # =====================================================
 # Robust Network Functions
 # =====================================================
 def robust_get(url, **kwargs):
     """
-    A robust wrapper around requests.get that catches various transient errors
+    A robust wrapper around requests.get that catches transient errors
     and retries indefinitely until a valid response is received.
-    It handles:
+    Catches:
       - ConnectionError
-      - Timeout (including ConnectTimeout and ReadTimeout)
+      - Timeout (both connect and read)
       - ChunkedEncodingError
-      - RequestException (covers any other requests-related errors)
+      - RequestException (any other requests-related error)
     """
     while True:
         try:
@@ -68,23 +71,27 @@ def robust_get(url, **kwargs):
             print(f"Error accessing {url}: {e}. Retrying in 30 seconds...")
             time.sleep(30)
 
-def robust_json(url, **kwargs):
+def robust_json(url, max_retries=3, **kwargs):
     """
-    A helper that retrieves a URL using robust_get() and attempts to decode its JSON.
-    If a JSONDecodeError occurs, it waits 30 seconds and retries.
+    Uses robust_get() to retrieve a URL and attempts to decode its JSON.
+    If a JSONDecodeError occurs, it retries up to max_retries times.
+    If all retries fail, it logs the issue and returns None.
     """
-    while True:
+    retries = 0
+    while retries < max_retries:
         response = robust_get(url, **kwargs)
         try:
             return response.json()
         except json.decoder.JSONDecodeError as e:
-            print(f"JSON decode error for {url}: {e}. Retrying in 30 seconds...")
+            retries += 1
+            print(f"JSON decode error for {url}: {e} (attempt {retries}/{max_retries}). Retrying in 30 seconds...")
             time.sleep(30)
+    print(f"Skipping {url} after {max_retries} failed JSON decode attempts.")
+    return None
 
 # =====================================================
 # Helper Functions to Process Metadata Fields
 # =====================================================
-
 def clean_citation(citation):
     r"""
     Remove HTML tags and any leading numbering (e.g., "1)" or "1.") from a citation string.
@@ -140,11 +147,14 @@ def process_ISSN(value):
         return ", ".join(value)
     return value
 
+# =====================================================
+# OpenAlex Citation Lookup and Reference Processing
+# =====================================================
 def get_openalex_citation(openalex_id):
-    r"""
+    """
     Given an OpenAlex work ID (e.g., "W136575539"), query OpenAlex for its metadata
-    and format a citation as: AUTHORS, TITLE, JOURNAL, VOLUME, (YEAR)
-    Uses caching to avoid redundant API calls
+    and format a citation as: AUTHORS, TITLE, JOURNAL, VOLUME, (YEAR).
+    Uses caching to avoid redundant API calls.
     """
     if openalex_id in openalex_cache:
         return openalex_cache[openalex_id]
@@ -187,16 +197,16 @@ def get_openalex_citation(openalex_id):
         return None
 
 def process_reference(value):
-    r"""
+    """
     Process the reference field into a formatted string.
     - If value is a list:
-         - For dictionaries (e.g., from Crossref), extract and clean the 'unstructured' field if available.
-         - For strings:
+         * For dictionaries (e.g., from Crossref), extract and clean the 'unstructured' field if available.
+         * For strings:
               - If it matches an OpenAlex ID pattern (e.g., "W123456") or starts with "https://openalex.org/",
                 convert it into a full citation using get_openalex_citation().
               - Otherwise, clean the string.
-         - Join all processed references with "; " as delimiter.
-    - If value is a string containing semicolons, split and process each part.
+         * Join all processed references with "; " as delimiter.
+    - If value is a string that contains semicolons, split and process each part.
     """
     if isinstance(value, list):
         processed_refs = []
@@ -253,7 +263,6 @@ def process_reference(value):
 # =====================================================
 # API Query Functions
 # =====================================================
-
 def query_nih_occ_metadata(doi):
     url = f"https://api.ncbi.nlm.nih.gov/oc/v1/citations/{doi}"
     try:
@@ -277,25 +286,30 @@ def query_pubmed_metadata(query):
         esearch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
         params = {"db": "pubmed", "term": query_str, "retmode": "json", "retmax": 1}
         data = robust_json(esearch_url, params=params, headers=HEADERS)
+        if data is None:
+            print("[PubMed] Skipping due to persistent JSON errors.")
+            return False, None
         idlist = data.get("esearchresult", {}).get("idlist", [])
         if idlist:
             pmid = idlist[0]
     if pmid:
         ctxp_url = f"https://api.ncbi.nlm.nih.gov/lit/ctxp/v1/pubmed/?format=csl&id={pmid}"
-        try:
-            result = robust_json(ctxp_url, headers=HEADERS)
-            if "DOI" in result and result["DOI"]:
-                result["DOI"] = result["DOI"].strip()
-            return True, result
-        except Exception as e:
-            print(f"[PubMed] Error: {e}")
+        result = robust_json(ctxp_url, headers=HEADERS)
+        if result is None:
+            print("[PubMed] Skipping due to persistent JSON errors.")
             return False, None
+        if "DOI" in result and result["DOI"]:
+            result["DOI"] = result["DOI"].strip()
+        return True, result
     return False, None
 
 def query_pmc_metadata(doi):
     conv_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?tool=BibliometrixMetadataEnhancer&email={EMAIL}&ids={doi}&format=json"
     try:
         conv_data = robust_json(conv_url, headers=HEADERS)
+        if conv_data is None:
+            print("[PMC] Skipping due to persistent JSON errors.")
+            return False, None
         records = conv_data.get("records", [])
         if records and records[0].get("pmcid"):
             pmcid = records[0]["pmcid"]
@@ -406,7 +420,7 @@ def query_openalex_metadata(doi):
             if "publication_year" in data:
                 meta["issued"] = data["publication_year"]
             if "referenced_works" in data:
-                meta["reference"] = data["referenced_works"]  # leave as list
+                meta["reference"] = data["referenced_works"]  # left as list for process_reference
             return True, meta
         return False, None
     except Exception as e:
@@ -414,7 +428,7 @@ def query_openalex_metadata(doi):
         return False, None
 
 def query_crossref_metadata(doi_or_query, use_direct_lookup=True, spreadsheet_row=None):
-    # Only direct lookup (removed query for providing false positives)
+    # Only direct lookup is used.
     if use_direct_lookup and doi_or_query.startswith("10."):
         url = f"https://api.crossref.org/works/{doi_or_query}"
         response = robust_get(url, headers=HEADERS)
@@ -476,6 +490,7 @@ mapping = {
     "publisher": ("PU", lambda v: v),
     "abstract": ("AB", lambda v: v),
     "reference": ("CR", process_reference),
+    # Fields enriched by PMC:
     "language": ("LA", lambda v: v),
     "affiliation": ("C1", lambda v: v),
     "keywords": ("DE", lambda v: v),
@@ -493,7 +508,7 @@ def main():
         print(f"Error reading {INPUT_FILE}: {e}")
         return
 
-    # Ensure all target columns exist
+    # Ensure all target columns exist.
     target_cols = set()
     for target, _ in mapping.values():
         if isinstance(target, tuple):
@@ -507,14 +522,14 @@ def main():
 
     empty_doi_counter = 0
 
-    # Initialize changelog structures
+    # Initialize changelog structures.
     global changelog_entries, column_edit_counts, rows_changed
     changelog_entries = []
     column_edit_counts = {}
     rows_changed = set()
 
     # Define API functions in strict priority order:
-    # 1. NIH-OCC, 2. PubMed, 3. PMC, 4. OpenAlex, 5. Crossref, 6. Semantic Scholar
+    # 1. NIH-OCC, 2. PubMed, 3. PMC, 4. OpenAlex, 5. Crossref, 6. Semantic Scholar.
     api_functions = [
         ("NIH-OCC", query_nih_occ_metadata),
         ("PubMed", query_pubmed_metadata),
@@ -524,7 +539,7 @@ def main():
         ("Semantic Scholar", query_semantic_scholar_metadata)
     ]
 
-    # Process each record
+    # Process each record.
     for idx, row in df.iterrows():
         doi_raw = row.get("DI")
         if not doi_raw or str(doi_raw).strip() == "":
@@ -539,7 +554,7 @@ def main():
             if success and metadata:
                 print(f"Row {idx}: Retrieved metadata from {label}.")
                 for key, (target_field, func) in mapping.items():
-                    # Check if field is already populated (treat "none" as empty)
+                    # Check if the field is already populated (treat "none" as empty).
                     if isinstance(target_field, tuple):
                         current_bp = str(row.get("BP", "")).strip().lower()
                         current_ep = str(row.get("EP", "")).strip().lower()
@@ -554,41 +569,47 @@ def main():
                         new_value = func(metadata[key])
                         if isinstance(new_value, str) and (new_value.strip().lower() == "none" or new_value.strip() == ""):
                             continue
-                        # Log the change
+                        # Log the change.
                         if isinstance(target_field, tuple):
                             old_bp = str(row.get("BP", ""))
                             old_ep = str(row.get("EP", ""))
                             bp, ep = new_value
                             if not old_bp or old_bp.lower() == "none":
                                 df.at[idx, "BP"] = bp
-                                changelog_entries.append(f"Row {idx} - BP updated from '{old_bp}' to '{bp}' via {label}.\n")
-                                changelog_entries.append("----------------------------------")
+                                changelog_entries.append(f"Row {idx} - BP updated from '{old_bp}' to '{bp}' via {label}.")
                                 column_edit_counts["BP"] = column_edit_counts.get("BP", 0) + 1
                             if not old_ep or old_ep.lower() == "none":
                                 df.at[idx, "EP"] = ep
-                                changelog_entries.append(f"Row {idx} - EP updated from '{old_ep}' to '{ep}' via {label}.\n")
-                                changelog_entries.append("----------------------------------")
+                                changelog_entries.append(f"Row {idx} - EP updated from '{old_ep}' to '{ep}' via {label}.")
                                 column_edit_counts["EP"] = column_edit_counts.get("EP", 0) + 1
                         else:
                             old_val = str(row.get(target_field, ""))
                             df.at[idx, target_field] = new_value
                             changelog_entries.append(f"Row {idx} - {target_field} updated from '{old_val}' to '{new_value}' via {label}.")
-                            changelog_entries.append("----------------------------------")
                             column_edit_counts[target_field] = column_edit_counts.get(target_field, 0) + 1
                         rows_changed.add(idx)
                 row = df.loc[idx]
-        # End processing for this record
+        # End processing for this record.
 
     total_changed_records = len(rows_changed)
     print(f"Total records changed: {total_changed_records}")
     print(f"Total rows with empty DOI: {empty_doi_counter}")
+
+    # Write the DataFrame to Excel using openpyxl's write-only mode to avoid memory issues.
     try:
-        df.to_excel(OUTPUT_FILE, index=False)
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet()
+        # Write header row.
+        ws.append(list(df.columns))
+        # Write data rows one by one.
+        for index, row in df.iterrows():
+            ws.append(row.tolist())
+        wb.save(OUTPUT_FILE)
         print(f"Updated Excel file saved as {OUTPUT_FILE}")
     except Exception as e:
         print(f"Error saving {OUTPUT_FILE}: {e}")
 
-    # Write changelog to file
+    # Write changelog to file.
     try:
         with open(CHANGELOG_FILE, "w", encoding="utf-8") as f:
             f.write("Changelog of Spreadsheet Updates\n")
