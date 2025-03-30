@@ -1,3 +1,8 @@
+# When exporting records from Scopus, WoS, PubMed, etc... often times you can only export a small subset of records at
+# a time. This leads to records being scattered across multiple files (e.g., scopus-1.csv, scopus-2.csv,
+# [...], scopus-n.csv). This script enters these directories and merges the files together so they can be easily merged
+# using the bibliometrixExternalDBMerge.py script.
+
 import pathlib
 import pandas as pd
 
