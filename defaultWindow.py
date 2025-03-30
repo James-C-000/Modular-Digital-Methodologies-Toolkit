@@ -4,6 +4,7 @@ import tkinter as tk
 import pygubu
 import webbrowser
 from ocrWindow import ocrWindow
+from advancedKeywordSearch import aksWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -31,6 +32,9 @@ class defaultWindow:
 
     def on_Zotero_item_clicked(self):
         webbrowser.open('https://www.zotero.org/download/', new=0, autoraise=True)
+
+    def on_AKS_item_clicked(self):
+        aksWindow(master=self.mainwindow)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window

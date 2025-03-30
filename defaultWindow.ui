@@ -1,5 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
-<interface version="1.3">
+<interface version="1.4">
+  <project>
+    <settings />
+    <customwidgets />
+  </project>
   <object class="tk.Toplevel" id="defaultWindow" named="True">
     <property name="geometry">480x680</property>
     <property name="minsize">480|680</property>
@@ -63,8 +67,9 @@
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_jupiter" named="True">
-        <property name="text" translatable="yes">Jupiter</property>
+      <object class="ttk.Button" id="button_advancedKeywordSearch" named="True">
+        <property name="command" type="command" cbtype="simple">on_AKS_item_clicked</property>
+        <property name="text" translatable="yes">Advanced Keyword Search</property>
         <layout manager="place">
           <property name="anchor">center</property>
           <property name="relheight">0.08</property>
