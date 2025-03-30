@@ -4,7 +4,7 @@ import tkinter as tk
 import pygubu
 import webbrowser
 from ocrWindow import ocrWindow
-from advancedKeywordSearch import aksWindow
+from aksWindow import aksWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')

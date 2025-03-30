@@ -17,7 +17,7 @@ from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
 import threading
 
 PROJECT_PATH = pathlib.Path(__file__).parent
-PROJECT_UI = PROJECT_PATH / "advancedKeywordSearch.ui"
+PROJECT_UI = PROJECT_PATH / "aksWindow.ui"
 
 
 class aksWindow:

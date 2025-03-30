@@ -4,105 +4,156 @@
     <settings />
     <customwidgets />
   </project>
-  <object class="tk.Toplevel" id="defaultWindow" named="True">
-    <property name="geometry">480x680</property>
-    <property name="minsize">480|680</property>
-    <property name="title" translatable="yes">Modular Digital Methodologies Toolkit</property>
+  <object class="tk.Toplevel" id="audioTranscriptionWindow" named="True">
+    <property name="geometry">480x380</property>
+    <property name="height">380</property>
+    <property name="minsize">480|380</property>
+    <property name="title" translatable="yes">MDMT - Audio Transcription</property>
+    <property name="width">200</property>
     <child>
-      <object class="ttk.Button" id="button_OCR" named="True">
-        <property name="command" type="command" cbtype="simple">on_ocr_item_clicked</property>
-        <property name="text" translatable="yes">OCR</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.1</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_bib_database" named="True">
-        <property name="command" type="command" cbtype="simple">on_Zotero_item_clicked</property>
-        <property name="text" translatable="yes">Zotero</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.2</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_bib_analysis" named="True">
-        <property name="text" translatable="yes">Bibliometric Analysis</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.3</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_pro_net_analysis" named="True">
-        <property name="text" translatable="yes">Programming and Network Analysis</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.4</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_advancedKeywordSearch" named="True">
-        <property name="command" type="command" cbtype="simple">on_AKS_item_clicked</property>
-        <property name="text" translatable="yes">Advanced Keyword Search</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.5</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_gephi" named="True">
-        <property name="text" translatable="yes">Gephi</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.6</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_audioTranscription" named="True">
+      <object class="ttk.Label" id="label_title" named="True">
+        <property name="font">TkHeadingFont</property>
         <property name="text" translatable="yes">Audio Transcription</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
+          <property name="rely">0.05</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Button" id="button_run_transcribe" named="True">
+        <property name="command" type="command" cbtype="simple">on_transcribe_item_clicked</property>
+        <property name="text" translatable="yes">Transcribe</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.08</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.80</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="selectAudioDirectory" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Audio Directory</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.15</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Separator" id="separator5">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.32</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Progressbar" id="progressBar" named="True">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.90</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="pygubu.widgets.PathChooserInput" id="audioInputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="type">directory</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.25</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="modelSelectionLabel" named="True">
+        <property name="font">TkHeadingFont</property>
+        <property name="text" translatable="yes">Model Selection</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.40</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Radiobutton" id="tiny_RadioButton" named="True">
+        <property name="text" translatable="yes">Tiny</property>
+        <property name="value">tiny</property>
+        <property name="variable">string:modelSelection</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.25</property>
+          <property name="rely">0.50</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Radiobutton" id="medium_RadioButton" named="True">
+        <property name="text" translatable="yes">Medium</property>
+        <property name="value">medium</property>
+        <property name="variable">string:modelSelection</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.75</property>
+          <property name="rely">0.50</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Radiobutton" id="base_RadioButton" named="True">
+        <property name="text" translatable="yes">Base</property>
+        <property name="value">base</property>
+        <property name="variable">string:modelSelection</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.25</property>
+          <property name="rely">0.60</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Radiobutton" id="small_RadioButton" named="True">
+        <property name="text" translatable="yes">Small</property>
+        <property name="value">small</property>
+        <property name="variable">string:modelSelection</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.25</property>
           <property name="rely">0.7</property>
           <property name="x">0</property>
           <property name="y">0</property>
@@ -110,61 +161,61 @@
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_nvivo_alt" named="True">
-        <property name="text" translatable="yes">Qualcoder/RQDA</property>
+      <object class="ttk.Radiobutton" id="large_RadioButton" named="True">
+        <property name="text" translatable="yes">Large</property>
+        <property name="value">large</property>
+        <property name="variable">string:modelSelection</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.8</property>
+          <property name="relx">0.75</property>
+          <property name="rely">0.6</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_ai" named="True">
-        <property name="text" translatable="yes">LLM/LLM Models/Vector Database/Semantic Search</property>
+      <object class="ttk.Radiobutton" id="turbo_RadioButton" named="True">
+        <property name="text" translatable="yes">Turbo</property>
+        <property name="value">turbo</property>
+        <property name="variable">string:modelSelection</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.9</property>
+          <property name="relx">0.75</property>
+          <property name="rely">0.7</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
   </object>
-  <object class="tk.Menu" id="menuBar">
+  <object class="tk.Menu" id="menu1">
     <property name="font">TkMenuFont</property>
     <property name="tearoff">false</property>
     <child>
-      <object class="tk.Menuitem.Submenu" id="subMenuFile">
+      <object class="tk.Menuitem.Submenu" id="submenu1">
         <property name="font">TkMenuFont</property>
         <property name="label" translatable="yes">File</property>
         <property name="tearoff">false</property>
         <child>
-          <object class="tk.Menuitem.Command" id="subMenuAboutButton">
+          <object class="tk.Menuitem.Command" id="command1">
             <property name="command" type="command" cbtype="simple">on_about_item_clicked</property>
             <property name="font">TkMenuFont</property>
             <property name="label" translatable="yes">About MDMT</property>
           </object>
         </child>
         <child>
-          <object class="tk.Menuitem.Command" id="subMenuHelpButton">
+          <object class="tk.Menuitem.Command" id="command2">
             <property name="command" type="command" cbtype="simple">on_help_item_clicked</property>
             <property name="font">TkMenuFont</property>
             <property name="label" translatable="yes">Help</property>
           </object>
         </child>
         <child>
-          <object class="tk.Menuitem.Separator" id="separator4" />
+          <object class="tk.Menuitem.Separator" id="separator1" />
         </child>
         <child>
-          <object class="tk.Menuitem.Command" id="subMenuQuitButton">
+          <object class="tk.Menuitem.Command" id="command3">
             <property name="command" type="command" cbtype="simple">on_quit_item_clicked</property>
             <property name="font">TkMenuFont</property>
             <property name="label" translatable="yes">Quit</property>
@@ -248,6 +299,7 @@ pygubu - Copyright © 2020 Alejandro Autalán</property>
     <property name="maxsize">600|600</property>
     <property name="minsize">600|600</property>
     <property name="resizable">none</property>
+    <property name="title" translatable="yes">MDMT - Licenses</property>
     <property name="width">600</property>
     <child>
       <object class="pygubu.builder.widgets.tkinterscrolledtext" id="licenseTerms">
@@ -420,6 +472,7 @@ SOFTWARE.</property>
     <property name="maxsize">600|600</property>
     <property name="minsize">600|600</property>
     <property name="resizable">none</property>
+    <property name="title" translatable="yes">MDMT - OCR Documentation</property>
     <property name="width">600</property>
     <child>
       <object class="pygubu.builder.widgets.tkinterscrolledtext" id="helpText">
@@ -428,9 +481,22 @@ SOFTWARE.</property>
         <property name="state">disabled</property>
         <property name="text" translatable="yes">Program Documentation
 =========================================================
+GENERAL
+=========================================================
+to-do: Update frame packing for about dialog
+
+Note: Only .mp3, .mp4, .mpeg, .mpga, .m4a, .wav, and .webm files are supported.
+=========================================================
 INPUT
 =========================================================
-to-do: update frame packing for about dialog</property>
+Select Audio Directory:
+
+Click the ellipsis icon to select a directory containing your audio files. You may have directories and subdirectories within the input directory.
+
+=========================================================
+OPTIONS
+=========================================================
+In a nutshell, the larger the model the more accurate, but the more resource hungry. If you do not have a powerful computer, stick with tiny or base.</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>
