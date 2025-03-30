@@ -4,4 +4,4 @@ Software By: James C. Caldwell
 
 Contact: James.Caldwell.000@gmail.com
 
-Dependencies: OCRmyPDF, Matplotlib, Pygubu, pdftotext
+Dependencies: requirements.txt
