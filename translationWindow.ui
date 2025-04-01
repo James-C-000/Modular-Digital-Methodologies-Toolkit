@@ -4,139 +4,173 @@
     <settings />
     <customwidgets />
   </project>
-  <object class="tk.Toplevel" id="defaultWindow" named="True">
+  <object class="tk.Toplevel" id="translationWindow" named="True">
     <property name="geometry">480x680</property>
+    <property name="height">680</property>
     <property name="minsize">480|680</property>
-    <property name="title" translatable="yes">Modular Digital Methodologies Toolkit</property>
+    <property name="title" translatable="yes">MDMT - Document Translation</property>
+    <property name="width">480</property>
     <child>
-      <object class="ttk.Button" id="button_OCR" named="True">
-        <property name="command" type="command" cbtype="simple">on_ocr_item_clicked</property>
-        <property name="text" translatable="yes">OCR</property>
+      <object class="ttk.Label" id="label_title" named="True">
+        <property name="font">TkHeadingFont</property>
+        <property name="text" translatable="yes">Document Translation</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.1</property>
+          <property name="rely">0.05</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_bib_database" named="True">
-        <property name="command" type="command" cbtype="simple">on_Zotero_item_clicked</property>
-        <property name="text" translatable="yes">Zotero</property>
+      <object class="ttk.Button" id="button_run_translation" named="True">
+        <property name="command" type="command" cbtype="simple">on_run_translation_clicked</property>
+        <property name="text" translatable="yes">Run Translation</property>
         <layout manager="place">
           <property name="anchor">center</property>
           <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.9</property>
+          <property name="rely">0.88</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_bib_analysis" named="True">
-        <property name="text" translatable="yes">Bibliometrix</property>
+      <object class="ttk.Label" id="selectInputDirLabel">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Input Directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.7</property>
+          <property name="rely">0.12</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_pro_net_analysis" named="True">
-        <property name="text" translatable="yes">Natural Language Processing</property>
+      <object class="pygubu.widgets.PathChooserInput" id="documentInputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="title" translatable="yes">Select Directory Containing Documents</property>
+        <property name="type">directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.6</property>
+          <property name="rely">0.18</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_advancedKeywordSearch" named="True">
-        <property name="command" type="command" cbtype="simple">on_AKS_item_clicked</property>
-        <property name="text" translatable="yes">Advanced Keyword Search</property>
+      <object class="ttk.Label" id="selectOutputDirLabel" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Output Directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.5</property>
+          <property name="rely">0.25</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_gephi" named="True">
-        <property name="command" type="command" cbtype="simple">on_Gephi_item_clicked</property>
-        <property name="text" translatable="yes">Gephi</property>
+      <object class="pygubu.widgets.PathChooserInput" id="documentOutputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="title" translatable="yes">Select Output Directory</property>
+        <property name="type">directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.31</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="selectModelLabel" named="True">
+        <property name="text" translatable="yes">Select Translation Model</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.39</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Separator" id="separator5">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.75</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Progressbar" id="progressBar" named="True">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.95</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Frame" id="modelBoxFrame" named="True">
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.30</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.55</property>
+        </layout>
+        <child>
+          <object class="tk.Listbox" id="modelSelection_Listbox" named="True">
+            <property name="selectmode">browse</property>
+            <layout manager="pack">
+              <property name="expand">true</property>
+              <property name="fill">both</property>
+              <property name="side">left</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Scrollbar" id="modelSelection_Scrollbar" named="True">
+            <property name="orient">vertical</property>
+            <layout manager="pack">
+              <property name="expand">false</property>
+              <property name="fill">both</property>
+              <property name="side">right</property>
+            </layout>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="translationInfoLabel">
+        <property name="text" translatable="yes">Supported file types: .txt, .pdf
+Translated files will be saved with language code suffix.</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
           <property name="relx">0.5</property>
           <property name="rely">0.8</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_audioTranscription" named="True">
-        <property name="command" type="command" cbtype="simple">on_audioTranscription_item_clicked</property>
-        <property name="text" translatable="yes">Audio Transcription</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.2</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_ai" named="True">
-        <property name="command" type="command" cbtype="simple">on_ai_item_clicked</property>
-        <property name="text" translatable="yes">AI Assistant (Retrieval Augmented Generation)</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.4</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_translation" named="True">
-        <property name="command" type="command" cbtype="simple">on_translation_item_clicked</property>
-        <property name="state">disabled</property>
-        <property name="text" translatable="yes">Language Translation</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.3</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
@@ -253,6 +287,7 @@ pygubu - Copyright © 2020 Alejandro Autalán</property>
     <property name="maxsize">600|600</property>
     <property name="minsize">600|600</property>
     <property name="resizable">none</property>
+    <property name="title" translatable="yes">MDMT - Licenses</property>
     <property name="width">600</property>
     <child>
       <object class="pygubu.builder.widgets.tkinterscrolledtext" id="licenseTerms">
@@ -425,17 +460,73 @@ SOFTWARE.</property>
     <property name="maxsize">600|600</property>
     <property name="minsize">600|600</property>
     <property name="resizable">none</property>
+    <property name="title" translatable="yes">MDMT - Translation Documentation</property>
     <property name="width">600</property>
     <child>
       <object class="pygubu.builder.widgets.tkinterscrolledtext" id="helpText">
         <property name="padx">10</property>
         <property name="pady">10</property>
         <property name="state">disabled</property>
-        <property name="text" translatable="yes">Program Documentation
+        <property name="text" translatable="yes">Document Translation Module Documentation
+=========================================================
+GENERAL INFORMATION
+=========================================================
+The Document Translation module provides cross-platform translation using online translation APIs:
+
+1. Google Translate API (via googletrans): Primary translation method
+2. Deep Translator: Alternative with multiple API options
+
+The system will automatically use whichever translation package is installed on your system.
+
+Note: For best results, install googletrans with: pip install googletrans==4.0.0-rc1
+
+Note: This module requires internet access to perform translations.
+
+Note: All files are output as text files (.txt) regardless of the input format.
 =========================================================
 INPUT
 =========================================================
-to-do: update frame packing for about dialog</property>
+Select Input Directory:
+
+Click the ellipsis icon to select a directory containing your documents to translate. All files with the extension .txt or .pdf will be processed. The directory structure will be preserved in the output.
+=========================================================
+OUTPUT
+=========================================================
+Select Output Directory:
+
+Click the ellipsis icon to select a directory where the translated documents will be saved. A new subfolder named "MDMT-Translation-Output" will be created in this directory. This can be the same as your input directory if desired, as translated files will have different names.
+=========================================================
+TRANSLATION MODEL
+=========================================================
+The system currently supports translation between various language pairs. Select the appropriate language pair from the list. The format is "Source → Target".
+
+For example:
+- "English → Spanish" will translate English documents to Spanish
+- "German → English" will translate German documents to English
+
+The "Multi-language → English" option can translate several Romance languages (Spanish, Portuguese, French, Italian, etc.) to English.
+=========================================================
+TRANSLATION PROCESS
+=========================================================
+1. The system loads the selected translation model. This may take a few moments the first time a model is used.
+2. Each document is processed individually:
+   - Text is extracted from the file
+   - The text is divided into manageable chunks
+   - Each chunk is translated using the MarianMT model
+   - The translated text is saved to a new file in the output directory
+
+3. Translated files follow the naming convention:
+   [original_filename]_[LANGUAGE_CODE]_translated.[extension]
+
+   For example, "report.txt" translated to Spanish would become "report_ES_translated.txt"
+=========================================================
+QUALITY CONSIDERATIONS
+=========================================================
+- Neural machine translation generally provides good quality translations but is not perfect.
+- Very technical content or domain-specific terminology may not be translated accurately.
+- Document formatting may be affected in the translation process.
+- PDF files with complex layouts might result in disorganized text extraction.
+- For critical translations, human review is recommended.</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>

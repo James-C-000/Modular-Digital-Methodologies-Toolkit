@@ -49,6 +49,10 @@ class defaultWindow:
         # Instantiate the RAG window
         ragWindow(master=self.mainwindow)
 
+    def on_translation_item_clicked(self):
+        # Nothing for now
+        pass
+
     def on_about_item_clicked(self):
         # Open the "About MDMT" window
         self.aboutDialog.run()
