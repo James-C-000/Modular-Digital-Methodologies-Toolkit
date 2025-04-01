@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-Local RAG (Retrieval-Augmented Generation) System
+Optimized Llama-3.2 RAG (Retrieval-Augmented Generation) System
 
-This script implements a streamlined RAG system that uses local LLMs and document stores.
-Following best practices for retrieval-augmented generation to enhance response quality
-while mitigating hallucinations.
+This script implements a streamlined RAG system optimized for Llama-3.2 models.
+It features enhanced performance, improved robustness, and cleaner code organization
+while maintaining high-quality retrieval and generation capabilities.
 
 Features:
-- In-memory indexing of documents at startup
-- Automatic cleanup when the script finishes
-- Support for both text and PDF documents
-- Efficient vector search with FAISS
-- Direct LLM integration with LlamaCpp
-- Support for Llama-3.2 family models (optimized for the 1B and 3B variants)
-- Domain-agnostic design suitable for any research topic
-- Enhanced output quality and consistency
+- Optimized specifically for Llama-3.2 models
+- Efficient in-memory document indexing
+- Automatic resource cleanup
+- Support for text and PDF documents
+- Fast vector search with FAISS
+- Optimized chunking and retrieval strategies
+- Enhanced prompt engineering for Llama-3.2
+- Robust error handling and recovery
+- Performance-focused parameter tuning
 
 Usage:
-  python local_rag.py --documents ./your_docs --llm ./your_model.gguf
+  python llama32_rag.py --documents ./your_docs --llm ./your_llama32_model.gguf
 """
 
 import os
@@ -28,19 +29,23 @@ import re
 import tempfile
 import atexit
 import shutil
-from typing import List, Dict, Any, Optional
+import time
+from typing import List, Dict, Any, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 
 # Setup logging with reduced verbosity
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("local-rag")
-# Reduce logging verbosity
-logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
-logging.getLogger("faiss").setLevel(logging.WARNING)
+logger = logging.getLogger("llama32-rag")
 
-# Try to import LangChain components
+# Reduce logging verbosity for dependencies
+for module in ["sentence_transformers", "faiss", "transformers", "filelock", "huggingface_hub"]:
+    logging.getLogger(module).setLevel(logging.WARNING)
+
+# Try to import required components
 try:
     # Import from correct packages to avoid deprecation warnings
     from langchain_community.document_loaders import TextLoader, PyPDFLoader, DirectoryLoader
@@ -56,9 +61,8 @@ try:
     from langchain_community.vectorstores import FAISS
     from langchain_community.llms import LlamaCpp
 
+    from langchain_core.documents import Document
     from langchain_core.prompts import PromptTemplate
-    from langchain_core.runnables import RunnablePassthrough
-    from langchain_core.output_parsers import StrOutputParser
     from langchain_core.messages import AIMessage, HumanMessage
 
 except ImportError as e:
@@ -69,11 +73,15 @@ except ImportError as e:
     exit(1)
 
 
-class RAGSystem:
+class Llama32RAGSystem:
     """
-    A local RAG system that indexes documents in memory and performs
-    retrieval and generation using local models, without persistent storage of the index.
-    Implements best practices for retrieval-augmented generation with support for Llama-3.2 models.
+    An optimized RAG system designed specifically for Llama-3.2 models.
+
+    This class provides a streamlined implementation that focuses on:
+    1. Maximum performance with Llama-3.2 models
+    2. Efficient memory usage and processing
+    3. Robust error handling and recovery
+    4. Clean, maintainable code structure
     """
 
     def __init__(
@@ -81,61 +89,73 @@ class RAGSystem:
             documents_dir: str = "./documents",
             llm_model_path: str = "./models/Llama-3.2-3B-Instruct-Q5_K_M.gguf",
             embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-            chunk_size: int = 512,  # Smaller chunk size for more precise retrieval
-            chunk_overlap: int = 50,
-            top_k: int = 5,
+            chunk_size: int = 512,
+            chunk_overlap: int = 64,
+            top_k: int = 15,
+            n_threads: int = 4,
+            context_window: int = 32768,
             verbose: bool = False
     ):
         """
-        Initialize the RAG system.
+        Initialize the Llama-3.2 RAG system.
 
         Args:
             documents_dir: Directory containing documents to index
-            llm_model_path: Path to the LLM model file (.gguf)
+            llm_model_path: Path to the Llama-3.2 model file (.gguf)
             embedding_model_name: Name or path of the embedding model
             chunk_size: Size of text chunks for indexing
             chunk_overlap: Overlap between text chunks
             top_k: Number of documents to retrieve per query
+            n_threads: Number of threads to use for parallel processing
+            context_window: Context window size for the Llama-3.2 model
             verbose: Whether to enable verbose logging
         """
-        self.documents_dir = documents_dir
-        self.llm_model_path = llm_model_path
+        self.documents_dir = os.path.abspath(documents_dir)
+        self.llm_model_path = os.path.abspath(llm_model_path)
         self.embedding_model_name = embedding_model_name
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.top_k = top_k
+        self.n_threads = n_threads
+        self.context_window = context_window
         self.verbose = verbose
 
-        # Create a temporary directory for any necessary files
-        self.temp_dir = tempfile.mkdtemp(prefix="rag_")
-        # Register cleanup function to remove temporary directory at exit
+        # Performance metrics
+        self.perf_metrics = {
+            "indexing_time": 0,
+            "doc_count": 0,
+            "chunk_count": 0,
+            "queries": 0,
+            "total_query_time": 0
+        }
+
+        # Create a temporary directory for processing
+        self.temp_dir = tempfile.mkdtemp(prefix="llama32_rag_")
         atexit.register(self._cleanup)
 
         # Store chat history
         self.chat_history = []
 
-        # Validate model paths
+        # Validate LLM model
         self._validate_models()
 
-        # Determine model type based on filename
-        self.model_type = self._detect_model_type()
-        if self.verbose:
-            logger.info(f"Detected model type: {self.model_type}")
+        # Initialize system components in sequence
+        start_time = time.time()
 
-        # Initialize embeddings
+        logger.info("Initializing embedding model...")
         self.embeddings = self._initialize_embeddings()
 
-        # Load and index documents
-        logger.info("Indexing documents...")
+        logger.info(f"Indexing documents from {self.documents_dir}...")
         self.vectorstore = self._create_vectorstore()
-        if self.verbose:
-            logger.info(f"Indexed {len(self._load_documents())} documents into {self.vectorstore._index.ntotal} chunks")
-        else:
-            document_count = len(self._load_documents())
-            logger.info(f"Indexed {document_count} documents successfully")
 
-        # Initialize LLM
+        self.perf_metrics["indexing_time"] = time.time() - start_time
+
+        logger.info(f"Loading Llama-3.2 model from {llm_model_path}...")
         self.llm = self._initialize_llm()
+
+        logger.info(f"Initialization complete ({self.perf_metrics['indexing_time']:.2f}s)")
+        logger.info(
+            f"Indexed {self.perf_metrics['doc_count']} documents into {self.perf_metrics['chunk_count']} chunks")
 
     def _cleanup(self):
         """Remove temporary directory and files when the object is destroyed."""
@@ -145,181 +165,241 @@ class RAGSystem:
                 logger.info(f"Cleaned up temporary directory: {self.temp_dir}")
 
     def _validate_models(self):
-        """Validate that the required model files exist."""
+        """Validate that the required model files exist and are correctly identified."""
         # Check LLM model
         if not os.path.exists(self.llm_model_path):
-            raise FileNotFoundError(f"LLM model not found at {self.llm_model_path}")
+            raise FileNotFoundError(f"Llama-3.2 model not found at {self.llm_model_path}")
 
-    def _detect_model_type(self):
-        """
-        Determine the type of LLM based on the filename.
-
-        Returns:
-            String indicating the model type ('llama2', 'llama3', 'llama32', or 'other')
-        """
+        # Ensure it's a Llama-3.2 model (basic filename check)
         model_name = os.path.basename(self.llm_model_path).lower()
-
-        if "llama-3.2" in model_name or "llama3.2" in model_name or "llama32" in model_name:
-            return "llama32"
-        elif "llama-3" in model_name or "llama3" in model_name:
-            return "llama3"
-        elif "llama-2" in model_name or "llama2" in model_name:
-            return "llama2"
-        else:
-            return "other"
+        if not any(x in model_name for x in ["llama-3.2", "llama3.2", "llama32"]):
+            logger.warning(f"Model filename '{model_name}' doesn't indicate a Llama-3.2 model")
+            logger.warning("This script is optimized specifically for Llama-3.2 models")
 
     def _initialize_embeddings(self):
-        """Initialize the embedding model."""
+        """Initialize the embedding model with caching for improved performance."""
         return HuggingFaceEmbeddings(
             model_name=self.embedding_model_name,
-            model_kwargs={'device': 'cpu'}
+            model_kwargs={'device': 'cpu'},
+            encode_kwargs={'normalize_embeddings': True}  # Improved retrieval with normalized embeddings
         )
 
     def _initialize_llm(self):
-        """Initialize the local language model with parameters optimized for the specific model type."""
-        logger.info(f"Loading language model from {self.llm_model_path}")
+        """
+        Initialize the Llama-3.2 language model with optimized parameters.
+        Tuned specifically for Llama-3.2 models for best performance.
+        """
+        # Optimized parameters for Llama-3.2
+        return LlamaCpp(
+            model_path=self.llm_model_path,
+            temperature=0.1,  # Low temperature for factual responses
+            max_tokens=1536,  # Increased for more complete answers
+            n_ctx=self.context_window,  # Large context window
+            n_batch=1024,  # Increased batch size for better throughput
+            n_threads=self.n_threads,  # Parallelization
+            f16_kv=True,  # Use half precision for key/value cache
+            top_p=0.85,  # Slightly reduced for more focused responses
+            top_k=40,
+            repeat_penalty=1.1,
+            verbose=self.verbose,
+            model_kwargs={
+                "chat_format": "llama-3.2"  # Format specific to Llama-3.2
+            }
+        )
 
-        # Common parameters for all models
-        params = {
-            "model_path": self.llm_model_path,
-            "temperature": 0.1,  # Lower temperature for factual responses
-            "max_tokens": 1024,
-            "verbose": self.verbose,
-        }
+    def _load_documents(self) -> Tuple[List[Document], int]:
+        """
+        Load documents from the documents directory with parallel processing.
 
-        # Add model-specific parameters based on detected model type
-        if self.model_type == "llama32":
-            # Llama-3.2 specific settings
-            params.update({
-                "n_ctx": 32768,  # According to model card, context window is 8k for quantized models
-                "n_batch": 512,  # Batch size for inference
-                "f16_kv": True,  # Use half precision for key/value cache
-                "top_p": 0.9,
-                "top_k": 40,
-                "repeat_penalty": 1.1,
-                "model_kwargs": {
-                    "chat_format": "llama-3.2"  # Specific format for Llama-3.2
-                }
-            })
-        elif self.model_type == "llama3":
-            # Llama-3 specific settings
-            params.update({
-                "n_ctx": 8192,
-                "n_batch": 512,
-                "f16_kv": True,
-                "top_p": 0.9,
-                "top_k": 40,
-                "repeat_penalty": 1.1,
-                "model_kwargs": {
-                    "chat_format": "llama-3"
-                }
-            })
-        else:
-            # Default parameters for other models (including Llama-2)
-            params.update({
-                "n_ctx": 4096,
-                "n_batch": 512,
-                "top_p": 0.9,
-                "top_k": 40,
-                "repeat_penalty": 1.1,
-            })
-
-        return LlamaCpp(**params)
-
-    def _load_documents(self) -> List:
-        """Load documents from the documents directory."""
+        Returns:
+            Tuple of (list of documents, count of source files)
+        """
         if self.verbose:
-            logger.info(f"Loading documents from {self.documents_dir}")
+            logger.info(f"Scanning documents in {self.documents_dir}")
 
-        loaders = []
+        # Find all eligible documents
+        txt_files = glob.glob(os.path.join(self.documents_dir, "**/*.txt"), recursive=True)
+        pdf_files = glob.glob(os.path.join(self.documents_dir, "**/*.pdf"), recursive=True)
 
-        # Text files
-        if glob.glob(os.path.join(self.documents_dir, "**/*.txt"), recursive=True):
-            text_loader = DirectoryLoader(
-                self.documents_dir,
-                glob="**/*.txt",
-                loader_cls=TextLoader,
-                show_progress=self.verbose
-            )
-            loaders.append(text_loader)
+        all_files = txt_files + pdf_files
+        file_count = len(all_files)
 
-        # PDF files
-        if glob.glob(os.path.join(self.documents_dir, "**/*.pdf"), recursive=True):
-            pdf_loader = DirectoryLoader(
-                self.documents_dir,
-                glob="**/*.pdf",
-                loader_cls=PyPDFLoader,
-                show_progress=self.verbose
-            )
-            loaders.append(pdf_loader)
+        if file_count == 0:
+            logger.warning("No documents found in the specified directory.")
+            return [], 0
 
-        # Load all documents
+        if self.verbose:
+            logger.info(f"Found {len(txt_files)} text files and {len(pdf_files)} PDF files")
+
         documents = []
-        for loader in loaders:
-            documents.extend(loader.load())
+
+        # For small number of files, don't parallelize to avoid overhead
+        if file_count <= 5:
+            # Load text files
+            for file_path in txt_files:
+                try:
+                    loader = TextLoader(file_path)
+                    documents.extend(loader.load())
+                except Exception as e:
+                    logger.warning(f"Error loading {file_path}: {str(e)}")
+
+            # Load PDF files
+            for file_path in pdf_files:
+                try:
+                    loader = PyPDFLoader(file_path)
+                    documents.extend(loader.load())
+                except Exception as e:
+                    logger.warning(f"Error loading {file_path}: {str(e)}")
+        else:
+            # Use parallel processing for larger document sets
+            def load_file(file_path):
+                try:
+                    if file_path.lower().endswith('.txt'):
+                        loader = TextLoader(file_path)
+                    elif file_path.lower().endswith('.pdf'):
+                        loader = PyPDFLoader(file_path)
+                    else:
+                        return []
+                    return loader.load()
+                except Exception as e:
+                    logger.warning(f"Error loading {file_path}: {str(e)}")
+                    return []
+
+            # Use ThreadPoolExecutor for parallel loading
+            with ThreadPoolExecutor(max_workers=min(self.n_threads, file_count)) as executor:
+                results = list(executor.map(load_file, all_files))
+
+            # Flatten results
+            for docs in results:
+                documents.extend(docs)
 
         if self.verbose:
-            logger.info(f"Loaded {len(documents)} documents")
-        return documents
+            logger.info(f"Loaded {len(documents)} document sections from {file_count} files")
+
+        return documents, file_count
 
     def _create_vectorstore(self):
-        """Create a vector store from documents with sliding window chunking for better retrieval."""
+        """
+        Create an optimized vector store from documents with improved chunking strategy.
+
+        Returns:
+            FAISS vector store containing document embeddings
+        """
+        start_time = time.time()
+
         # Load documents
-        documents = self._load_documents()
+        documents, doc_count = self._load_documents()
+        self.perf_metrics["doc_count"] = doc_count
 
         if not documents:
-            logger.warning("No documents found to index.")
-            # Create an empty vector store if no documents found
+            logger.warning("No documents were successfully loaded.")
+            # Create an empty vector store
             empty_texts = ["No documents are available in the corpus."]
             return FAISS.from_texts(empty_texts, self.embeddings)
 
-        # Process and index documents
-        if self.verbose:
-            logger.info("Processing and indexing documents...")
-
-        # Use sliding window approach as recommended in best practices
+        # Improved text splitter with better separation strategies
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
-            separators=["\n\n", "\n", ". ", " ", ""]
+            separators=["\n\n", "\n", ". ", "! ", "? ", ", ", " ", ""],
+            length_function=len
         )
 
         # Split documents into chunks
         chunks = text_splitter.split_documents(documents)
+        self.perf_metrics["chunk_count"] = len(chunks)
+
         if self.verbose:
-            logger.info(f"Created {len(chunks)} document chunks")
+            logger.info(f"Created {len(chunks)} document chunks in {time.time() - start_time:.2f}s")
 
-        # Create vector store from chunks
-        return FAISS.from_documents(chunks, self.embeddings)
+        # Deduplicate chunks to save space and improve quality
+        chunk_texts = set()
+        unique_chunks = []
 
-    def _format_context(self, source_documents):
+        for chunk in chunks:
+            if chunk.page_content not in chunk_texts:
+                chunk_texts.add(chunk.page_content)
+                unique_chunks.append(chunk)
+
+        if len(unique_chunks) < len(chunks) and self.verbose:
+            logger.info(f"Removed {len(chunks) - len(unique_chunks)} duplicate chunks")
+
+        # Create vector store with optimized parameters
+        return FAISS.from_documents(
+            unique_chunks,
+            self.embeddings
+        )
+
+    def _format_context(self, source_documents: List[Document]) -> str:
         """
-        Format retrieved documents into a consistent context string.
+        Format retrieved documents into a clean, structured context string.
 
         Args:
             source_documents: List of documents retrieved from the vector store
 
         Returns:
-            Formatted context string
+            Formatted context string optimized for Llama-3.2
         """
-        context = ""
+        if not source_documents:
+            return "No relevant documents were found."
+
+        context_parts = []
+
         for i, doc in enumerate(source_documents):
+            # Get source information
             source = doc.metadata.get("source", "unknown source")
-            source = os.path.basename(source) if "/" in source else source
+            source = os.path.basename(source) if "/" in source or "\\" in source else source
             page = doc.metadata.get("page", "")
             page_info = f" (page {page})" if page else ""
 
-            context += f"[Source {i + 1}: {source}{page_info}]\n"
-            context += f"{doc.page_content.strip()}\n\n"
+            # Format the document section with clear separation
+            section = f"[Document {i + 1}: {source}{page_info}]\n{doc.page_content.strip()}"
+            context_parts.append(section)
 
-        # Determine appropriate context length based on model
-        max_context_length = 15000 if self.model_type in ["llama3", "llama32"] else 12000
+        # Join with clear separators
+        context = "\n\n".join(context_parts)
 
-        # Truncate if needed
+        # Determine appropriate context length based on model's context window
+        # Leaving room for the prompt and response
+        max_context_length = min(self.context_window * 0.7, 24000)
+
+        # Truncate if needed with a clean cutoff
         if len(context) > max_context_length:
-            context = context[:max_context_length] + "...[truncated]"
+            # Try to find a clean break point
+            cutoff = int(max_context_length)
+            while cutoff > max_context_length - 100 and cutoff > 0:
+                if context[cutoff] in ".!?\n":
+                    break
+                cutoff -= 1
+
+            if cutoff <= 0:  # Fallback if no good breakpoint found
+                cutoff = int(max_context_length)
+
+            context = context[:cutoff] + "\n\n[Note: Some relevant content was truncated due to length constraints.]"
 
         return context
+
+    @lru_cache(maxsize=16)  # Cache recent queries for faster repeated access
+    def _retrieve_documents(self, question: str) -> List[Document]:
+        """
+        Retrieve relevant documents for a question, with caching for performance.
+
+        Args:
+            question: The question to find documents for
+
+        Returns:
+            List of relevant documents
+        """
+        retriever = self.vectorstore.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": self.top_k}
+        )
+
+        try:
+            return retriever.invoke(question)
+        except Exception as e:
+            logger.error(f"Error during document retrieval: {str(e)}")
+            return []
 
     def query(self, question: str) -> Dict[str, Any]:
         """
@@ -331,80 +411,44 @@ class RAGSystem:
         Returns:
             Dictionary containing the answer and source documents
         """
+        start_time = time.time()
+        self.perf_metrics["queries"] += 1
+
         try:
             # Get source documents using retrieval
-            retriever = self.vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": self.top_k}
-            )
-            source_documents = retriever.invoke(question)
+            source_documents = self._retrieve_documents(question)
 
+            retrieval_time = time.time() - start_time
             if self.verbose:
-                logger.info(f"Retrieved {len(source_documents)} documents for query: {question}")
-                for i, doc in enumerate(source_documents):
-                    logger.info(f"Document {i + 1}: {os.path.basename(doc.metadata.get('source', 'unknown'))}")
+                logger.info(f"Retrieved {len(source_documents)} documents in {retrieval_time:.2f}s")
 
             # Format context from documents
             context = self._format_context(source_documents)
 
-            # Use appropriate prompt format based on model type
-            if self.model_type == "llama32":
-                # Llama-3.2 specific chat format
-                prompt = f"""<|system|>
-You are a helpful and concise assistant that answers questions based only on the provided information.
+            # Optimized prompt for Llama-3.2
+            prompt = f"""<|system|>
+You are a helpful, precise, and accurate research assistant that answers questions based only on the provided information. 
+Your responses are concise yet complete, and you focus only on the information from the retrieved documents.
+If the information to answer the question is not present in the documents, clearly state this instead of making up information.
 <|user|>
-I need information about the following:
-{question}
-
-Here is the relevant information:
-{context}
-
-Please provide a comprehensive and accurate answer based only on this information.
-<|assistant|>
-"""
-            elif self.model_type == "llama3":
-                # Llama-3 specific chat format
-                prompt = f"""<|start_header_id|>system<|end_header_id|>
-You are a research assistant providing information based on the documents available to you.
-
-<|start_header_id|>user<|end_header_id|>
 I need information about the following question:
 {question}
 
-Here is relevant information from documents:
+Here is the relevant information from my document collection:
 {context}
 
-Please provide a comprehensive answer based only on this information. If the information to answer the question is not available in the documents, clearly state this.
-
-<|start_header_id|>assistant<|end_header_id|>
+Please provide a comprehensive and accurate answer based only on this information. Don't use external knowledge.
+<|assistant|>
 """
-            else:
-                # Standard prompt for other models (including Llama-2)
-                prompt = f"""You are a research assistant providing information based on the documents available to you.
-
-QUESTION: {question}
-
-RETRIEVED INFORMATION:
-{context}
-
-INSTRUCTIONS (DO NOT INCLUDE THESE IN YOUR RESPONSE):
-1. Answer ONLY based on the information in the retrieved documents. Do not use external knowledge.
-2. If the documents don't contain relevant information to answer the question fully, clearly state what information is missing.
-3. If the question appears nonsensical or cannot be answered based on the documents, politely explain why.
-4. Start with a direct answer to the question, then provide supporting details.
-5. Organize information logically, using numbered lists where appropriate.
-6. Be concise but complete.
-7. Use simple formatting only.
-8. Never make up information that's not in the documents.
-9. If multiple documents contain relevant information, synthesize it into a coherent answer.
-10. Do not repeat phrases like "According to the documents" in every sentence.
-
-ANSWER:"""
-
-            # Directly invoke the LLM
+            # Invoke the LLM
+            generation_start = time.time()
             raw_answer = self.llm.invoke(prompt)
+            generation_time = time.time() - generation_start
 
-            # Clean up the answer with improved processing
+            if self.verbose:
+                logger.info(f"Generated response in {generation_time:.2f}s")
+
+            # Clean up the answer
             answer = self._clean_llm_response(raw_answer)
 
             # Update chat history
@@ -420,23 +464,33 @@ ANSWER:"""
                 }
                 sources.append(source)
 
+            total_time = time.time() - start_time
+            self.perf_metrics["total_query_time"] += total_time
+
+            if self.verbose:
+                logger.info(f"Total query processing time: {total_time:.2f}s")
+
             return {
                 "answer": answer,
-                "sources": sources
+                "sources": sources,
+                "processing_time": total_time
             }
+
         except Exception as e:
             logger.error(f"Error querying RAG system: {str(e)}")
             if self.verbose:
                 import traceback
                 logger.error(traceback.format_exc())
+
             return {
                 "answer": f"I encountered an error while processing your question. Please try again or rephrase your query.",
-                "sources": []
+                "sources": [],
+                "processing_time": time.time() - start_time
             }
 
     def _clean_llm_response(self, response: str) -> str:
         """
-        Clean the LLM response by removing unwanted patterns and formatting artifacts.
+        Clean the LLM response for Llama-3.2 format, removing artifacts and formatting issues.
 
         Args:
             response: The raw LLM response
@@ -447,15 +501,10 @@ ANSWER:"""
         if not response:
             return "I could not generate an answer based on the available documents."
 
-        # Model-specific cleaning
-        if self.model_type == "llama32":
-            # Remove Llama-3.2 specific tokens
-            response = re.sub(r'<\|system\|>.*?<\|user\|>', '', response, flags=re.DOTALL)
-            response = re.sub(r'<\|user\|>.*?<\|assistant\|>', '', response, flags=re.DOTALL)
-            response = re.sub(r'<\|assistant\|>', '', response)
-        elif self.model_type == "llama3":
-            # Remove Llama-3 specific tokens
-            response = re.sub(r'<\|start_header_id\|>.*?<\|end_header_id\|>', '', response, flags=re.DOTALL)
+        # Remove Llama-3.2 specific tags
+        response = re.sub(r'<\|system\|>.*?<\|user\|>', '', response, flags=re.DOTALL)
+        response = re.sub(r'<\|user\|>.*?<\|assistant\|>', '', response, flags=re.DOTALL)
+        response = re.sub(r'<\|assistant\|>', '', response)
 
         # Remove any leading/trailing whitespace
         cleaned = response.strip()
@@ -464,37 +513,28 @@ ANSWER:"""
         if not cleaned or len(cleaned) < 10:
             return "I could not generate a meaningful answer based on the available documents."
 
-        # Remove any system-level instructions or metadata that leaked into the response
+        # Remove any leaked instruction text
         patterns_to_remove = [
-            r"INSTRUCTIONS.*?ANSWER:",
-            r"INSTRUCTIONS \(DO NOT INCLUDE THESE IN YOUR RESPONSE\):.*?ANSWER:",
-            r"^QUESTION:.*?\n",
-            r"^RETRIEVED INFORMATION:",
-            r"1\. Answer ONLY based.*?10\. Do not repeat phrases.*?\n\n",
-            r"ANSWER:",
-            r"### Question \d+:.*?\n",
-            r"### Answer \d+:.*?\n",
-            r"Please provide a comprehensive.*?information\.",
             r"I need information about the following.*?\n",
-            r"Here is (?:the )?relevant information.*?:\n"
+            r"Here is the relevant information.*?:\n",
+            r"Please provide a comprehensive.*?knowledge\.",
+            r"^\s*\[Document \d+:.*?\]\s*",
+            r"^Based on the provided documents",
+            r"^According to the provided context",
         ]
 
         for pattern in patterns_to_remove:
             cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
 
-        # Remove lines that are obviously part of the prompt structure
+        # Remove lines that are obviously document headers
         lines = cleaned.split('\n')
         filtered_lines = []
         skip_line = False
 
         for line in lines:
-            # Skip lines that are clearly part of document headers
-            if re.match(r'^\s*\[Source \d+:', line, re.IGNORECASE):
+            # Skip document headers
+            if re.match(r'^\s*\[Document \d+:', line, re.IGNORECASE):
                 skip_line = True
-                continue
-
-            # Skip formatting artifacts from the model
-            if re.match(r'^\s*(\\section|\\begin\{|\\end\{|\\item|\\strong)', line, re.IGNORECASE):
                 continue
 
             # If we've been skipping and found a blank line, stop skipping
@@ -507,24 +547,9 @@ ANSWER:"""
 
         cleaned = '\n'.join(filtered_lines)
 
-        # Remove LaTeX, HTML and markdown artifacts
-        cleaned = re.sub(r'\\section\{[^}]+\}', '', cleaned)
-        cleaned = re.sub(r'\\begin\{[^}]+\}', '', cleaned)
-        cleaned = re.sub(r'\\end\{[^}]+\}', '', cleaned)
-        cleaned = re.sub(r'\\item', '', cleaned)
-        cleaned = re.sub(r'\\strong\{([^}]+)\}', r'\1', cleaned)
-        cleaned = re.sub(r'\\emph\{([^}]+)\}', r'\1', cleaned)
-        cleaned = re.sub(r'\\textbf\{([^}]+)\}', r'\1', cleaned)
-        cleaned = re.sub(r'\\textit\{([^}]+)\}', r'\1', cleaned)
-        cleaned = re.sub(r'<[^>]+>', '', cleaned)  # Remove HTML tags
-
-        # Remove repetitive patterns
-        cleaned = re.sub(r'(The .+?\n)\1+', r'\1', cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r'(are listed as follows:\s*\n\s*\n)\1+', r'\1', cleaned, flags=re.DOTALL)
-
-        # Final cleanup of any double spaces or multiple newlines
-        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-        cleaned = re.sub(r"  +", " ", cleaned)
+        # Final cleanup of formatting issues
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)  # Remove excessive newlines
+        cleaned = re.sub(r"  +", " ", cleaned)  # Remove excessive spaces
         cleaned = cleaned.strip()
 
         # If we've stripped too much, provide a fallback
@@ -534,76 +559,152 @@ ANSWER:"""
         return cleaned
 
     def run_interactive(self):
-        """Run the RAG system in interactive mode."""
-        model_desc = "Llama-3.2" if self.model_type == "llama32" else \
-            "Llama-3" if self.model_type == "llama3" else \
-                "Llama-2" if self.model_type == "llama2" else \
-                    "Unknown model type"
-
-        print(f"\n===== Local RAG Chat System ({model_desc}) =====")
-        print(f"Documents directory: {self.documents_dir}")
-        print(f"LLM: {os.path.basename(self.llm_model_path)}")
-        print("Type 'exit' to quit, 'reindex' to reindex documents")
-        print("====================================\n")
+        """Run the RAG system in interactive mode with improved output formatting."""
+        print(f"\n===== Llama-3.2 RAG Chat System =====")
+        print(f"Documents: {self.documents_dir}")
+        print(f"Model: {os.path.basename(self.llm_model_path)}")
+        print(f"Indexed {self.perf_metrics['chunk_count']} chunks from {self.perf_metrics['doc_count']} documents")
+        print("Type 'exit' to quit, 'reindex' to refresh documents")
+        print("======================================\n")
 
         while True:
-            user_input = input("\nYou: ").strip()
+            try:
+                user_input = input("\nYou: ").strip()
 
-            if user_input.lower() == "exit":
-                print("Exiting. Goodbye!")
-                break
-            elif user_input.lower() == "reindex":
-                print("Reindexing documents...")
-                self.vectorstore = self._create_vectorstore()
-                print("Reindexing complete.")
+                if not user_input:
+                    continue
+
+                if user_input.lower() == "exit":
+                    print("\nExiting. Goodbye!")
+                    break
+
+                elif user_input.lower() == "reindex":
+                    print("\nReindexing documents...")
+                    start_time = time.time()
+                    self.vectorstore = self._create_vectorstore()
+                    print(
+                        f"Reindexing complete. Processed {self.perf_metrics['chunk_count']} chunks from {self.perf_metrics['doc_count']} documents in {time.time() - start_time:.2f}s")
+                    continue
+
+                elif user_input.lower() == "stats":
+                    # Show performance statistics
+                    avg_query_time = (self.perf_metrics["total_query_time"] / self.perf_metrics["queries"]) if \
+                    self.perf_metrics["queries"] > 0 else 0
+                    print("\n=== Performance Statistics ===")
+                    print(f"Document count: {self.perf_metrics['doc_count']}")
+                    print(f"Chunk count: {self.perf_metrics['chunk_count']}")
+                    print(f"Indexing time: {self.perf_metrics['indexing_time']:.2f}s")
+                    print(f"Queries processed: {self.perf_metrics['queries']}")
+                    print(f"Average query time: {avg_query_time:.2f}s")
+                    print("============================")
+                    continue
+
+                print("\nThinking...")
+                result = self.query(user_input)
+
+                # More attractive answer formatting
+                print(f"\nAssistant: {result['answer']}")
+
+                # Show processing time for transparency
+                print(f"\n(Processed in {result['processing_time']:.2f}s)")
+
+                if result['sources']:
+                    print("\nSources:")
+                    # Deduplicate and limit sources for clarity
+                    unique_sources = {}
+
+                    for source in result['sources']:
+                        source_text = os.path.basename(source['source'])
+                        if source.get('page') is not None:
+                            key = f"{source_text}:{source['page']}"
+                        else:
+                            key = source_text
+
+                        unique_sources[key] = source
+
+                    # Print deduplicated sources
+                    for i, (_, source) in enumerate(unique_sources.items(), 1):
+                        source_text = os.path.basename(source['source'])
+                        if source.get('page') is not None:
+                            source_text += f" (page {source['page']})"
+                        print(f"{i}. {source_text}")
+
+            except KeyboardInterrupt:
+                print("\n\nInterrupted. Type 'exit' to quit or press Enter to continue.")
                 continue
-            elif not user_input:
-                continue
 
-            print("\nThinking...")
-            result = self.query(user_input)
-
-            print(f"\nAssistant: {result['answer']}")
-
-            if result['sources']:
-                print("\nSources:")
-                # Deduplicate sources
-                unique_sources = []
-                unique_source_texts = set()
-
-                for source in result['sources']:
-                    source_text = source['source']
-                    if source.get('page') is not None:
-                        source_text += f" (page {source['page']})"
-
-                    if source_text not in unique_source_texts:
-                        unique_sources.append(source)
-                        unique_source_texts.add(source_text)
-
-                # Print deduplicated sources
-                for i, source in enumerate(unique_sources, 1):
-                    source_text = source['source']
-                    if source.get('page') is not None:
-                        source_text += f" (page {source['page']})"
-                    print(f"{i}. {source_text}")
+            except Exception as e:
+                print(f"\nError: {str(e)}")
+                if self.verbose:
+                    import traceback
+                    print(traceback.format_exc())
 
 
 def main():
-    """Main function to run the local RAG system."""
-    parser = argparse.ArgumentParser(description="Local RAG Chat System")
-    parser.add_argument("--documents", default="./documents",
-                        help="Directory containing documents (default: ./documents)")
-    parser.add_argument("--llm", default="./models/Llama-3.2-3B-Instruct-Q5_K_M.gguf",
-                        help="Path to local LLM model file (.gguf) (default: ./models/Llama-3.2-3B-Instruct-Q5_K_M.gguf)")
-    parser.add_argument("--embeddings", default="sentence-transformers/all-MiniLM-L6-v2",
-                        help="Name of embedding model to use")
-    parser.add_argument("--chunk-size", type=int, default=512,
-                        help="Size of document chunks for indexing")
-    parser.add_argument("--chunk-overlap", type=int, default=50,
-                        help="Overlap between document chunks")
-    parser.add_argument("--top-k", type=int, default=15,
-                        help="Number of chunks to retrieve per query")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    """Main function with improved argument handling and error recovery."""
+    parser = argparse.ArgumentParser(
+        description="Llama-3.2 RAG Chat System",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "--documents",
+        default="./documents",
+        help="Directory containing documents"
+    )
+
+    parser.add_argument(
+        "--llm",
+        default="./models/Llama-3.2-3B-Instruct-Q5_K_M.gguf",
+        help="Path to Llama-3.2 model file (.gguf)"
+    )
+
+    parser.add_argument(
+        "--embeddings",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        help="Name of embedding model to use"
+    )
+
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=512,
+        help="Size of document chunks for indexing"
+    )
+
+    parser.add_argument(
+        "--chunk-overlap",
+        type=int,
+        default=64,
+        help="Overlap between document chunks"
+    )
+
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=15,
+        help="Number of chunks to retrieve per query"
+    )
+
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=4,
+        help="Number of threads to use for processing"
+    )
+
+    parser.add_argument(
+        "--context-window",
+        type=int,
+        default=32768,
+        help="Context window size for the Llama-3.2 model"
+    )
+
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging"
+    )
 
     args = parser.parse_args()
 
@@ -619,22 +720,27 @@ def main():
         if not os.path.isfile(args.llm):
             logger.error(f"LLM model file not found: {args.llm}")
             print(f"\nError: LLM model file not found: {args.llm}")
-            print(f"Please download an appropriate LLM model or specify the correct path with --llm")
+            print(f"Please download an appropriate Llama-3.2 model or specify the correct path with --llm")
             return
 
         # Initialize the RAG system
-        rag_system = RAGSystem(
+        rag_system = Llama32RAGSystem(
             documents_dir=args.documents,
             llm_model_path=args.llm,
             embedding_model_name=args.embeddings,
             chunk_size=args.chunk_size,
             chunk_overlap=args.chunk_overlap,
             top_k=args.top_k,
+            n_threads=args.threads,
+            context_window=args.context_window,
             verbose=args.verbose
         )
 
         # Run the interactive chat
         rag_system.run_interactive()
+
+    except KeyboardInterrupt:
+        print("\nExiting on user interrupt.")
 
     except FileNotFoundError as e:
         logger.error(f"Error: {str(e)}")
