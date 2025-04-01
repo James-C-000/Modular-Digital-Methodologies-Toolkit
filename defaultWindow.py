@@ -3,6 +3,8 @@ import os
 import tkinter as tk
 import pygubu
 import webbrowser
+
+from audioTranscriptionWindow import audioTranscriptionWindow
 from ocrWindow import ocrWindow
 from aksWindow import aksWindow
 
@@ -35,6 +37,12 @@ class defaultWindow:
 
     def on_AKS_item_clicked(self):
         aksWindow(master=self.mainwindow)
+
+    def on_audioTranscription_item_clicked(self):
+        audioTranscriptionWindow(master=self.mainwindow)
+        
+    def on_Gephi_item_clicked(self):
+        webbrowser.open('https://gephi.org/users/download/', new=0, autoraise=True)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window
