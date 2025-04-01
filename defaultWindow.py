@@ -7,6 +7,7 @@ import webbrowser
 from audioTranscriptionWindow import audioTranscriptionWindow
 from ocrWindow import ocrWindow
 from aksWindow import aksWindow
+from ragWindow import ragWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -43,6 +44,10 @@ class defaultWindow:
         
     def on_Gephi_item_clicked(self):
         webbrowser.open('https://gephi.org/users/download/', new=0, autoraise=True)
+
+    def on_ai_item_clicked(self):
+        # Instantiate the RAG window
+        ragWindow(master=self.mainwindow)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window
