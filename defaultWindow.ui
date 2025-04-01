@@ -114,7 +114,7 @@
     <child>
       <object class="ttk.Button" id="button_ai" named="True">
         <property name="command" type="command" cbtype="simple">on_ai_item_clicked</property>
-        <property name="text" translatable="yes">AI Assistant (Retrieval Augmented Generation)</property>
+        <property name="text" translatable="yes">Retrieval-Augmented Generation Chatbot</property>
         <layout manager="place">
           <property name="anchor">center</property>
           <property name="relheight">0.08</property>
@@ -129,8 +129,7 @@
     <child>
       <object class="ttk.Button" id="button_translation" named="True">
         <property name="command" type="command" cbtype="simple">on_translation_item_clicked</property>
-        <property name="state">disabled</property>
-        <property name="text" translatable="yes">Language Translation</property>
+        <property name="text" translatable="yes">Language Translation (Experimental)</property>
         <layout manager="place">
           <property name="anchor">center</property>
           <property name="relheight">0.08</property>
