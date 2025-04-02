@@ -28,7 +28,7 @@ class relationshipExtractionWindow:
 
         # Create element references
         self.inputDir = builder.get_object("inputDir", self.mainwindow)
-        self.outputDir = builder.get_object("outputDir", self.mainwindow)
+        self.outputDir = self.inputDir
         self.modelSelection = builder.get_object("modelSelection", self.mainwindow)
         self.extractTextCheckbox = builder.get_object("extractTextCheckbox", self.mainwindow)
         self.generateGraphCheckbox = builder.get_object("generateGraphCheckbox", self.mainwindow)
@@ -63,7 +63,7 @@ class relationshipExtractionWindow:
     def on_run_extraction_clicked(self):
         # Get user input vars
         inputDir = self.inputDir.cget('path')
-        outputDir = self.outputDir.cget('path')
+        outputDir = inputDir
         modelName = self.modelSelection.get()
         extractText = self.builder.get_variable('extractTextState').get()
         generateGraph = self.builder.get_variable('generateGraphState').get()
