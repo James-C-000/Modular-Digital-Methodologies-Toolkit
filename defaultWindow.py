@@ -9,6 +9,7 @@ from ocrWindow import ocrWindow
 from aksWindow import aksWindow
 from ragWindow import ragWindow
 from translationWindow import translationWindow
+from relationshipExtractionWindow import relationshipExtractionWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -53,6 +54,12 @@ class defaultWindow:
     def on_translation_item_clicked(self):
         # Instantiate the Translation window
         translationWindow(master=self.mainwindow)
+
+    def on_NER_button_clicked(self):
+        pass
+
+    def on_relationship_item_clicked(self):
+        relationshipExtractionWindow(master=self.mainwindow)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window

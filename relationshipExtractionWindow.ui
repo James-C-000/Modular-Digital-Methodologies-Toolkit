@@ -4,139 +4,220 @@
     <settings />
     <customwidgets />
   </project>
-  <object class="tk.Toplevel" id="defaultWindow" named="True">
+  <object class="tk.Toplevel" id="relationshipExtractionWindow" named="True">
     <property name="geometry">480x680</property>
+    <property name="height">680</property>
     <property name="minsize">480|680</property>
-    <property name="title" translatable="yes">Modular Digital Methodologies Toolkit</property>
+    <property name="title" translatable="yes">MDMT - Relationship Extraction</property>
+    <property name="width">480</property>
     <child>
-      <object class="ttk.Button" id="button_OCR" named="True">
-        <property name="command" type="command" cbtype="simple">on_ocr_item_clicked</property>
-        <property name="text" translatable="yes">OCR</property>
-        <layout manager="place">
-          <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
-          <property name="relx">0.5</property>
-          <property name="rely">0.1</property>
-          <property name="x">0</property>
-          <property name="y">0</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object class="ttk.Button" id="button_bib_database" named="True">
-        <property name="command" type="command" cbtype="simple">on_relationship_item_clicked</property>
+      <object class="ttk.Label" id="label_title" named="True">
+        <property name="font">TkHeadingFont</property>
         <property name="text" translatable="yes">Relationship Extraction</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.7</property>
+          <property name="rely">0.05</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_bib_analysis" named="True">
-        <property name="text" translatable="yes">Bibliometrix</property>
+      <object class="ttk.Label" id="inputDirLabel" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Input Directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.8</property>
+          <property name="rely">0.10</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_NER" named="True">
-        <property name="command" type="command" cbtype="simple">on_NER_button_clicked</property>
-        <property name="text" translatable="yes">Named Entity Recognition</property>
+      <object class="pygubu.widgets.PathChooserInput" id="inputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="type">directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.6</property>
+          <property name="rely">0.15</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_advancedKeywordSearch" named="True">
-        <property name="command" type="command" cbtype="simple">on_AKS_item_clicked</property>
-        <property name="text" translatable="yes">Advanced Keyword Search</property>
+      <object class="ttk.Label" id="outputDirLabel" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Output Directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.5</property>
+          <property name="rely">0.22</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_gephi" named="True">
-        <property name="command" type="command" cbtype="simple">on_Gephi_item_clicked</property>
-        <property name="text" translatable="yes">Gephi</property>
+      <object class="pygubu.widgets.PathChooserInput" id="outputDir" named="True">
+        <property name="image">ellipsis-icon.png</property>
+        <property name="type">directory</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.9</property>
+          <property name="rely">0.27</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_audioTranscription" named="True">
-        <property name="command" type="command" cbtype="simple">on_audioTranscription_item_clicked</property>
-        <property name="text" translatable="yes">Audio Transcription</property>
+      <object class="ttk.Separator" id="separator1">
+        <property name="orient">horizontal</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.2</property>
+          <property name="rely">0.34</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_ai" named="True">
-        <property name="command" type="command" cbtype="simple">on_ai_item_clicked</property>
-        <property name="text" translatable="yes">Retrieval-Augmented Generation Chatbot</property>
+      <object class="ttk.Label" id="modelSelectionLabel" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">NLTK Processing Settings</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.4</property>
+          <property name="rely">0.38</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
       </object>
     </child>
     <child>
-      <object class="ttk.Button" id="button_translation" named="True">
-        <property name="command" type="command" cbtype="simple">on_translation_item_clicked</property>
-        <property name="text" translatable="yes">Language Translation (Experimental)</property>
+      <object class="ttk.Combobox" id="modelSelection" named="True">
+        <property name="state">readonly</property>
+        <property name="values">standard|detailed</property>
         <layout manager="place">
           <property name="anchor">center</property>
-          <property name="relheight">0.08</property>
-          <property name="relwidth">0.75</property>
+          <property name="relwidth">0.9</property>
           <property name="relx">0.5</property>
-          <property name="rely">0.3</property>
+          <property name="rely">0.43</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Label" id="entityTypeLabel" named="True">
+        <property name="font">TkTextFont</property>
+        <property name="text" translatable="yes">Select Entity Types</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.50</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Frame" id="entityListFrame" named="True">
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.18</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.60</property>
+        </layout>
+        <child>
+          <object class="tk.Listbox" id="entityTypeList" named="True">
+            <property name="selectmode">multiple</property>
+            <layout manager="pack">
+              <property name="expand">true</property>
+              <property name="fill">both</property>
+              <property name="side">left</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Scrollbar" id="entityTypeScrollbar" named="True">
+            <property name="orient">vertical</property>
+            <layout manager="pack">
+              <property name="expand">false</property>
+              <property name="fill">both</property>
+              <property name="side">right</property>
+            </layout>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Frame" id="optionsFrame" named="True">
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.72</property>
+        </layout>
+        <child>
+          <object class="ttk.Checkbutton" id="extractTextCheckbox" named="True">
+            <property name="text" translatable="yes">Extract and save input file text</property>
+            <property name="variable">int:extractTextState</property>
+            <layout manager="pack">
+              <property name="anchor">w</property>
+              <property name="padx">5</property>
+              <property name="pady">5</property>
+              <property name="side">top</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Checkbutton" id="generateGraphCheckbox" named="True">
+            <property name="text" translatable="yes">Generate relationship network graph visualizations</property>
+            <property name="variable">int:generateGraphState</property>
+            <layout manager="pack">
+              <property name="anchor">w</property>
+              <property name="padx">5</property>
+              <property name="pady">5</property>
+              <property name="side">top</property>
+            </layout>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Button" id="button_run_extraction" named="True">
+        <property name="command" type="command" cbtype="simple">on_run_extraction_clicked</property>
+        <property name="text" translatable="yes">Extract Relationships</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relheight">0.07</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.82</property>
+          <property name="x">0</property>
+          <property name="y">0</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Progressbar" id="progressBar" named="True">
+        <property name="orient">horizontal</property>
+        <layout manager="place">
+          <property name="anchor">center</property>
+          <property name="relwidth">0.9</property>
+          <property name="relx">0.5</property>
+          <property name="rely">0.90</property>
           <property name="x">0</property>
           <property name="y">0</property>
         </layout>
@@ -253,6 +334,7 @@ pygubu - Copyright © 2020 Alejandro Autalán</property>
     <property name="maxsize">600|600</property>
     <property name="minsize">600|600</property>
     <property name="resizable">none</property>
+    <property name="title" translatable="yes">MDMT - Licenses</property>
     <property name="width">600</property>
     <child>
       <object class="pygubu.builder.widgets.tkinterscrolledtext" id="licenseTerms">
@@ -425,17 +507,74 @@ SOFTWARE.</property>
     <property name="maxsize">600|600</property>
     <property name="minsize">600|600</property>
     <property name="resizable">none</property>
+    <property name="title" translatable="yes">MDMT - Relationship Extraction Documentation</property>
     <property name="width">600</property>
     <child>
       <object class="pygubu.builder.widgets.tkinterscrolledtext" id="helpText">
         <property name="padx">10</property>
         <property name="pady">10</property>
         <property name="state">disabled</property>
-        <property name="text" translatable="yes">Program Documentation
+        <property name="text" translatable="yes">Relationship Extraction Module Documentation
+=========================================================
+GENERAL
+=========================================================
+The relationship extraction module analyzes text and PDF documents to identify entities (such as people, organizations, locations) and the relationships between them. It uses natural language processing techniques through NLTK (Natural Language Toolkit) to extract these relationships and can generate network graphs visualizing the connections.
+
 =========================================================
 INPUT
 =========================================================
-to-do: update frame packing for about dialog</property>
+Select Input Directory:
+Click the ellipsis icon to select a directory containing your text (.txt) and PDF (.pdf) files. The module will process all such files in the directory, including in subdirectories.
+
+Select Output Directory:
+Click the ellipsis icon to select a directory where the results will be saved. You can use the same directory as the input if desired.
+
+=========================================================
+PROCESSING MODE
+=========================================================
+NLTK Processing Settings:
+Choose from available processing modes:
+  * standard: Basic entity extraction (faster)
+  * detailed: More thorough processing (slower but may find more relationships)
+
+=========================================================
+ENTITY TYPES
+=========================================================
+Select Entity Types:
+Choose which types of entities to extract relationships for. Available types include:
+  * PERSON: People's names
+  * ORGANIZATION: Organizations, companies, etc.
+  * GPE: Geopolitical entities (countries, cities, states)
+  * LOCATION: Non-GPE locations
+  * DATE: Dates
+  * TIME: Times
+  * MONEY: Monetary values
+  * PERCENT: Percentages
+  * FACILITY: Buildings, airports, highways, etc.
+
+You can select multiple types by holding Ctrl (or Cmd on Mac) while clicking.
+
+=========================================================
+OPTIONS
+=========================================================
+Extract and save document text:
+When enabled, the module will save the extracted text content of each document to a separate file in the output directory.
+
+Generate relationship network graphs:
+When enabled, the module will create network graphs visualizing the relationships between entities. It will generate:
+  * A full network graph showing all relationships
+  * Individual graphs for each entity type (e.g., all PERSON relationships)
+
+=========================================================
+OUTPUT
+=========================================================
+The module produces:
+  * relationships.csv: A CSV file containing all extracted relationships with columns for source entity, target entity, relationship type, source sentence, and source file
+  * [filename]_text.txt: (Optional) Extracted text from each document
+  * relationship_network.png: (Optional) Full network graph visualization
+  * [entity_type]_network.png: (Optional) Network graphs for each entity type
+
+You can open the CSV file in spreadsheet applications for further analysis, and use the generated graphs in reports or presentations.</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>
