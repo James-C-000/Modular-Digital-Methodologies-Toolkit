@@ -10,6 +10,7 @@ from aksWindow import aksWindow
 from ragWindow import ragWindow
 from translationWindow import translationWindow
 from relationshipExtractionWindow import relationshipExtractionWindow
+from nerWindow import nerWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -56,7 +57,7 @@ class defaultWindow:
         translationWindow(master=self.mainwindow)
 
     def on_NER_button_clicked(self):
-        pass
+        nerWindow(master=self.mainwindow)
 
     def on_relationship_item_clicked(self):
         relationshipExtractionWindow(master=self.mainwindow)
