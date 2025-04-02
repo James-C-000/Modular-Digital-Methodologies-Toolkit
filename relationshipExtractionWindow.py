@@ -29,15 +29,11 @@ class relationshipExtractionWindow:
         # Create element references
         self.inputDir = builder.get_object("inputDir", self.mainwindow)
         self.outputDir = self.inputDir
-        self.modelSelection = builder.get_object("modelSelection", self.mainwindow)
         self.extractTextCheckbox = builder.get_object("extractTextCheckbox", self.mainwindow)
         self.generateGraphCheckbox = builder.get_object("generateGraphCheckbox", self.mainwindow)
         self.entityTypeList = builder.get_object("entityTypeList", self.mainwindow)
         self.runButton = builder.get_object("button_run_extraction", self.mainwindow)
         self.progressBar = builder.get_object("progressBar", self.mainwindow)
-
-        # Set default processing mode
-        self.modelSelection.set("standard")
 
         # Populate entity type listbox
         entity_types = ["PERSON", "ORGANIZATION", "GPE", "LOCATION", "FACILITY", "DATE", "TIME", "MONEY", "PERCENT"]
@@ -64,7 +60,6 @@ class relationshipExtractionWindow:
         # Get user input vars
         inputDir = self.inputDir.cget('path')
         outputDir = inputDir
-        modelName = self.modelSelection.get()
         extractText = self.builder.get_variable('extractTextState').get()
         generateGraph = self.builder.get_variable('generateGraphState').get()
 
@@ -85,9 +80,8 @@ class relationshipExtractionWindow:
             messagebox.showerror("Error", "Please select an output directory.")
             return
 
-        if not modelName:
-            messagebox.showerror("Error", "Please select an NLTK processing mode.")
-            return
+        # Always use "detailed" NLTK processing
+        modelName = "detailed"
 
         # Disable run button and start progress bar
         self.runButton.configure(state='disabled')
