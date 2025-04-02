@@ -12,3 +12,6 @@ langchain-core~=0.3.49
 googletrans~=4.0.2
 pypdf~=5.4.0
 future~=1.0.0
+nltk~=3.9.1
+networkx~=3.4.2
+transformers~=4.50.3
