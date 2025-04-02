@@ -11,6 +11,7 @@ from ragWindow import ragWindow
 from translationWindow import translationWindow
 from relationshipExtractionWindow import relationshipExtractionWindow
 from nerWindow import nerWindow
+from coWordAnalysisWindow import coWordAnalysisWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -45,8 +46,8 @@ class defaultWindow:
     def on_audioTranscription_item_clicked(self):
         audioTranscriptionWindow(master=self.mainwindow)
         
-    def on_Gephi_item_clicked(self):
-        webbrowser.open('https://gephi.org/users/download/', new=0, autoraise=True)
+    def on_co_word_item_clicked(self):
+        coWordAnalysisWindow(master=self.mainwindow)
 
     def on_ai_item_clicked(self):
         # Instantiate the RAG window
