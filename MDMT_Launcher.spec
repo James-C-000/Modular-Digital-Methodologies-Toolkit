@@ -4,10 +4,16 @@ import sys
 import glob
 import ocrmypdf
 from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata, collect_data_files
+import site
+import os.path
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 # Base directory - use current working directory
 base_dir = os.getcwd()
 block_cipher = None
+
+# Find llama shared libraries
+llama_binaries = collect_dynamic_libs('llama_cpp')
 
 # Platform detection
 is_windows = sys.platform.startswith('win')
@@ -125,6 +131,29 @@ hidden_imports = [
     'collections',
     'csv',
     're',
+
+    # Add these Pydantic-related imports
+    'pydantic',
+    'pydantic.deprecated.decorator',
+    'pydantic.deprecated.class_validators',
+    'pydantic.deprecated.config',
+    'pydantic.deprecated.tools',
+    'pydantic.alias_generators',
+    'pydantic.networks',
+    'pydantic.color',
+    'pydantic.dataclasses',
+    'pydantic.datetime_parse',
+
+    # LangChain-related imports
+    'langchain',
+    'langchain_community',
+    'langchain_core',
+    'langchain_huggingface',
+
+    # Add llama-cpp-python related imports
+    'llama_cpp',
+    'llama_cpp.llama',
+    'llama_cpp.llama_types',
 ]
 
 # Create a runtime hook to set up NLTK data path
@@ -144,7 +173,7 @@ nltk.data.path.insert(0, nltk_data_dir)
 a = Analysis(
     ['MDMT_Launcher.py'],
     pathex=[base_dir],
-    binaries=binaries,
+    binaries=binaries + llama_binaries,
     datas=datas + package_data,
     hiddenimports=hidden_imports,
     hookspath=['.'],  # Add the current directory to find our hook
