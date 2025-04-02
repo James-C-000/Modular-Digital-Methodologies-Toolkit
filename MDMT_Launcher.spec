@@ -1,46 +1,53 @@
-# MDMT_Launcher.spec
+# MDMT_Launcher.spec (Enhanced version)
 import os
 import sys
-from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
+import glob
+import ocrmypdf
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata, collect_data_files
 
 # Base directory - use current working directory
 base_dir = os.getcwd()
-
-# Define a block cipher (None in this case)
 block_cipher = None
 
+# Platform detection
+is_windows = sys.platform.startswith('win')
+is_mac = sys.platform.startswith('darwin')
+is_linux = sys.platform.startswith('linux')
+
 # Define executable name based on platform
-if sys.platform.startswith('win'):
+if is_windows:
     exe_name = 'MDMT.exe'
-elif sys.platform.startswith('darwin'):
+    icon_file = os.path.join(base_dir, 'resources', 'mdmt_icon.ico')
+elif is_mac:
     exe_name = 'MDMT'
+    icon_file = os.path.join(base_dir, 'resources', 'mdmt_icon.icns')
 else:
     exe_name = 'MDMT'
+    icon_file = None
 
-# Explicitly list all UI files with their full paths
+# Gather all UI files
 ui_files = []
-for ui_file in [
-    'aksWindow.ui',
-    'audioTranscriptionWindow.ui',
-    'coWordAnalysisWindow.ui',
-    'defaultWindow.ui',
-    'nerWindow.ui',
-    'ocrWindow.ui',
-    'ragWindow.ui',
-    'relationshipExtractionWindow.ui',
-    'translationWindow.ui'
-]:
-    full_path = os.path.join(base_dir, ui_file)
-    if os.path.exists(full_path):
-        ui_files.append((full_path, '.'))
-    else:
-        print(f"Warning: UI file not found: {full_path}")
+for ui_file in glob.glob(os.path.join(base_dir, '*.ui')):
+    ui_files.append((ui_file, '.'))
 
 # Define data files to include
 datas = []
 datas.extend(ui_files)
 
-# Include required directories
+# Find and include ocrmypdf data files
+ocrmypdf_data_dir = os.path.join(os.path.dirname(ocrmypdf.__file__), 'data')
+if os.path.exists(ocrmypdf_data_dir):
+    for root, dirs, files in os.walk(ocrmypdf_data_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
+            rel_path = os.path.join('ocrmypdf', 'data', os.path.relpath(file_path, ocrmypdf_data_dir))
+            datas.append((file_path, os.path.dirname(rel_path)))
+
+# Explicitly include images
+for file in glob.glob(os.path.join(base_dir, '*.png')) + glob.glob(os.path.join(base_dir, '*.ico')):
+    datas.append((file, '.'))
+
+# Include directories with their contents
 for directory in [
     'OCR',
     'Advanced_Keyword_Search',
@@ -53,74 +60,76 @@ for directory in [
 ]:
     dir_path = os.path.join(base_dir, directory)
     if os.path.exists(dir_path):
-        datas.append((dir_path, directory))
-    else:
-        print(f"Warning: Directory not found: {dir_path}")
+        # Get all files in the directory and subdirectories
+        for root, dirs, files in os.walk(dir_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Calculate relative path for destination
+                rel_path = os.path.relpath(os.path.dirname(file_path), base_dir)
+                datas.append((file_path, rel_path))
 
-# Find all image files in the base directory
-for file in os.listdir(base_dir):
-    if file.endswith('.png') or file.endswith('.ico'):
-        datas.append((os.path.join(base_dir, file), '.'))
+# Collect data from packages
+binaries = []
+package_data = []
 
-# Collect all necessary modules
-for module_name in ['whisper', 'torch', 'ocrmypdf', 'pygubu', 'nltk']:
+# Core packages with data files
+for package in ['nltk', 'transformers', 'whisper', 'torch']:
     try:
-        module_datas, module_binaries, module_hiddenimports = collect_all(module_name)
-        datas.extend(module_datas)
-        binaries = module_binaries  # We'll accumulate all binaries
-        # Also collect metadata
-        datas.extend(copy_metadata(module_name))
+        pkg_data, pkg_binaries, pkg_hidden = collect_all(package)
+        datas.extend(pkg_data)
+        binaries.extend(pkg_binaries)
+        package_data.extend(copy_metadata(package))
     except Exception as e:
-        print(f"Warning: Could not collect {module_name} module: {e}")
+        print(f"Warning: Error collecting {package}: {e}")
 
-# Define hidden imports
+# NLTK data
+nltk_data_path = os.path.join(os.path.expanduser('~'), 'nltk_data')
+if os.path.exists(nltk_data_path):
+    for item in os.listdir(nltk_data_path):
+        item_path = os.path.join(nltk_data_path, item)
+        if os.path.isdir(item_path):
+            datas.append((item_path, os.path.join('nltk_data', item)))
+
+# Hidden imports
 hidden_imports = [
-    # GUI framework
-    'pygubu',
-    'pygubu.builder',
-    'pygubu.builder.tkstdwidgets',
-    'pygubu.builder.widgets.dialog',
-    'pygubu.builder.widgets.tkinterscrolledtext',
-    'pygubu.builder.widgets.pathchooserinput',
+    # Core
     'tkinter',
     'tkinter.ttk',
-
-    # Data processing
     'pandas',
+    'numpy',
     'matplotlib',
-    'matplotlib.backends.backend_tkagg',
+    'PIL',
 
     # NLP
     'nltk',
     'nltk.tokenize',
     'nltk.corpus',
-    'nltk.data',
     'transformers',
 
-    # OCR processing
-    'ocrmypdf',
-    'ocrmypdf.data',
-
-    # Audio processing
+    # Audio
     'whisper',
     'torch',
 
-    # Others
-    'glob',
-    'json',
-    're',
-    'collections',
-    'time',
-    'asyncio',
+    # PDF
+    'pypdf',
+    'ocrmypdf',
+
+    # Specific modules
+    'pygubu',
+    'pygubu.builder',
+    'pygubu.builder.widgets',
     'threading',
+    'webbrowser',
+    'glob',
+    'asyncio',
+    'collections',
+    'csv',
+    're',
 ]
 
-# Add all submodules
-for module_name in ['pygubu', 'nltk', 'ocrmypdf']:
-    hidden_imports.extend(collect_submodules(module_name))
-
 # Create a runtime hook to set up NLTK data path
-runtime_hook = """
+with open('runtime_hook.py', 'w') as f:
+    f.write("""
 import os
 import sys
 import nltk
@@ -129,19 +138,16 @@ import nltk
 nltk_data_dir = os.path.join(sys._MEIPASS, 'nltk_data')
 os.makedirs(nltk_data_dir, exist_ok=True)
 nltk.data.path.insert(0, nltk_data_dir)
-"""
+""")
 
-with open('runtime_hook.py', 'w') as f:
-    f.write(runtime_hook)
-
-# Define the Analysis object
+# Create the Analysis object
 a = Analysis(
     ['MDMT_Launcher.py'],
     pathex=[base_dir],
     binaries=binaries,
-    datas=datas,
+    datas=datas + package_data,
     hiddenimports=hidden_imports,
-    hookspath=[],
+    hookspath=['.'],  # Add the current directory to find our hook
     hooksconfig={},
     runtime_hooks=['runtime_hook.py'],
     excludes=[],
@@ -170,11 +176,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
+    icon=icon_file if icon_file and os.path.exists(icon_file) else None,
 )
 
 # Create the collection
@@ -188,3 +190,12 @@ coll = COLLECT(
     upx_exclude=[],
     name='MDMT',
 )
+
+# For macOS, create a .app bundle
+if is_mac:
+    app = BUNDLE(
+        coll,
+        name='MDMT.app',
+        icon=icon_file if icon_file and os.path.exists(icon_file) else None,
+        bundle_identifier='com.jamescaldwell.mdmt',
+    )
