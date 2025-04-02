@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import sys
 import tkinter as tk
 from tkinter import messagebox
 import pygubu
@@ -9,7 +10,15 @@ import threading
 from NLP.relationship_extraction import process_files_for_relationships
 
 PROJECT_PATH = os.getcwd()
-PROJECT_UI = os.path.join(PROJECT_PATH, 'relationshipExtractionWindow.ui')
+# In audioTranscriptionWindow.py, ocrWindow.py, etc.
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    PROJECT_PATH = sys._MEIPASS
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'relationshipExtractionWindow.ui')  # Replace with appropriate UI filename
+else:
+    # Running in development
+    PROJECT_PATH = os.getcwd()
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'relationshipExtractionWindow.ui')  # Replace with appropriate UI filename
 
 
 class relationshipExtractionWindow:

@@ -11,7 +11,15 @@ import sys
 PROJECT_PATH = os.getcwd()
 sys.path.append(os.path.join(PROJECT_PATH, 'Translation'))
 
-PROJECT_UI = os.path.join(PROJECT_PATH, 'translationWindow.ui')
+# In audioTranscriptionWindow.py, ocrWindow.py, etc.
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    PROJECT_PATH = sys._MEIPASS
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'translationWindow.ui')  # Replace with appropriate UI filename
+else:
+    # Running in development
+    PROJECT_PATH = os.getcwd()
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'translationWindow.ui')  # Replace with appropriate UI filename
 
 # Dictionary mapping display names to language codes for Google Translate
 LANGUAGE_CODES = {

@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+import sys
 import tkinter as tk
 import pygubu
 import webbrowser
@@ -14,7 +15,14 @@ from nerWindow import nerWindow
 from coWordAnalysisWindow import coWordAnalysisWindow
 
 PROJECT_PATH = os.getcwd()
-PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
+
+# Replace it with this code that will work in both development and PyInstaller environments
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    PROJECT_UI = os.path.join(sys._MEIPASS, 'defaultWindow.ui')
+else:
+    # Running in development
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
 
 
 class defaultWindow:

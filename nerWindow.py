@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import sys
 import tkinter as tk
 from tkinter import messagebox
 import pygubu
@@ -9,7 +10,15 @@ import threading
 from NLP.named_entity_recognition import main as ner_main
 
 PROJECT_PATH = os.getcwd()
-PROJECT_UI = os.path.join(PROJECT_PATH, 'nerWindow.ui')
+# In audioTranscriptionWindow.py, ocrWindow.py, etc.
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    PROJECT_PATH = sys._MEIPASS
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'nerWindow.ui')  # Replace with appropriate UI filename
+else:
+    # Running in development
+    PROJECT_PATH = os.getcwd()
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'nerWindow.ui')  # Replace with appropriate UI filename
 
 
 class nerWindow:

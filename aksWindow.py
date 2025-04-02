@@ -9,15 +9,24 @@
 # v. 2.1: 2021-08-27
 # v. 3.0: 2022-04-03
 #
-
+import os
 import pathlib
+import sys
+
 import pygubu
 from tkinter import messagebox
 from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
 import threading
 
 PROJECT_PATH = pathlib.Path(__file__).parent
-PROJECT_UI = PROJECT_PATH / "aksWindow.ui"
+
+# Replace it with this code that will work in both development and PyInstaller environments
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    PROJECT_UI = os.path.join(sys._MEIPASS, 'aksWindow.ui')
+else:
+    # Running in development
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'aksWindow.ui')
 
 
 class aksWindow:

@@ -8,7 +8,15 @@ import subprocess
 import sys
 
 PROJECT_PATH = os.getcwd()
-PROJECT_UI = os.path.join(PROJECT_PATH, 'ragWindow.ui')
+# In audioTranscriptionWindow.py, ocrWindow.py, etc.
+if hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    PROJECT_PATH = sys._MEIPASS
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'ragWindow.ui')  # Replace with appropriate UI filename
+else:
+    # Running in development
+    PROJECT_PATH = os.getcwd()
+    PROJECT_UI = os.path.join(PROJECT_PATH, 'ragWindow.ui')  # Replace with appropriate UI filename
 DEFAULT_MODEL_PATH = os.path.join(PROJECT_PATH, 'RAG', 'models', 'Llama-3.2-3B-Instruct-Q5_K_M.gguf')
 
 
