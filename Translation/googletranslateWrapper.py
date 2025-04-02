@@ -5,16 +5,15 @@ import asyncio
 from googletrans import Translator
 from pypdf import PdfReader  # pypdf replaces PyPDF2
 
-# ----- Configuration variables (update these by hand) -----
-TARGET_LANG = "es"  # Desired target language code (e.g., "en", "es", "fr", "de")
-SUFFIX = "_translated"  # Suffix to append to output filenames
-DIRECTORY = "/home/james/Work/Aboriginal Sport Circle/Policy Documents/National"  # Path to the directory containing files to translate
-MAX_CHARS = 5000  # Maximum characters per translation chunk (adjust if needed)
+# ----- Default Configuration variables -----
+# These values will be overridden by settings from the UI
+DEFAULT_TARGET_LANG = "es"  # Default target language code (e.g., "en", "es", "fr", "de")
+DEFAULT_SUFFIX = "_translated"  # Default suffix to append to output filenames
+DEFAULT_DIRECTORY = ""  # Path will be set via UI
+DEFAULT_MAX_CHARS = 5000  # Maximum characters per translation chunk (adjust if needed)
 
 
-# --------------------------------------------------------------
-
-def chunk_text(text, max_chars=MAX_CHARS):
+def chunk_text(text, max_chars=DEFAULT_MAX_CHARS):
     """
     Split the text into chunks of less than max_chars by splitting on sentence boundaries.
     """
@@ -40,7 +39,7 @@ def chunk_text(text, max_chars=MAX_CHARS):
     return chunks
 
 
-async def translate_text_with_chunking(text, translator, dest_lang, max_chars=MAX_CHARS):
+async def translate_text_with_chunking(text, translator, dest_lang, max_chars=DEFAULT_MAX_CHARS):
     """
     Translate the given text by splitting it into chunks (each < max_chars),
     translating each chunk asynchronously, and joining the results.
@@ -75,8 +74,8 @@ async def process_txt_file(file_path, translator, dest_lang, suffix):
         print(f"Processing TXT file '{file_path}' (detected language: {detected.lang})")
 
         translated = await translate_text_with_chunking(text, translator, dest_lang)
-        base, _ = os.path.splitext(file_path)
-        output_path = f"{base}{suffix}.txt"
+        base, ext = os.path.splitext(file_path)
+        output_path = f"{base}{suffix}{ext}"
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(translated)
         print(f"Translated TXT file saved to: {output_path}")
@@ -114,7 +113,28 @@ async def process_pdf_file(file_path, translator, dest_lang, suffix):
         print(f"Error processing PDF file {file_path}: {e}")
 
 
-async def main():
+async def translate_documents_async(settings=None):
+    """
+    Main function that processes files in a directory.
+    Can be called directly from command line or from the GUI with settings.
+    """
+    # Use provided settings or defaults
+    if settings:
+        TARGET_LANG = settings.get("TARGET_LANG", DEFAULT_TARGET_LANG)
+        SUFFIX = settings.get("SUFFIX", DEFAULT_SUFFIX)
+        DIRECTORY = settings.get("DIRECTORY", DEFAULT_DIRECTORY)
+        MAX_CHARS = settings.get("MAX_CHARS", DEFAULT_MAX_CHARS)
+    else:
+        TARGET_LANG = DEFAULT_TARGET_LANG
+        SUFFIX = DEFAULT_SUFFIX
+        DIRECTORY = DEFAULT_DIRECTORY
+        MAX_CHARS = DEFAULT_MAX_CHARS
+
+    # Ensure we have a valid directory
+    if not DIRECTORY or not os.path.isdir(DIRECTORY):
+        print(f"Error: Invalid directory {DIRECTORY}")
+        return
+
     translator = Translator()
     tasks = []
     # Walk through all files in the specified directory (including subdirectories)
@@ -127,6 +147,13 @@ async def main():
                 tasks.append(process_pdf_file(file_path, translator, TARGET_LANG, SUFFIX))
     if tasks:
         await asyncio.gather(*tasks)
+
+
+async def main():
+    """
+    Entry point when run directly from command line.
+    """
+    await translate_documents_async()
 
 
 if __name__ == "__main__":

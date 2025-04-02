@@ -8,6 +8,7 @@ from audioTranscriptionWindow import audioTranscriptionWindow
 from ocrWindow import ocrWindow
 from aksWindow import aksWindow
 from ragWindow import ragWindow
+from translationWindow import translationWindow
 
 PROJECT_PATH = os.getcwd()
 PROJECT_UI = os.path.join(PROJECT_PATH, 'defaultWindow.ui')
@@ -50,8 +51,8 @@ class defaultWindow:
         ragWindow(master=self.mainwindow)
 
     def on_translation_item_clicked(self):
-        # Nothing for now
-        pass
+        # Instantiate the Translation window
+        translationWindow(master=self.mainwindow)
 
     def on_about_item_clicked(self):
         # Open the "About MDMT" window
