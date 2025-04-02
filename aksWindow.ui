@@ -644,43 +644,42 @@ INPUT
 =========================================================
 Select PDF Directory:
 
-Click the ellipsis icon to select a directory containing your corpus of PDF documents. All documents of the filetype ".pdf" will be selected for analysis.
+Click the ellipsis to select a directory containing your PDFs. All PDFs in this directory will be analyzed.
 =========================================================
 Select Keyword File:
 
-Click the ellipsis icon to select your text file containing keywords of interest. The keyword file should be of the filetype ".txt" and contain each keyword on a new line. For example:
+Click the ellipsis to select a text file containing keywords to search for, one per line. For example:
 
 	Morphogenesis
 	Blood-brain barrier
 	Central nervous system
 	Endothelial
 
-You may also enter your keywords into the text box below, following the same format as above.
+Alternatively, enter keywords manually in the text box below, one per line.
 =========================================================
 OUTPUT
 =========================================================
 Context Paragraph Length:
-
-This number will change the number of words in the generated context paragraph. Defaults to 30 words.
+Sets the number of words in the generated context paragraphs. Default is 30.
 =========================================================
 Basic Letter/Number Filter:
-
-Ticking this box will disable user filters and filter out anything that isn't a letter, number, or space. Should not be used if any keywords contain characters such as hyphens, as they will be caught by the basic filter.
+Enables a filter that removes everything except letters, numbers, and spaces. Do not use if your keywords contain other characters like hyphens.
 =========================================================
 Select Filter File:
 
-Click the ellipsis icon to select your filter file containing characters to filter. The filter file should be of the filetype ".txt" and contain each filter character on a new line. For example:
+Click the ellipsis to select a text file containing characters to filter out, one per line. For example:
 
 	!
 	@
 	#
 	©
 
-You may also enter your filter characters into the text box below, following the same format as above.
+Alternatively, enter filter characters manually in the text box below, one per line.
 =========================================================
 Select Output Directory:
 
-Click the ellipsis icon to select the directory where the output files will be saved.</property>
+Click the ellipsis to select where the output files will be saved.
+</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>

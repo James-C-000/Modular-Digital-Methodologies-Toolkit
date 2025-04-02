@@ -385,7 +385,14 @@ SOFTWARE.</property>
 =========================================================
 INPUT
 =========================================================
-to-do: update frame packing for about dialog</property>
+Select Documents Directory:
+
+Click the ellipsis icon to select the directory containing the documents you want to use as the knowledge base for the RAG chatbot.
+
+Select Llama-3.2 Model File:
+
+Click the ellipsis icon to select the Llama-3.2 model file (.gguf) to use for generating responses. This should be a model fine-tuned for instruction following and question answering.
+</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>

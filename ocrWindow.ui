@@ -628,53 +628,47 @@ SOFTWARE.</property>
 =========================================================
 GENERAL
 =========================================================
-to-do: Update frame packing for about dialog
+The OCR tool extracts text from image-based PDF files, making the content searchable and selectable. It uses Tesseract OCR under the hood.
 
-Note: OCR won't work with password protected PDFs and will invalidate any PDFs signed with a digital certificate.
+Note: OCR won't work with password-protected PDFs and will invalidate digitally signed PDFs.
 
-Note: Unless "Redo Existing OCR" is ticked, files which are already text selectable will not be copied from input dir to output dir.
+Note: Unless "Redo Existing OCR" is enabled, files that are already text-selectable will be skipped.
 =========================================================
 INPUT
 =========================================================
 Select PDF Directory:
 
-Click the ellipsis icon to select a directory containing your corpus of PDFs. All documents of the filetype "pdf" will be selected for analysis. You may have directories and subdirectories within the input directory, and this directory structure will be duplicated in the output directory.
+Click the ellipsis icon to select a directory containing your PDFs. All PDF files in this directory and its subdirectories will be processed. The original directory structure will be recreated in the output directory.
 =========================================================
 OUTPUT
 =========================================================
 Select Output Directory:
 
-Click the ellipsis icon to select a directory your OCR'd PDFs will be saved to. This directory cannot be your input directory.
+Click the ellipsis icon to select where OCR'd PDFs will be saved. This cannot be the same as the input directory.
 =========================================================
 LANGUAGES
 =========================================================
-Select any languages your PDFs contain in the "Select PDF Language(s)" list. When a language has a "(Script)" option, this means it will automatically select any languages which are written in that script. For example, "Ethiopic (Script)" will automatically select the Amharic and Tigrinya languages.
+Select the language(s) your PDFs contain from the list. When a "(Script)" option is available, it will automatically select all languages using that script. For example, "Ethiopic (Script)" selects both Amharic and Tigrinya.
 =========================================================
 OPTIONS
 =========================================================
 PDF/A Output (Archive Ready):
+Creates archive-ready PDFs in the output directory. Enable only if needed.
 
-Directs the program to create an archive ready version of each PDF in the output directory. It is safe to leave this disabled unless you have a reason to enable it. See Adobe for more information: https://www.adobe.com/uk/acrobat/resources/document-files/pdf-types/pdf-a.html
---------------------
 Extract Text to Text File:
+Creates a plain text file alongside each OCR'd PDF, containing just the extracted text. Useful for text analysis projects.
 
-Directs the program to create an accompanying text file for each PDF which contains only the OCR'd text. Useful for qualitative computational analysis projects.
---------------------
 Redo Existing OCR:
+Discards any existing OCR and re-OCRs using Tesseract. If disabled, already OCR'd PDFs in the input will be skipped.
 
-Directs the program to discard any existing OCR and recreate the text selectable layer using Tesseract. If this checkbox is disabled, any PDFs in the input directory which are already OCR'd will be skipped.
---------------------
 Correct Page Rotation:
+Auto-rotates pages to an upright orientation based on the selected confidence threshold.
 
-Directs the program to automatically rotate pages to an upright orientation based on the Confidence Threshold value selected (see below).
---------------------
 Confidence Threshold:
+Determines how certain the tool must be that a page needs rotation before rotating it. Low confidence risks false positives, high risks false negatives. Choose based on your PDF quality.
 
-The confidence threshold is a measure of how sure the program must be that the PDF input is not upright before attempting to make it upright. Generally, a low confidence threshold will produce more false positives (rotating your PDF to an incorrect orientation) while a higher confidence threshold will reduce false positives and increase false negatives. You may want to select this option based on the quality of your PDF corpus: lower quality scans will need a lower confidence threshold. Keep in mind the general property of "garbge in, garbage out" -- the lower the quality of the scan, the higher the probability of an incorrect rotation and low quality OCR job.
---------------------
 Correct Skewed Scans:
-
-Directs the program to automatically straighten the orientation of the page so the text is horizontal. Generally works best with text that is significantly skewed (&gt;4 degrees).
+Auto-straightens page text. Works best on significantly skewed text (>4 degrees).
 </property>
         <property name="wrap">word</property>
         <layout manager="place">

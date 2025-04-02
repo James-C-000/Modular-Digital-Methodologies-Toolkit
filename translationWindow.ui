@@ -454,35 +454,34 @@ SOFTWARE.</property>
 =========================================================
 GENERAL
 =========================================================
-The language translation tool uses Google Translate API to translate PDF and text files.
+The Language Translation tool uses Google Translate to translate PDF and text documents.
 
-Supported file formats: .txt, .pdf, .mp3, .mp4, .mpeg, .mpga, .m4a, .wav, and .webm.
+Supported formats: .txt, .pdf
 
-IMPORTANT: Large files may take a long time to process. The system will process files in parallel where possible.
+IMPORTANT: Large files may take significant time to process. The system will process files in parallel when possible.
 
-NOTE: This feature is experimental and may have limitations with very large documents or certain languages.
+NOTE: This feature is experimental and may have limitations with very large documents or certain language pairs.
 =========================================================
 INPUT
 =========================================================
 Select Documents Directory:
 
-Click the ellipsis icon to select a directory containing your text and PDF documents. You may have directories and subdirectories within the input directory. All supported files will be processed.
+Click the ellipsis icon to select the directory containing the text and PDF documents you want to translate. The tool will process all supported files in this directory and its subdirectories.
 =========================================================
 OPTIONS
 =========================================================
 Target Language:
+Select the language to translate your documents into from the dropdown menu.
 
-Select the language you want your documents translated into from the dropdown menu.
---------------------
+
 Output File Suffix:
+The suffix that will be appended to translated file names. For example, if your file is "document.txt" and the suffix is "_es", the translated file will be "document_es.txt".
 
-The suffix that will be added to translated file names. For example, if your file is "document.txt" and the suffix is "_es", the translated file will be named "document_es.txt".
---------------------
 Output to Same Directory:
+If selected, translated files will be saved in the same location as the originals, with the specified suffix added to each filename.
 
-When selected, translated files will be saved in the same location as the original files. Each translated file will have the specified suffix added to its name.
-
-If not selected, the system will create a new folder called "Translated" in the input directory, with the same folder structure as the original.</property>
+If not selected, the tool will create a new "Translated" folder in the input directory, mirroring the original folder structure.
+</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>

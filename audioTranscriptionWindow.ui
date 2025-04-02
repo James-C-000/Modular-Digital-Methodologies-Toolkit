@@ -483,20 +483,22 @@ SOFTWARE.</property>
 =========================================================
 GENERAL
 =========================================================
-to-do: Update frame packing for about dialog
+The Audio Transcription tool converts speech in audio files to text using OpenAI's Whisper system.
 
-Note: Only .mp3, .mp4, .mpeg, .mpga, .m4a, .wav, and .webm files are supported.
+Supported formats: .mp3, .mp4, .mpeg, .mpga, .m4a, .wav, and .webm
 =========================================================
 INPUT
 =========================================================
 Select Audio Directory:
 
-Click the ellipsis icon to select a directory containing your audio files. You may have directories and subdirectories within the input directory.
+Click the ellipsis icon to select a directory containing your audio files. The tool will process all supported files in this directory and its subdirectories.
 
 =========================================================
 OPTIONS
 =========================================================
-In a nutshell, the larger the model the more accurate, but the more resource hungry. If you do not have a powerful computer, stick with tiny or base.</property>
+Model Selection:
+Choose the Whisper model to use for transcription. Larger models are more accurate but slower and more resource intensive. If your computer is not powerful, use the Tiny or Base models.
+</property>
         <property name="wrap">word</property>
         <layout manager="place">
           <property name="anchor">nw</property>

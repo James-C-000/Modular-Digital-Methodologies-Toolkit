@@ -434,7 +434,27 @@ SOFTWARE.</property>
         <property name="state">disabled</property>
         <property name="text" translatable="yes">Program Documentation
 =========================================================
-INPUT
+The main MDMT window allows you to launch the various tools included in the toolkit. Click on a button to open the respective tool's window.
+=========================================================
+Button descriptions:
+
+OCR: Opens the Optical Character Recognition tool for extracting text from image-based PDFs.
+
+Audio Transcription: Opens the audio transcription tool for converting audio files to text.
+
+Translation (Experimental): Opens the language translation tool for translating documents.
+
+Retrieval-Augmented Generation Chatbot: Opens an AI-powered chatbot that can answer questions using a knowledge base of your documents.
+
+Advanced Keyword Search: Opens the tool for searching PDFs for keywords and generating analytics.
+
+Named Entity Recognition: Opens the tool for identifying named entities like people, places, and organizations in your documents.
+
+Relationship Extraction: Opens the tool for extracting relationships between entities in your documents.
+
+Co-Word Analysis: Opens the tool for analyzing word co-occurrences and generating network visualizations.
+
+Bibliometrix: (Disabled) Placeholder for a bibliometric analysis tool. Currently a WIP. Run locally in Bibliometrix dir with R interpreter.
 =========================================================
 to-do: update frame packing for about dialog</property>
         <property name="wrap">word</property>
