@@ -1,6 +1,6 @@
+faiss-cpu~=1.10.0
 matplotlib==3.10.0
 ocrmypdf==16.8.0
-pdftotext==3.0.0
 pygubu==0.35.6
 pandas~=2.2.3
 requests~=2.32.3
@@ -9,6 +9,8 @@ openai-whisper~=20240930
 langchain-community~=0.3.20
 langchain~=0.3.22
 langchain-core~=0.3.49
+langchain-huggingface~=0.1.2
+llama-cpp-python~=0.3.8
 googletrans~=4.0.2
 pypdf~=5.4.0
 future~=1.0.0
