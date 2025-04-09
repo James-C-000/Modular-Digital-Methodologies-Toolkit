@@ -8,6 +8,7 @@ from tkinter import messagebox
 import ocrmypdf
 import pygubu
 import threading
+import tempfile
 
 PROJECT_PATH = os.getcwd()
 # In audioTranscriptionWindow.py, ocrWindow.py, etc.
@@ -182,6 +183,29 @@ tesseractLanguages = {
 }
 
 
+# Function to ensure Tesseract config files are available
+def ensure_tesseract_configs():
+    """Create or verify Tesseract config files in a temporary directory"""
+    temp_dir = tempfile.mkdtemp(prefix='mdmt_tesseract_')
+    config_dir = os.path.join(temp_dir, 'configs')
+    os.makedirs(config_dir, exist_ok=True)
+
+    # Create basic config files
+    configs = {
+        'hocr': 'tessedit_create_hocr 1\nhocr_font_info 0\n',
+        'txt': 'tessedit_create_txt 1\n',
+        'pdf': 'tessedit_create_pdf 1\n',
+        'alto': 'tessedit_create_alto 1\n',
+        'tsv': 'tessedit_create_tsv 1\n'
+    }
+
+    for name, content in configs.items():
+        with open(os.path.join(config_dir, name), 'w') as f:
+            f.write(content)
+
+    return config_dir
+
+
 class ocrWindow:
     def __init__(self, master=None):
         self.builder = builder = pygubu.Builder()
@@ -205,7 +229,8 @@ class ocrWindow:
         self.progressBar = builder.get_object("progressBar", self.ocrWindow)
         self.langListBoxScrollbar = builder.get_object("langSelection_Scrollbar", self.ocrWindow)
         self.rotateThresholdLowRadiobutton = builder.get_object("rotationConfidenceLow_RadioButton", self.ocrWindow)
-        self.rotateThresholdNormalRadiobutton = builder.get_object("rotationConfidenceNormal_RadioButton", self.ocrWindow)
+        self.rotateThresholdNormalRadiobutton = builder.get_object("rotationConfidenceNormal_RadioButton",
+                                                                   self.ocrWindow)
         self.rotateThresholdHighRadiobutton = builder.get_object("rotationConfidenceHigh_RadioButton", self.ocrWindow)
         # Get rotate confidence threshold
         self.rotateThresholdSelection = builder.get_variable("rotateThresholdSelection")
@@ -219,6 +244,21 @@ class ocrWindow:
         _main_menu = builder.get_object("menu1", self.ocrWindow)
         self.ocrWindow.configure(menu=_main_menu)
         builder.connect_callbacks(self)
+
+        # Cleanup any leftover temporary directories
+        self.cleanup_temp_tesseract()
+
+    def cleanup_temp_tesseract(self):
+        """Clean up any leftover temporary tesseract directories from previous runs"""
+        temp_dir = tempfile.gettempdir()
+        for item in os.listdir(temp_dir):
+            if item.startswith('mdmt_tesseract_'):
+                try:
+                    path = os.path.join(temp_dir, item)
+                    if os.path.isdir(path):
+                        shutil.rmtree(path)
+                except Exception:
+                    pass
 
     def on_runOCR_item_clicked(self):
         ocrThread = threading.Thread(target=self.ocrmypdfThread, daemon=True)
@@ -278,20 +318,62 @@ class ocrWindow:
         textFileCheckboxState = self.builder.get_variable('textFileCheckboxState').get()  # 0 = unchecked; 1 = checked
         redoOCRCheckboxState = self.builder.get_variable('redoOCRCheckboxState').get()  # 0 = unchecked; 1 = checked
 
-        # Set Tesseract env. variable for tessdata path
-        if hasattr(sys, '_MEIPASS'):
-            # Use the path set in the runtime hook
-            os.environ["TESSDATA_PREFIX"] = os.path.join(sys._MEIPASS, 'OCR', 'tessdata')
-            # Use custom config path created by the hook
-            if "TESSCONFIG_PATH" in os.environ:
-                tesseractConfig = os.environ["TESSCONFIG_PATH"]
+        # Set up Tesseract configs and environment variables
+        try:
+            # First check if we have bundled tessconfigs
+            if hasattr(sys, '_MEIPASS'):
+                tessdata_path = os.path.join(sys._MEIPASS, 'OCR', 'tessdata')
+                bundled_configs_path = os.path.join(tessdata_path, 'tessconfigs', 'configs')
+
+                # Check if bundled configs exist and directory is not empty
+                if os.path.exists(bundled_configs_path) and len(os.listdir(bundled_configs_path)) > 0:
+                    # Use the bundled configs
+                    tesseractConfig = bundled_configs_path
+                    os.environ["TESSDATA_PREFIX"] = tessdata_path
+                    os.environ["TESSCONFIG_PATH"] = tesseractConfig
+                    print(f"Using bundled Tesseract configs at: {tesseractConfig}")
+                else:
+                    # Create temporary configs if bundled ones aren't available
+                    tesseractConfig = ensure_tesseract_configs()
+                    os.environ["TESSDATA_PREFIX"] = tessdata_path
+                    os.environ["TESSCONFIG_PATH"] = tesseractConfig
+                    print(f"Created temporary Tesseract configs at: {tesseractConfig}")
             else:
-                # Fallback
-                tesseractConfig = os.path.join(sys._MEIPASS, 'OCR', 'tessdata', 'tessconfigs', 'configs')
-        else:
-            # Running from source - use original paths
-            os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
-            tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs', 'configs')
+                # Running in development
+                tessdata_path = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+                # Check if development configs exist
+                dev_configs_path = os.path.join(tessdata_path, 'tessconfigs', 'configs')
+                if os.path.exists(dev_configs_path) and len(os.listdir(dev_configs_path)) > 0:
+                    tesseractConfig = dev_configs_path
+                else:
+                    tesseractConfig = ensure_tesseract_configs()
+
+                os.environ["TESSDATA_PREFIX"] = tessdata_path
+                os.environ["TESSCONFIG_PATH"] = tesseractConfig
+                print(f"Development mode: Using Tesseract configs at: {tesseractConfig}")
+
+            # Debug output
+            print(f"TESSDATA_PREFIX = {os.environ.get('TESSDATA_PREFIX', 'Not set')}")
+            print(f"TESSCONFIG_PATH = {os.environ.get('TESSCONFIG_PATH', 'Not set')}")
+
+            # Verify configs directory exists and contains necessary files
+            if tesseractConfig and os.path.exists(tesseractConfig):
+                config_files = os.listdir(tesseractConfig)
+                print(f"Config directory contains: {config_files}")
+
+                # Check for important config files
+                for req_config in ['hocr', 'txt', 'pdf']:
+                    if req_config not in config_files:
+                        print(f"Warning: Required config '{req_config}' not found in {tesseractConfig}")
+            else:
+                print(f"Warning: Config directory {tesseractConfig} does not exist or is inaccessible")
+
+        except Exception as e:
+            error_msg = f"Failed to set up Tesseract: {str(e)}"
+            print(error_msg)
+            messagebox.showerror("Tesseract Configuration Error", error_msg)
+            self.runOCRButton.configure(state='normal')
+            return
 
         if pdfInputDir == pdfOutputDir:
             messagebox.showerror(title='Error', message='Input and output directory cannot be the same.')
@@ -328,62 +410,49 @@ class ocrWindow:
                 error = "ERROR: " + str(e) + ".\nDelete and recreate output directory then retry."
                 messagebox.showerror(title='Error', message=error)
 
-            # OCR the PDF using OCRmyPDF
+            # OCR the PDF using OCRmyPDF with additional debug information
             for i in pdfsInInputDir:
                 try:
                     inputDirStructure = os.path.relpath(i, pdfInputDir)
                     outputDirPreserveStructure = os.path.join(pdfOutputDir, 'MDMT-OCR-Output', inputDirStructure)
                     sidecarTextFile = os.path.splitext(outputDirPreserveStructure)[0] + '.txt'
-                    if bool(textFileCheckboxState) == True and bool(rotatePagesCheckboxState) == True:
-                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
-                        ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                     language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
-                                     redo_ocr=bool(redoOCRCheckboxState),
-                                     skip_text=not (bool(redoOCRCheckboxState)),
-                                     deskew=bool(deskewCheckboxState),
-                                     rotate_pages=bool(rotatePagesCheckboxState),
-                                     rotate_pages_threshold=rotateThresholdSelection,
-                                     sidecar=sidecarTextFile,
-                                     output_type=pdfType,
-                                     invalidate_digital_signatures=True)
-                    elif bool(textFileCheckboxState) == False and bool(rotatePagesCheckboxState) == False:
-                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
-                        ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                     language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
-                                     redo_ocr=bool(redoOCRCheckboxState),
-                                     skip_text=not (bool(redoOCRCheckboxState)),
-                                     deskew=bool(deskewCheckboxState),
-                                     rotate_pages=bool(rotatePagesCheckboxState),
-                                     output_type=pdfType,
-                                     invalidate_digital_signatures=True)
-                    elif bool(textFileCheckboxState) == True and bool(rotatePagesCheckboxState) == False:
-                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
-                        ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                     language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
-                                     redo_ocr=bool(redoOCRCheckboxState),
-                                     skip_text=not (bool(redoOCRCheckboxState)),
-                                     deskew=bool(deskewCheckboxState),
-                                     rotate_pages=bool(rotatePagesCheckboxState),
-                                     sidecar=sidecarTextFile,
-                                     output_type=pdfType,
-                                     invalidate_digital_signatures=True)
-                    elif bool(textFileCheckboxState) == False and bool(rotatePagesCheckboxState) == True:
-                        ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
-                        ocrmypdf.ocr(i, outputDirPreserveStructure,
-                                     language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
-                                     redo_ocr=bool(redoOCRCheckboxState),
-                                     skip_text=not (bool(redoOCRCheckboxState)),
-                                     deskew=bool(deskewCheckboxState),
-                                     rotate_pages=bool(rotatePagesCheckboxState),
-                                     rotate_pages_threshold=rotateThresholdSelection,
-                                     output_type=pdfType,
-                                     invalidate_digital_signatures=True)
+
+                    # Show debug info for troubleshooting
+                    print(f"Processing PDF: {i}")
+                    print(f"Output file: {outputDirPreserveStructure}")
+                    print(f"Language: {pdfLanguageValsString}")
+                    print(f"Tesseract config dir: {tesseractConfig}")
+
+                    ocr_options = {
+                        "language": pdfLanguageValsString,
+                        "tesseract_config": tesseractConfig,
+                        "redo_ocr": bool(redoOCRCheckboxState),
+                        "skip_text": not bool(redoOCRCheckboxState),
+                        "deskew": bool(deskewCheckboxState),
+                        "rotate_pages": bool(rotatePagesCheckboxState),
+                        "output_type": pdfType,
+                        "invalidate_digital_signatures": True,
+                        "verbose": True,
+                        "jobs": 1  # Set to 1 for better error reporting
+                    }
+
+                    # Add conditional options
+                    if bool(rotatePagesCheckboxState):
+                        ocr_options["rotate_pages_threshold"] = float(rotateThresholdSelection)
+
+                    if bool(textFileCheckboxState):
+                        ocr_options["sidecar"] = sidecarTextFile
+
+                    # Configure logging for more visibility
+                    ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.debug)
+
+                    # Run OCR
+                    result = ocrmypdf.ocr(i, outputDirPreserveStructure, **ocr_options)
+                    print(f"OCR completed with status: {result}")
+
                 except Exception as e:
-                    error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry.\nNot a fatal error, continuing..."
+                    error = f"ERROR: {str(e)}.\nCheck PDF inputs and retry.\nNot a fatal error, continuing..."
+                    print(f"OCR error: {error}")
                     messagebox.showerror(title='Error', message=error)
             # Stop progress bar
             self.progressBar.configure(mode='determinate')  # Hide progress bar pip
