@@ -8,8 +8,9 @@ from tkinter import messagebox
 import ocrmypdf
 import pygubu
 import threading
+import subprocess
+from pathlib import Path
 
-PROJECT_PATH = os.getcwd()
 # In audioTranscriptionWindow.py, ocrWindow.py, etc.
 if hasattr(sys, '_MEIPASS'):
     # Running from PyInstaller bundle
@@ -215,6 +216,9 @@ class ocrWindow:
         # Insert langs into listbox
         for lang in tesseractLanguages.keys():
             self.langListbox.insert("end", lang)
+            
+        # Check for Tesseract installation at startup
+        self.check_tesseract_installation()
         # Main menu
         _main_menu = builder.get_object("menu1", self.ocrWindow)
         self.ocrWindow.configure(menu=_main_menu)
@@ -312,10 +316,33 @@ class ocrWindow:
             except Exception as e:
                 error = "ERROR: " + str(e) + ".\nDelete and recreate output directory then retry."
                 messagebox.showerror(title='Error', message=error)
-            # Set Tesseract env. variable for tessdata path (system agnostic)
-            os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
-            # Set tessconfigs path (system agnostic)
-            tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs')
+            # Setup for Tesseract
+            # If running as PyInstaller bundle, use the bundled tesseract
+            if hasattr(sys, '_MEIPASS'):
+                # Set path to bundled Tesseract executable
+                tesseract_path = os.path.join(PROJECT_PATH, 'tesseract')
+                if os.name == 'nt':  # Windows
+                    tesseract_path += '.exe'
+                if os.path.exists(tesseract_path):
+                    os.environ["TESSERACT_PATH"] = tesseract_path
+                
+                # Always set TESSDATA_PREFIX to our bundled tessdata
+                tessdata_path = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+                os.environ["TESSDATA_PREFIX"] = tessdata_path
+                
+                # Verify tesseract is accessible
+                try:
+                    # Check if tesseract is available by running a simple subprocess call
+                    subprocess.run(['tesseract', '--version'], capture_output=True, check=True)
+                except Exception as e:
+                    error = f"Tesseract not found: {str(e)}. This may be a bundling issue."
+                    messagebox.showerror(title='Error', message=error)
+            else:
+                # Development environment - use local tessdata
+                os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+            
+            # Create necessary config files in the current directory
+            self.create_tesseract_config_files()
 
             # OCR the PDF using OCRmyPDF
             for i in pdfsInInputDir:
@@ -327,7 +354,6 @@ class ocrWindow:
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
                                      language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
                                      redo_ocr=bool(redoOCRCheckboxState),
                                      skip_text=not (bool(redoOCRCheckboxState)),
                                      deskew=bool(deskewCheckboxState),
@@ -335,45 +361,74 @@ class ocrWindow:
                                      rotate_pages_threshold=rotateThresholdSelection,
                                      sidecar=sidecarTextFile,
                                      output_type=pdfType,
-                                     invalidate_digital_signatures=True)
+                                     invalidate_digital_signatures=True,
+                                     tesseract_timeout=120)
                     elif bool(textFileCheckboxState) == False and bool(rotatePagesCheckboxState) == False:
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
                                      language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
                                      redo_ocr=bool(redoOCRCheckboxState),
                                      skip_text=not (bool(redoOCRCheckboxState)),
                                      deskew=bool(deskewCheckboxState),
                                      rotate_pages=bool(rotatePagesCheckboxState),
                                      output_type=pdfType,
-                                     invalidate_digital_signatures=True)
+                                     invalidate_digital_signatures=True,
+                                     tesseract_timeout=120)
                     elif bool(textFileCheckboxState) == True and bool(rotatePagesCheckboxState) == False:
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
                                      language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
                                      redo_ocr=bool(redoOCRCheckboxState),
                                      skip_text=not (bool(redoOCRCheckboxState)),
                                      deskew=bool(deskewCheckboxState),
                                      rotate_pages=bool(rotatePagesCheckboxState),
                                      sidecar=sidecarTextFile,
                                      output_type=pdfType,
-                                     invalidate_digital_signatures=True)
+                                     invalidate_digital_signatures=True,
+                                     tesseract_timeout=120)
                     elif bool(textFileCheckboxState) == False and bool(rotatePagesCheckboxState) == True:
                         ocrmypdf.configure_logging(verbosity=ocrmypdf.Verbosity.default)
                         ocrmypdf.ocr(i, outputDirPreserveStructure,
                                      language=pdfLanguageValsString,
-                                     tesseract_config=tesseractConfig,
                                      redo_ocr=bool(redoOCRCheckboxState),
                                      skip_text=not (bool(redoOCRCheckboxState)),
                                      deskew=bool(deskewCheckboxState),
                                      rotate_pages=bool(rotatePagesCheckboxState),
                                      rotate_pages_threshold=rotateThresholdSelection,
                                      output_type=pdfType,
-                                     invalidate_digital_signatures=True)
+                                     invalidate_digital_signatures=True,
+                                     tesseract_timeout=120)
                 except Exception as e:
-                    error = "ERROR: " + str(e) + ".\nCheck PDF inputs and retry.\nNot a fatal error, continuing..."
-                    messagebox.showerror(title='Error', message=error)
+                    error_msg = str(e)
+                    # More detailed error handling for common issues
+                    if "No such file or directory" in error_msg and "hocr" in error_msg:
+                        error = (
+                            "ERROR: Tesseract HOCR configuration issue.\n"
+                            f"Original error: {error_msg}\n\n"
+                            "Possible solutions:\n"
+                            "1. Make sure Tesseract is properly installed on your system\n"
+                            "2. Check if TESSDATA_PREFIX environment variable is set correctly\n"
+                            "3. Verify that the tessdata directory contains all required files\n"
+                            "\nContinuing with next file..."
+                        )
+                    elif "OCR engine" in error_msg and "failed" in error_msg:
+                        error = (
+                            "ERROR: Tesseract OCR engine failed.\n"
+                            f"Original error: {error_msg}\n\n"
+                            "Possible solutions:\n"
+                            "1. Try a different language selection\n"
+                            "2. Verify the PDF is not corrupt or password-protected\n"
+                            "3. Make sure the PDF contains scanned images (not just text)\n"
+                            "\nContinuing with next file..."
+                        )
+                    else:
+                        error = f"ERROR: {error_msg}.\nCheck PDF inputs and retry.\nNot a fatal error, continuing..."
+                    
+                    # Log the error for debugging
+                    print(f"OCR Error: {error_msg}")
+                    
+                    # Show error message to user
+                    messagebox.showerror(title='OCR Processing Error', message=error)
             # Stop progress bar
             self.progressBar.configure(mode='determinate')  # Hide progress bar pip
             self.progressBar.stop()
@@ -398,6 +453,101 @@ class ocrWindow:
     def on_viewLicenses_item_clicked(self):
         # Open the license terms text window
         self.licenseDialog.run()
+
+    def create_tesseract_config_files(self):
+        """Create required Tesseract config files in local directory."""
+        # Define config file contents
+        config_files = {
+            'hocr': "tessedit_create_hocr 1\nhocr_font_info 0\n",
+            'txt': "tessedit_create_txt 1\n", 
+            'pdf': "tessedit_create_pdf 1\n"
+        }
+        
+        # Create config files in current directory
+        for filename, content in config_files.items():
+            config_path = os.path.join(os.getcwd(), filename)
+            try:
+                with open(config_path, 'w') as f:
+                    f.write(content)
+                print(f"Created config file: {config_path}")
+            except Exception as e:
+                print(f"Error creating config file {filename}: {e}")
+        
+        # Ensure configs directory exists in TESSDATA_PREFIX if possible
+        tessdata_prefix = os.environ.get('TESSDATA_PREFIX')
+        if tessdata_prefix and os.path.exists(tessdata_prefix):
+            tessconfigs_dir = os.path.join(tessdata_prefix, 'tessconfigs')
+            configs_dir = os.path.join(tessconfigs_dir, 'configs')
+            
+            # Create directories if they don't exist
+            os.makedirs(configs_dir, exist_ok=True)
+            
+            # Copy config files to tessdata directory
+            for filename, content in config_files.items():
+                config_path = os.path.join(configs_dir, filename)
+                try:
+                    with open(config_path, 'w') as f:
+                        f.write(content)
+                    print(f"Created tessdata config file: {config_path}")
+                except Exception as e:
+                    print(f"Error creating tessdata config file {filename}: {e}")
+                    
+    def check_tesseract_installation(self):
+        """Check if Tesseract is properly installed and configured."""
+        tesseract_available = False
+        try:
+            # Try to run tesseract to check if it's available
+            result = subprocess.run(['tesseract', '--version'], 
+                                   capture_output=True, text=True)
+            if result.returncode == 0:
+                tesseract_available = True
+                print(f"Tesseract found: {result.stdout.strip()}")
+        except Exception as e:
+            print(f"Error checking for tesseract: {e}")
+        
+        # Check TESSDATA_PREFIX environment variable
+        tessdata_path = os.environ.get('TESSDATA_PREFIX')
+        if not tessdata_path:
+            print("Warning: TESSDATA_PREFIX environment variable not set")
+            
+            # Try to set it based on project path
+            tessdata_path = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+            if os.path.exists(tessdata_path):
+                os.environ['TESSDATA_PREFIX'] = tessdata_path
+                print(f"Set TESSDATA_PREFIX to: {tessdata_path}")
+            else:
+                print(f"Warning: Could not find tessdata at {tessdata_path}")
+                
+        # Check if the essential tessdata files exist
+        if tessdata_path and os.path.exists(tessdata_path):
+            eng_traineddata = os.path.join(tessdata_path, 'eng.traineddata')
+            if not os.path.exists(eng_traineddata):
+                print(f"Warning: eng.traineddata not found at {eng_traineddata}")
+                
+            # Check for tessconfigs
+            tessconfigs_dir = os.path.join(tessdata_path, 'tessconfigs')
+            if os.path.exists(tessconfigs_dir):
+                configs_dir = os.path.join(tessconfigs_dir, 'configs')
+                if os.path.exists(configs_dir):
+                    for config_file in ['hocr', 'txt', 'pdf']:
+                        if not os.path.exists(os.path.join(configs_dir, config_file)):
+                            print(f"Warning: Config file {config_file} not found")
+                else:
+                    print(f"Warning: tessconfigs/configs directory not found")
+            else:
+                print(f"Warning: tessconfigs directory not found")
+                
+        # Create the config files in current directory as a fallback
+        self.create_tesseract_config_files()
+        
+        # Show a warning if tesseract isn't available
+        if not tesseract_available:
+            messagebox.showwarning(
+                "Tesseract Installation Issue",
+                "Tesseract OCR engine was not found on your system.\n\n"
+                "OCR functionality may not work correctly.\n\n"
+                "Please ensure Tesseract is properly installed and available in your PATH."
+            )
 
     def run(self):
         self.ocrWindow.mainloop()
