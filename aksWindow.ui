@@ -406,7 +406,7 @@ Kentucky</property>
     </child>
     <child>
       <object class="ttk.Label" id="logoImageLabel">
-        <property name="image">starNymph.png</property>
+        <property name="image">Logo.png</property>
         <layout manager="place">
           <property name="anchor">nw</property>
           <property name="x">15</property>
