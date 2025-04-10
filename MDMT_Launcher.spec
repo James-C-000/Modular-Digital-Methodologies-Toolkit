@@ -169,40 +169,16 @@ os.makedirs(nltk_data_dir, exist_ok=True)
 nltk.data.path.insert(0, nltk_data_dir)
 """)
 
-# Add platform-specific Tesseract binaries
-tesseract_binaries = []
-if is_windows:
-    tesseract_dir = os.path.join(base_dir, 'OCR', 'win_tesseract')
-    if os.path.exists(tesseract_dir):
-        for file in glob.glob(os.path.join(tesseract_dir, '*.exe')):
-            tesseract_binaries.append((file, 'OCR'))
-        for file in glob.glob(os.path.join(tesseract_dir, '*.dll')):
-            tesseract_binaries.append((file, 'OCR'))
-elif is_mac:
-    tesseract_dir = os.path.join(base_dir, 'OCR', 'mac_tesseract')
-    if os.path.exists(tesseract_dir):
-        for file in glob.glob(os.path.join(tesseract_dir, 'tesseract')):
-            tesseract_binaries.append((file, 'OCR'))
-        for file in glob.glob(os.path.join(tesseract_dir, '*.dylib')):
-            tesseract_binaries.append((file, 'OCR'))
-elif is_linux:
-    tesseract_dir = os.path.join(base_dir, 'OCR', 'linux_tesseract')
-    if os.path.exists(tesseract_dir):
-        for file in glob.glob(os.path.join(tesseract_dir, 'tesseract')):
-            tesseract_binaries.append((file, 'OCR'))
-        for file in glob.glob(os.path.join(tesseract_dir, '*.so*')):
-            tesseract_binaries.append((file, 'OCR'))
-
 # Create the Analysis object
 a = Analysis(
     ['MDMT_Launcher.py'],
     pathex=[base_dir],
-    binaries=binaries + llama_binaries + tesseract_binaries,  # Keep your existing binaries
-    datas=datas + package_data,          # Keep your existing data
+    binaries=binaries + llama_binaries,
+    datas=datas + package_data,
     hiddenimports=hidden_imports,
-    hookspath=['.'],
+    hookspath=['.'],  # Add the current directory to find our hook
     hooksconfig={},
-    runtime_hooks=['runtime_hook.py', 'tesseract_hook.py'],  # Add the new hook
+    runtime_hooks=['runtime_hook.py'],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

@@ -278,21 +278,6 @@ class ocrWindow:
         textFileCheckboxState = self.builder.get_variable('textFileCheckboxState').get()  # 0 = unchecked; 1 = checked
         redoOCRCheckboxState = self.builder.get_variable('redoOCRCheckboxState').get()  # 0 = unchecked; 1 = checked
 
-        # Set Tesseract env. variable for tessdata path
-        if hasattr(sys, '_MEIPASS'):
-            # Use the path set in the runtime hook
-            os.environ["TESSDATA_PREFIX"] = os.path.join(sys._MEIPASS, 'OCR', 'tessdata')
-            # Use custom config path created by the hook
-            if "TESSCONFIG_PATH" in os.environ:
-                tesseractConfig = os.environ["TESSCONFIG_PATH"]
-            else:
-                # Fallback
-                tesseractConfig = os.path.join(sys._MEIPASS, 'OCR', 'tessdata', 'tessconfigs', 'configs')
-        else:
-            # Running from source - use original paths
-            os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
-            tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs', 'configs')
-
         if pdfInputDir == pdfOutputDir:
             messagebox.showerror(title='Error', message='Input and output directory cannot be the same.')
             # Enable OCR Button
@@ -327,6 +312,10 @@ class ocrWindow:
             except Exception as e:
                 error = "ERROR: " + str(e) + ".\nDelete and recreate output directory then retry."
                 messagebox.showerror(title='Error', message=error)
+            # Set Tesseract env. variable for tessdata path (system agnostic)
+            os.environ["TESSDATA_PREFIX"] = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+            # Set tessconfigs path (system agnostic)
+            tesseractConfig = os.path.join(PROJECT_PATH, 'OCR', 'tessdata', 'tessconfigs')
 
             # OCR the PDF using OCRmyPDF
             for i in pdfsInInputDir:
