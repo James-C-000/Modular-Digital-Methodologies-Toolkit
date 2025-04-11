@@ -2,12 +2,13 @@
 # Script to batch parse PDF input files and generate data analytics based on some input
 # Written for the linux operating system, compatibility with others is not guaranteed
 #
-# DEPENDENCIES: matplotlib, pdftotext, pygubu
+# DEPENDENCIES: matplotlib, pypdf, pygubu
 #
 # v. 1.x: 2019-07-05
 # v. 2.0: 2020-11-15
 # v. 2.1: 2021-08-27
 # v. 3.0: 2022-04-03
+# v. 3.1: 2025-04-10
 #
 
 import pathlib

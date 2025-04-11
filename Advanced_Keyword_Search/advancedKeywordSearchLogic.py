@@ -1,4 +1,4 @@
-import pdftotext
+import pypdf
 import matplotlib
 import matplotlib.pyplot as plt
 import re
@@ -106,22 +106,32 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
     # Open each pdf in a for loop
     for i in pdfsInDirectory:
         try:
-            with open(os.path.join(PDFDirectory, str(i)), "rb") as pdf:
-                pdfInput = pdftotext.PDF(pdf)  # Open pdf
+            # Open PDF file with pypdf instead of pdftotext
+            pdf_reader = pypdf.PdfReader(os.path.join(PDFDirectory, str(i)))
+            numOfPages = len(pdf_reader.pages)  # Get number of pages in open pdf
         except Exception as e:
             error = "ERROR: " + str(e) + " in file: " + str(i) + ".\nCheck PDFs and retry."
             logic_error(error)
             return
 
-        numOfPages = len(pdfInput)  # Get number of pages in open pdf
         pageNumber = 0  # Set current page
 
         # Check for hits page by page
-        for j in pdfInput:
+        for page in pdf_reader.pages:
             # Running page number
             pageNumber += 1
-            # Extract text on current page into string
-            allText = j
+
+            try:
+                # Extract text from current page
+                allText = page.extract_text()
+                if not allText:
+                    continue  # Skip empty pages
+            except Exception as e:
+                error = "ERROR: " + str(e) + " in file: " + str(i) + " on page: " + str(
+                    pageNumber) + ".\nCheck PDF and retry."
+                logic_error(error)
+                continue
+
             # Strip user filters from text
             if basicFilterState == 1:
                 # filter everything that isn't a letter, number, or space
@@ -150,8 +160,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                     foundWords = re.findall(r'\s' + k + r'\s', allText)  # Find the keyword in the text
                 except Exception as e:
                     error = ("ERROR: " + str(e) + " in file: " + str(i) +
-                             " with keyword: " + str(k) + " on page: " + str(pageNumber) +
-                             " on word: " + str(l))
+                             " with keyword: " + str(k) + " on page: " + str(pageNumber))
                     logic_error(error)
                     return
                 numOfFoundWords = len(foundWords)
@@ -172,22 +181,25 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                                 # Check if allTextFiltered contains our k sequence.
                                 # If it does, change the first found index to the whole
                                 # word (k), then remove the every other index to remove word repetition
+                                flaggedIndicies = []
                                 for l in range(len(allTextFiltered) - len(matchedK)):
+                                    match = True
+                                    startIndex = l
                                     for m in range(len(matchedK)):
-                                        if allTextFiltered[l + m] == matchedK[m]:
-                                            match = True
-                                            startIndex = l
+                                        if l + m < len(allTextFiltered) and allTextFiltered[l + m] == matchedK[m]:
+                                            pass  # Match continues
                                         else:
                                             match = False
                                             break
                                     if match == True:
                                         allTextFiltered[startIndex] = str(k)
-                                        flaggedIndicies = []
                                         for m in range(1, len(matchedK)):
                                             # Flag every index after allTextFiltered entry point within k bounds
-                                            flaggedIndicies.append(startIndex + m)
+                                            if startIndex + m < len(allTextFiltered):
+                                                flaggedIndicies.append(startIndex + m)
                                 for n in sorted(flaggedIndicies, reverse=True):
-                                    del allTextFiltered[n]
+                                    if n < len(allTextFiltered):
+                                        del allTextFiltered[n]
                             elif k.find('-') == -1:  # If the keyword is unhyphenated, remove hyphens from text
                                 allTextFiltered = re.split('[- ]', allText)
                             else:  # If not, just split it into a list based on whitespace
@@ -197,13 +209,17 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                             for l in range(len(allTextFiltered)):
                                 if allTextFiltered[l] == k:  # Check if current iteration matches keyword
                                     halfContextLength = round(int(contextLength) / 2)
-                                    preKeyword = allTextFiltered[(l - halfContextLength):l]  # Extract 15 words before
-                                    postKeyword = allTextFiltered[l:(l + halfContextLength)]  # Extract hit + post 15
+                                    preKeyword = allTextFiltered[
+                                                 max(0, l - halfContextLength):l]  # Extract words before
+                                    postKeyword = allTextFiltered[l:min(l + halfContextLength,
+                                                                        len(allTextFiltered))]  # Extract hit + post words
                                     snippet = preKeyword + postKeyword  # concat the context
                                     # Remove whitespace indices from context list
-                                    if snippet.count(' ') > 0:
-                                        snippet.remove(' ')
-                                    formattedContext = ' '.join([str(i) for i in snippet])  # Cast from list -> str
+                                    if ' ' in snippet:
+                                        while ' ' in snippet:
+                                            snippet.remove(' ')
+                                    formattedContext = ' '.join(
+                                        [str(word) for word in snippet])  # Cast from list -> str
                                     writer.writerow([i, pageNumber, formattedContext])
                             keywordCSV.close()
                     except Exception as e:
