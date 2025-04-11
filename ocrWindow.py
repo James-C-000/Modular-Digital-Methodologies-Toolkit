@@ -495,28 +495,79 @@ class ocrWindow:
     def check_tesseract_installation(self):
         """Check if Tesseract is properly installed and configured."""
         tesseract_available = False
-        try:
-            # Try to run tesseract to check if it's available
-            result = subprocess.run(['tesseract', '--version'], 
-                                   capture_output=True, text=True)
-            if result.returncode == 0:
-                tesseract_available = True
-                print(f"Tesseract found: {result.stdout.strip()}")
-        except Exception as e:
-            print(f"Error checking for tesseract: {e}")
+        tesseract_path = None
+        
+        # Check if TESSERACT_PATH is set directly
+        if 'TESSERACT_PATH' in os.environ and os.path.exists(os.environ['TESSERACT_PATH']):
+            tesseract_path = os.environ['TESSERACT_PATH']
+            print(f"Using TESSERACT_PATH from environment: {tesseract_path}")
+            tesseract_available = True
+            
+        # If not available yet, try other methods
+        if not tesseract_available:
+            try:
+                # On Windows, look in common installation paths first
+                if os.name == 'nt':
+                    common_paths = [
+                        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                        r'C:\Program Files\Tesseract-OCT\tesseract.exe'  # User's specific path
+                    ]
+                    
+                    for path in common_paths:
+                        if os.path.exists(path):
+                            tesseract_path = path
+                            os.environ['TESSERACT_PATH'] = path
+                            print(f"Found Tesseract at: {path}")
+                            tesseract_available = True
+                            break
+                
+                # Try running tesseract command if still not found
+                if not tesseract_available:
+                    tesseract_cmd = 'tesseract.exe' if os.name == 'nt' else 'tesseract'
+                    result = subprocess.run([tesseract_cmd, '--version'], 
+                                        capture_output=True, text=True)
+                    if result.returncode == 0:
+                        tesseract_available = True
+                        print(f"Tesseract found in PATH: {result.stdout.strip()}")
+                        
+                        # Try to get actual path
+                        import shutil
+                        tesseract_path = shutil.which(tesseract_cmd)
+                        if tesseract_path:
+                            os.environ['TESSERACT_PATH'] = tesseract_path
+            except Exception as e:
+                print(f"Error checking for tesseract: {e}")
         
         # Check TESSDATA_PREFIX environment variable
         tessdata_path = os.environ.get('TESSDATA_PREFIX')
         if not tessdata_path:
             print("Warning: TESSDATA_PREFIX environment variable not set")
             
-            # Try to set it based on project path
-            tessdata_path = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
-            if os.path.exists(tessdata_path):
-                os.environ['TESSDATA_PREFIX'] = tessdata_path
-                print(f"Set TESSDATA_PREFIX to: {tessdata_path}")
-            else:
-                print(f"Warning: Could not find tessdata at {tessdata_path}")
+            # Try to determine TESSDATA_PREFIX from tesseract_path
+            if tesseract_path:
+                # For Windows, typically in same folder as executable or in parent folder
+                if os.name == 'nt':
+                    tesseract_dir = os.path.dirname(tesseract_path)
+                    possible_paths = [
+                        os.path.join(tesseract_dir, 'tessdata'),
+                        os.path.join(os.path.dirname(tesseract_dir), 'tessdata')
+                    ]
+                    for path in possible_paths:
+                        if os.path.exists(path) and os.path.isdir(path):
+                            os.environ['TESSDATA_PREFIX'] = path
+                            tessdata_path = path
+                            print(f"Set TESSDATA_PREFIX from tesseract binary location: {path}")
+                            break
+            
+            # If still not set, try project path
+            if not tessdata_path:
+                tessdata_path = os.path.join(PROJECT_PATH, 'OCR', 'tessdata')
+                if os.path.exists(tessdata_path):
+                    os.environ['TESSDATA_PREFIX'] = tessdata_path
+                    print(f"Set TESSDATA_PREFIX to: {tessdata_path}")
+                else:
+                    print(f"Warning: Could not find tessdata at {tessdata_path}")
                 
         # Check if the essential tessdata files exist
         if tessdata_path and os.path.exists(tessdata_path):

@@ -46,12 +46,30 @@ def add_tesseract_binary():
             if not tesseract_binary:
                 common_paths = [
                     r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe'
+                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                    # Include the specific path mentioned by the user
+                    r'C:\Program Files\Tesseract-OCT\tesseract.exe'
                 ]
                 for path in common_paths:
                     if os.path.exists(path):
                         tesseract_binary = path
                         break
+                        
+                # If still not found, try to find any tesseract.exe in Program Files
+                if not tesseract_binary:
+                    program_files = os.environ.get('ProgramFiles', r'C:\Program Files')
+                    program_files_x86 = os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)')
+                    
+                    # Walk through Program Files directories looking for tesseract.exe
+                    for root_dir in [program_files, program_files_x86]:
+                        if os.path.exists(root_dir):
+                            for root, dirs, files in os.walk(root_dir):
+                                if 'tesseract.exe' in files:
+                                    tesseract_binary = os.path.join(root, 'tesseract.exe')
+                                    print(f"Found tesseract.exe by directory scan: {tesseract_binary}")
+                                    break
+                            if tesseract_binary:
+                                break
                         
         # On macOS and Linux, we can use the 'which' command
         else:
