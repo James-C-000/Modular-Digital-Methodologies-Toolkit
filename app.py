@@ -1,7 +1,17 @@
 """MDMT main application entry point with NiceGUI sidebar navigation."""
 import multiprocessing
+import platform
+
+
+def _preferred_start_method() -> str:
+    """Return the preferred multiprocessing start method for the current OS."""
+    if platform.system() == "Windows":
+        return "spawn"
+    return "fork"
+
+
 try:
-    multiprocessing.set_start_method('fork')
+    multiprocessing.set_start_method(_preferred_start_method())
 except RuntimeError:
     pass
 
