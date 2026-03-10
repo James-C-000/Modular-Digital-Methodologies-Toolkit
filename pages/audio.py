@@ -18,24 +18,24 @@ def audio_page():
         ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
         return
 
-    input_dir = ui.input("Audio Directory").classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+    with ui.card().classes("w-full"):
+        input_dir = ui.input("Audio Directory").classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
 
-    model_select = ui.select(
-        ["tiny", "base", "small", "medium"],
-        label="Whisper Model",
-        value=config.get("defaults.whisper_model", "tiny"),
-    ).classes("w-48")
+    with ui.card().classes("w-full"):
+        model_select = ui.select(
+            ["tiny", "base", "small", "medium"],
+            label="Whisper Model",
+            value=config.get("defaults.whisper_model", "tiny"),
+        ).classes("w-48")
 
-    ui.markdown(
-        "**tiny** \u2014 Fastest, lowest accuracy. Good for quick drafts or testing. ~75 MB  \n"
-        "**base** \u2014 Fast with improved accuracy over tiny. Suitable for clear audio. ~142 MB  \n"
-        "**small** \u2014 Balanced speed and accuracy. Good for most use cases. ~466 MB  \n"
-        "**medium** \u2014 Best accuracy, slowest. Recommended for difficult audio or non-English. ~1.5 GB  \n\n"
-        "Larger models require more RAM and processing time but produce more accurate transcriptions."
-    ).classes("text-caption text-grey")
-
-    ui.separator()
+        ui.markdown(
+            "**tiny** \u2014 Fastest, lowest accuracy. Good for quick drafts or testing. ~75 MB  \n"
+            "**base** \u2014 Fast with improved accuracy over tiny. Suitable for clear audio. ~142 MB  \n"
+            "**small** \u2014 Balanced speed and accuracy. Good for most use cases. ~466 MB  \n"
+            "**medium** \u2014 Best accuracy, slowest. Recommended for difficult audio or non-English. ~1.5 GB  \n\n"
+            "Larger models require more RAM and processing time but produce more accurate transcriptions."
+        ).classes("text-caption text-grey")
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)

@@ -34,26 +34,40 @@ document.addEventListener('click', function(e) {
 
 def create_sidebar():
     """Build the persistent sidebar navigation."""
-    with ui.left_drawer(value=True).classes("bg-blue-grey-1") as drawer:
-        ui.label("MDMT").classes("text-h5 q-mb-sm")
+    config = AppConfig()
+    dark = ui.dark_mode(config.get("ui.dark_mode", False))
 
-        ui.label("Document Processing").classes("text-overline q-mt-sm")
-        ui.button("OCR", on_click=lambda: ui.navigate.to("/ocr"), icon="document_scanner").props("flat align=left").classes("w-full")
-        ui.button("Audio Transcription", on_click=lambda: ui.navigate.to("/audio"), icon="mic").props("flat align=left").classes("w-full")
-        ui.button("Translation", on_click=lambda: ui.navigate.to("/translation"), icon="translate").props("flat align=left").classes("w-full")
+    ui.add_head_html('''<style>
+    body.body--light .mdmt-drawer { background-color: #eee; }
+    body.body--dark .mdmt-drawer { background-color: #1a1a1a; }
+    </style>''')
+    with ui.left_drawer(value=True).classes("mdmt-drawer").style("padding: 8px") as drawer:
+        ui.label("MDMT").classes("text-h4")
 
-        ui.label("Analysis").classes("text-overline q-mt-sm")
-        ui.button("Keyword Search", on_click=lambda: ui.navigate.to("/keywords"), icon="search").props("flat align=left").classes("w-full")
-        ui.button("Named Entity Recognition", on_click=lambda: ui.navigate.to("/ner"), icon="person_search").props("flat align=left").classes("w-full")
-        ui.button("Relationships", on_click=lambda: ui.navigate.to("/relationships"), icon="hub").props("flat align=left").classes("w-full")
-        ui.button("Co-Words", on_click=lambda: ui.navigate.to("/cowords"), icon="grain").props("flat align=left").classes("w-full")
+        ui.label("Document Processing").classes("text-overline")
+        ui.button("OCR", on_click=lambda: ui.navigate.to("/ocr"), icon="document_scanner").props("flat dense align=left").classes("w-full")
+        ui.button("Audio Transcription", on_click=lambda: ui.navigate.to("/audio"), icon="mic").props("flat dense align=left").classes("w-full")
+        ui.button("Translation", on_click=lambda: ui.navigate.to("/translation"), icon="translate").props("flat dense align=left").classes("w-full")
 
-        ui.label("AI").classes("text-overline q-mt-sm")
-        ui.button("RAGBot", on_click=lambda: ui.navigate.to("/rag"), icon="smart_toy").props("flat align=left").classes("w-full")
+        ui.label("Analysis").classes("text-overline")
+        ui.button("Keyword Search", on_click=lambda: ui.navigate.to("/keywords"), icon="search").props("flat dense align=left").classes("w-full")
+        ui.button("Named Entities", on_click=lambda: ui.navigate.to("/ner"), icon="person_search").props("flat dense align=left").classes("w-full")
+        ui.button("Relationships", on_click=lambda: ui.navigate.to("/relationships"), icon="hub").props("flat dense align=left").classes("w-full")
+        ui.button("Co-Words", on_click=lambda: ui.navigate.to("/cowords"), icon="grain").props("flat dense align=left").classes("w-full")
 
-        ui.separator().classes("q-mt-sm")
-        ui.button("Downloads", on_click=lambda: ui.navigate.to("/downloads"), icon="download").props("flat align=left").classes("w-full")
-        ui.button("Help / About", on_click=lambda: ui.navigate.to("/about"), icon="info").props("flat align=left").classes("w-full")
+        ui.label("AI").classes("text-overline")
+        ui.button("RAGBot", on_click=lambda: ui.navigate.to("/rag"), icon="smart_toy").props("flat dense align=left").classes("w-full")
+
+        ui.separator()
+        ui.button("Downloads", on_click=lambda: ui.navigate.to("/downloads"), icon="download").props("flat dense align=left").classes("w-full")
+        ui.button("Help / About", on_click=lambda: ui.navigate.to("/about"), icon="info").props("flat dense align=left").classes("w-full")
+
+        def toggle_dark(e):
+            dark.set_value(e.value)
+            config.set("ui.dark_mode", e.value)
+            config.save()
+
+        ui.switch("Dark Mode", value=config.get("ui.dark_mode", False), on_change=toggle_dark)
 
     return drawer
 

@@ -13,26 +13,27 @@ def relationships_page():
     ui.label("Discover connections between entities in your documents").classes("text-subtitle1")
     ui.separator()
 
-    input_dir = ui.input("Input Directory").classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+    with ui.card().classes("w-full"):
+        input_dir = ui.input("Input Directory").classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
 
-    ui.label("Entity Types").classes("text-subtitle2 q-mt-md")
-    entity_select = ui.select(
-        ENTITY_TYPES,
-        multiple=True,
-        label="Select entity types",
-        value=["PERSON", "ORGANIZATION", "GPE"],
-    ).classes("w-full")
+    with ui.card().classes("w-full"):
+        ui.label("Entity Types").classes("text-subtitle2")
+        entity_select = ui.select(
+            ENTITY_TYPES,
+            multiple=True,
+            label="Select entity types",
+            value=["PERSON", "ORGANIZATION", "GPE"],
+        ).classes("w-full")
 
-    with ui.row():
-        extract_text = ui.checkbox("Extract text from PDFs", value=False)
-        generate_graph = ui.checkbox("Generate network graph", value=True)
-    ui.label(
-        "\"Extract text from PDFs\" extracts raw text from PDF files before processing."
-        " Leave unchecked if your input directory already contains plain text files."
-    ).classes("text-caption text-grey")
-
-    ui.separator()
+    with ui.card().classes("w-full"):
+        with ui.row():
+            extract_text = ui.checkbox("Extract text from PDFs", value=False)
+            generate_graph = ui.checkbox("Generate network graph", value=True)
+        ui.label(
+            "\"Extract text from PDFs\" extracts raw text from PDF files before processing."
+            " Leave unchecked if your input directory already contains plain text files."
+        ).classes("text-caption text-grey")
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)

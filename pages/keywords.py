@@ -18,28 +18,32 @@ def keywords_page():
         ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
         return
 
-    pdf_dir = ui.input("PDF Input Directory").classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(pdf_dir), icon="folder_open").props("flat")
+    with ui.card().classes("w-full"):
+        pdf_dir = ui.input("PDF Input Directory").classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(pdf_dir), icon="folder_open").props("flat")
 
-    output_dir = ui.input("Output Directory").classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
+        output_dir = ui.input("Output Directory").classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
 
-    context_length = ui.number("Context Length (words)", value=5, min=1, max=50).classes("w-48")
+        context_length = ui.number("Context Length (words)", value=5, min=1, max=50).classes("w-48")
 
-    ui.label("Keywords (one per line)").classes("text-subtitle2 q-mt-md")
-    keywords_text = ui.textarea(placeholder="Enter keywords, one per line...").classes("w-full")
+    with ui.card().classes("w-full"):
+        ui.label("Keywords (one per line)").classes("text-subtitle2")
+        keywords_text = ui.textarea(placeholder="Enter keywords, one per line...").classes("w-full").props("rows=5")
 
-    with ui.row().classes("items-center"):
-        basic_filter = ui.checkbox("Basic Filter (letters & numbers only)", value=False)
-    ui.label(
-        "When enabled, strips all characters except letters and numbers from extracted"
-        " text before searching. Useful for cleaning up OCR artifacts or special characters."
-    ).classes("text-caption text-grey")
-    filters_text = ui.textarea(placeholder="Enter filter words, one per line...").classes("w-full")
-    ui.label(
-        "Filter words to exclude from results. Any keyword match containing a filter"
-        " word in its surrounding context will be removed. One filter word per line."
-    ).classes("text-caption text-grey")
+    with ui.card().classes("w-full"):
+        with ui.row().classes("items-center"):
+            basic_filter = ui.checkbox("Basic Filter (letters & numbers only)", value=False)
+        ui.label(
+            "When enabled, strips all characters except letters and numbers from extracted"
+            " text before searching. Useful for cleaning up OCR artifacts or special characters."
+        ).classes("text-caption text-grey")
+        ui.label("Filter Words (one per line)").classes("text-subtitle2 q-mt-md")
+        filters_text = ui.textarea(placeholder="Enter filter words, one per line...").classes("w-full").props("rows=5")
+        ui.label(
+            "Filter words to exclude from results. Any keyword match containing a filter"
+            " word in its surrounding context will be removed."
+        ).classes("text-caption text-grey")
 
     with ui.expansion("Or load from files...").classes("w-full"):
         keyword_file = ui.input("Keyword File Path").classes("w-full")

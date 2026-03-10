@@ -11,10 +11,9 @@ def cowords_page():
     ui.label("Generate word co-occurrence networks to reveal conceptual relationships").classes("text-subtitle1")
     ui.separator()
 
-    input_dir = ui.input("Input Directory").classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
-
-    ui.separator()
+    with ui.card().classes("w-full"):
+        input_dir = ui.input("Input Directory").classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)

@@ -23,24 +23,24 @@ def translation_page():
         ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
         return
 
-    input_dir = ui.input("Input Directory").classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+    with ui.card().classes("w-full"):
+        input_dir = ui.input("Input Directory").classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
 
-    with ui.row().classes("items-center"):
-        source_lang = ui.select(
-            ["Auto-detect"] + list(LANGUAGE_CODES.keys()),
-            label="Translate from",
-            value="Auto-detect",
-        ).classes("w-64")
-        target_lang = ui.select(
-            list(LANGUAGE_CODES.keys()),
-            label="Translate to",
-            value=config.get("defaults.translation_target_lang_display", "Spanish"),
-        ).classes("w-64")
+    with ui.card().classes("w-full"):
+        with ui.row().classes("items-center"):
+            source_lang = ui.select(
+                ["Auto-detect"] + list(LANGUAGE_CODES.keys()),
+                label="Translate from",
+                value="Auto-detect",
+            ).classes("w-64")
+            target_lang = ui.select(
+                list(LANGUAGE_CODES.keys()),
+                label="Translate to",
+                value=config.get("defaults.translation_target_lang_display", "Spanish"),
+            ).classes("w-64")
 
-    suffix = ui.input("Output Suffix", value="_translated").classes("w-64")
-
-    ui.separator()
+        suffix = ui.input("Output Suffix", value="_translated").classes("w-64")
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)

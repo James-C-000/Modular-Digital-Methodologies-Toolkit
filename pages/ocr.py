@@ -42,45 +42,46 @@ def ocr_page():
     ui.label("OCR Processing").classes("text-h4")
     ui.separator()
 
-    input_dir = ui.input("Input Directory", value=config.get("defaults.ocr_input_dir", "")).classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+    with ui.card().classes("w-full"):
+        input_dir = ui.input("Input Directory", value=config.get("defaults.ocr_input_dir", "")).classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
 
-    output_dir = ui.input("Output Directory", value=config.get("defaults.ocr_output_dir", "")).classes("w-full")
-    ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
+        output_dir = ui.input("Output Directory", value=config.get("defaults.ocr_output_dir", "")).classes("w-full")
+        ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
 
-    lang_options = list(available_langs.keys()) + ["\u2913 Download more languages..."]
-    lang_select = ui.select(
-        lang_options,
-        multiple=True,
-        label="Languages",
-        value=["English"] if "English" in available_langs else [],
-    ).classes("w-full")
+    with ui.card().classes("w-full"):
+        lang_options = list(available_langs.keys()) + ["\u2913 Download more languages..."]
+        lang_select = ui.select(
+            lang_options,
+            multiple=True,
+            label="Languages",
+            value=["English"] if "English" in available_langs else [],
+        ).classes("w-full")
 
-    def _on_lang_change(e):
-        if "\u2913 Download more languages..." in (e.value or []):
-            lang_select.set_value([v for v in e.value if v != "\u2913 Download more languages..."])
-            ui.navigate.to("/downloads")
+        def _on_lang_change(e):
+            if "\u2913 Download more languages..." in (e.value or []):
+                lang_select.set_value([v for v in e.value if v != "\u2913 Download more languages..."])
+                ui.navigate.to("/downloads")
 
-    lang_select.on_value_change(_on_lang_change)
-    ui.label(
-        "Select the languages present in your source documents for best results."
-    ).classes("text-caption text-grey")
+        lang_select.on_value_change(_on_lang_change)
+        ui.label(
+            "Select the languages present in your source documents for best results."
+        ).classes("text-caption text-grey")
 
-    with ui.row().classes("w-full"):
-        deskew = ui.checkbox("Deskew", value=False)
-        rotate = ui.checkbox("Rotate Pages", value=False)
-        redo_ocr = ui.checkbox("Redo OCR", value=False)
-        pdfa = ui.checkbox("PDF/A Output", value=False)
-        extract_text = ui.checkbox("Extract Text", value=False)
+    with ui.card().classes("w-full"):
+        with ui.row().classes("w-full"):
+            deskew = ui.checkbox("Deskew", value=False)
+            rotate = ui.checkbox("Rotate Pages", value=False)
+            redo_ocr = ui.checkbox("Redo OCR", value=False)
+            pdfa = ui.checkbox("PDF/A Output", value=False)
+            extract_text = ui.checkbox("Extract Text", value=False)
 
-    deskew.bind_enabled_from(redo_ocr, "value", backward=lambda v: not v)
-    redo_ocr.bind_enabled_from(deskew, "value", backward=lambda v: not v)
+        deskew.bind_enabled_from(redo_ocr, "value", backward=lambda v: not v)
+        redo_ocr.bind_enabled_from(deskew, "value", backward=lambda v: not v)
 
-    with ui.row().classes("w-full").bind_visibility_from(rotate, "value"):
-        ui.label("Rotation Sensitivity:")
-        rotate_threshold = ui.radio({2: "High", 6: "Normal", 15: "Low"}, value=6).props("inline")
-
-    ui.separator()
+        with ui.row().classes("w-full").bind_visibility_from(rotate, "value"):
+            ui.label("Rotation Sensitivity:")
+            rotate_threshold = ui.radio({2: "High", 6: "Normal", 15: "Low"}, value=6).props("inline")
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
