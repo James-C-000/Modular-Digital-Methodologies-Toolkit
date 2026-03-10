@@ -1,3 +1,5 @@
+<p align="center"><img src="MDMT_logo.png" alt="MDMT Logo" width="200"></p>
+
 # Modular Digital Methodologies Toolkit (MDMT)
 
 A comprehensive suite of digital humanities and research tools designed to streamline text analysis, document processing, and data extraction workflows.
@@ -14,13 +16,13 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 - **Language Translation**: Translate documents between multiple languages using Google Translate
 
 ### Text Analysis
-- **Advanced Keyword Search**: Find and analyze keyword patterns across document collections with visualization
+- **Keyword Search**: Find and analyze keyword patterns across document collections with visualization
 - **Named Entity Recognition**: Identify and extract people, organizations, locations, and other named entities
 - **Relationship Extraction**: Discover connections between entities in texts and visualize network graphs
 - **Co-Word Analysis**: Generate word co-occurrence networks to reveal conceptual relationships
 
 ### AI Integration
-- **Retrieval-Augmented Generation (RAG)**: Chat with your documents using an AI assistant powered by Qwen 3.5 models
+- **RAGBot**: Chat with your documents using an AI assistant powered by local Qwen 3.5 models. MDMT auto-detects your hardware (NVIDIA, AMD, and Apple Metal GPUs) and recommends the best model size for your system.
 
 ## Installation
 
@@ -49,19 +51,16 @@ Launch MDMT with `python app.py`. The application opens in a native desktop wind
 1. **OCR**: Process PDFs to make them searchable with text selection
 2. **Audio Transcription**: Convert audio files to text transcriptions
 3. **Translation**: Translate documents between languages
-4. **Advanced Keyword Search**: Find and analyze keywords with context
-5. **Named Entity Recognition**: Extract named entities from documents
-6. **Relationship Extraction**: Identify entity relationships and generate network graphs
-7. **Co-Word Analysis**: Generate word co-occurrence networks
-8. **RAG Chat**: Query your document collection using a local LLM
+4. **Keyword Search**: Find and analyze keywords with context
+5. **Named Entities**: Extract named entities from documents
+6. **Relationships**: Identify entity relationships and generate network graphs
+7. **Co-Words**: Generate word co-occurrence networks
+8. **RAGBot**: Query your document collection using a local LLM
 9. **Downloads**: Manage optional assets (Tesseract languages, Whisper models, NLTK data, LLM models)
 
 Optional assets (language models, NLTK data, Tesseract language files) are downloaded on demand via the Downloads page. Large ML models are not bundled with the application.
 
-## TODO
-
-- **About page**: Add all required third-party licenses.
-- **Verify cross-platform capability**: Ensure the program runs on Mac, Windows, and Linux.
+A dark mode toggle is available in the sidebar.
 
 ## Dependencies
 
@@ -69,30 +68,38 @@ Major dependencies include:
 - `nicegui` + `pywebview`: Web-based UI in a native desktop window
 - `ocrmypdf`: OCR functionality
 - `openai-whisper`: Audio transcription
+- `googletrans`: Language translation
 - `transformers`: Named entity recognition
 - `nltk` + `networkx`: NLP and graph analysis
-- `langchain`: RAG implementation
+- `langchain` + `llama-cpp-python`: RAG implementation with local LLM inference
+- `sentence-transformers` + `faiss-cpu`: Document embeddings and vector search
 - `pandas`: Data manipulation
 - `matplotlib`: Data visualization
 - `pypdf`: PDF text extraction
 
-See `requirements.txt` for a complete list.
+See `requirements.txt` for a complete list, and the Help/About page for license details on each dependency.
 
 ## Building
 
-To build a standalone executable:
+Platform-specific PyInstaller spec files are provided, each bundling Tesseract OCR and its dependencies:
+
 ```
 pip install pyinstaller
-pyinstaller mdmt.spec
+pyinstaller mdmt-linux.spec    # Linux
+pyinstaller mdmt-macos.spec    # macOS
+pyinstaller mdmt-windows.spec  # Windows
 ```
 
-The spec file uses `--onedir` mode to avoid multi-GB extraction on each launch.
+All specs use `--onedir` mode to avoid multi-GB extraction on each launch.
+
+Automated cross-platform builds and releases are handled by GitHub Actions. A release is created automatically when a version tag is pushed.
 
 ## License
 
-This project uses several open-source libraries, each with their own licenses. See the Help/About page within the application for details.
+This project uses several open-source libraries, each with their own licenses. See the Help/About page within the application for a full attribution table with license types and project links.
 
 ## Contact
 
 Software by James C. Caldwell
 Email: James.Caldwell.000@gmail.com
+GitHub: [James-C-000/Modular-Digital-Methodologies-Toolkit](https://github.com/James-C-000/Modular-Digital-Methodologies-Toolkit)
