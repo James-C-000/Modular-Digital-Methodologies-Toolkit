@@ -62,8 +62,9 @@ def rag_page():
                 default_model = saved_path
             elif gguf_files:
                 # Try to pick the recommended model, else first available
+                rec_tag = hw_info.recommended_model  # e.g. "0.8B", "2B", "4B"
                 for f in gguf_files:
-                    if hw_info.recommended_model.lower().replace("b", "") in f.lower():
+                    if f"-{rec_tag}-" in f or f"-{rec_tag}." in f:
                         default_model = os.path.join(models_dir, f)
                         break
                 if not default_model:
@@ -117,6 +118,12 @@ def rag_page():
                     ui.notify("Please select a valid model file.", type="warning")
                     return
 
+                ctx_val = ctx_length.value
+                if ctx_val is None:
+                    ui.notify("Please enter a context length.", type="warning")
+                    return
+                ctx_val = int(ctx_val)
+
                 progress.set_visibility(True)
                 status_label.set_text("Loading model and indexing documents...")
 
@@ -125,7 +132,7 @@ def rag_page():
                     return QwenRAGSystem(
                         documents_dir=doc_dir.value,
                         llm_model_path=chosen_model,
-                        context_window=int(ctx_length.value),
+                        context_window=ctx_val,
                         enable_thinking=thinking.value,
                         n_gpu_layers=hw_info.n_gpu_layers,
                         verbose=False,
@@ -135,7 +142,7 @@ def rag_page():
                     rag_state["system"] = await run.io_bound(do_init)
                     rag_state["initialized"] = True
                     config.set("defaults.rag_model_path", chosen_model)
-                    config.set("defaults.rag_context_window", int(ctx_length.value))
+                    config.set("defaults.rag_context_window", ctx_val)
                     config.set("defaults.rag_thinking_mode", thinking.value)
                     config.save()
                     content.refresh()
