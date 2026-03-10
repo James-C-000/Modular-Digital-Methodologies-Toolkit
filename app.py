@@ -161,6 +161,7 @@ def main():
     if nltk_dir not in nltk.data.path:
         nltk.data.path.insert(0, nltk_dir)
 
+    app.native.window_args["text_select"] = True
     ui.run(
         native=True,
         title="MDMT - Modular Digital Methodologies Toolkit",

@@ -64,6 +64,7 @@ Optional assets (language models, NLTK data, Tesseract language files) are downl
 - **Advanced Keywords UI**: Redesign the Advanced Keywords module interface — the large keyword textboxes make the page difficult to navigate.
 - **Verify cross-platform capability**: Ensure the program runs on Mac, Windows, and Linux.
 - **UI Theme Redesign**: Move away from the flat, minimal (basic) look currently used? At a minimum, offer a dark and light mode.
+- **Expand RAGBot filetype support**: If it has text (e.g., text searchable PDF, markdown file, DOCX), try to support it.
 
 ## Dependencies
 

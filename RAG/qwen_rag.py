@@ -85,7 +85,7 @@ class QwenRAGSystem:
             embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
             chunk_size: int = 512,
             chunk_overlap: int = 64,
-            top_k: int = 15,
+            top_k: int = 4,
             n_threads: int = 4,
             context_window: int = 32768,
             verbose: bool = False,
@@ -152,6 +152,7 @@ class QwenRAGSystem:
         self.perf_metrics["indexing_time"] = time.time() - start_time
 
         logger.info(f"Loading Qwen model from {llm_model_path}...")
+        self._inference_params = self._get_llm_params(self.enable_thinking)
         self.llm = self._initialize_llm()
 
         logger.info(f"Initialization complete ({self.perf_metrics['indexing_time']:.2f}s)")
@@ -191,12 +192,14 @@ class QwenRAGSystem:
                 "top_p": 0.95,
                 "top_k": 20,
                 "repeat_penalty": 1.0,
+                "min_p": 0.0,
             }
         return {
             "temperature": 0.7,
             "top_p": 0.8,
             "top_k": 20,
             "repeat_penalty": 1.0,
+            "min_p": 0.0,
         }
 
     def _initialize_llm(self):
@@ -213,7 +216,7 @@ class QwenRAGSystem:
         return LlamaCpp(
             model_path=self.llm_model_path,
             temperature=params["temperature"],
-            max_tokens=1536,
+            max_tokens=768,
             n_ctx=self.context_window,
             n_batch=1024,
             n_threads=self.n_threads,
@@ -221,6 +224,7 @@ class QwenRAGSystem:
             top_p=params["top_p"],
             top_k=params["top_k"],
             repeat_penalty=params["repeat_penalty"],
+            stop=["<|im_end|>", "<|im_start|>"],
             verbose=self.verbose,
             **kwargs,
         )
@@ -370,8 +374,8 @@ class QwenRAGSystem:
             page = doc.metadata.get("page", "")
             page_info = f" (page {page})" if page else ""
 
-            # Format the document section with clear separation
-            section = f"[Document {i + 1}: {source}{page_info}]\n{doc.page_content.strip()}"
+            # Format the document section with source attribution but no numbering
+            section = f"--- {source}{page_info} ---\n{doc.page_content.strip()}"
             context_parts.append(section)
 
         # Join with clear separators
@@ -432,18 +436,12 @@ class QwenRAGSystem:
         """Build a ChatML prompt for Qwen 3.5."""
         assistant_suffix = "\n<think>" if enable_thinking else ""
         return f"""<|im_start|>system
-You are a helpful, precise, and accurate research assistant that answers questions based only on the provided information.
-Your responses are concise yet complete, and you focus only on the information from the retrieved documents.
-If the information to answer the question is not present in the documents, clearly state this instead of making up information.
-<|im_end|>
+You are a research assistant. Answer questions using only the provided documents. Be concise and direct. If the documents don't contain the answer, say so. Do not fabricate quotes or invent information.<|im_end|>
 <|im_start|>user
-I need information about the following question:
-{question}
+Question: {question}
 
-Here is the relevant information from my document collection:
+Documents:
 {context}
-
-Please provide a comprehensive and accurate answer based only on this information. Don't use external knowledge.
 <|im_end|>
 <|im_start|>assistant{assistant_suffix}
 """
@@ -473,9 +471,22 @@ Please provide a comprehensive and accurate answer based only on this informatio
             context = self._format_context(source_documents)
 
             prompt = self._build_prompt(question, context, self.enable_thinking)
-            # Invoke the LLM
+            # Call llama-cpp-python directly to guarantee present_penalty
+            # is applied (LangChain's invoke() silently drops it).
             generation_start = time.time()
-            raw_answer = self.llm.invoke(prompt, present_penalty=1.5)
+            p = self._inference_params
+            completion = self.llm.client.create_completion(
+                prompt,
+                max_tokens=768,
+                temperature=p["temperature"],
+                top_p=p["top_p"],
+                top_k=p["top_k"],
+                min_p=p["min_p"],
+                repeat_penalty=p["repeat_penalty"],
+                present_penalty=1.5,
+                stop=["<|im_end|>", "<|im_start|>"],
+            )
+            raw_answer = completion["choices"][0]["text"]
             generation_time = time.time() - generation_start
 
             if self.verbose:
@@ -541,12 +552,12 @@ Please provide a comprehensive and accurate answer based only on this informatio
 
         # Remove leaked instruction text
         patterns_to_remove = [
-            r"I need information about the following.*?\n",
-            r"Here is the relevant information.*?:\n",
-            r"Please provide a comprehensive.*?knowledge\.",
+            r"^Question:.*?\n",
+            r"^Documents:\s*\n",
+            r"^---\s+.*?\s+---\s*\n",
             r"^\s*\[Document \d+:.*?\]\s*",
-            r"^Based on the provided documents",
-            r"^According to the provided context",
+            r"^Based on the provided documents,?\s*",
+            r"^According to the provided (?:context|documents),?\s*",
         ]
 
         for pattern in patterns_to_remove:

@@ -71,6 +71,10 @@ def rag_page():
                     default_model = os.path.join(models_dir, gguf_files[0])
 
             model_options = {os.path.join(models_dir, f): f for f in gguf_files}
+            # If the saved model exists but lives outside the models directory,
+            # add it to the dropdown so ui.select doesn't reject the value.
+            if default_model and default_model not in model_options:
+                model_options[default_model] = os.path.basename(default_model)
             model_select = ui.select(
                 options=model_options,
                 value=default_model,
@@ -81,7 +85,26 @@ def rag_page():
                 "Or enter custom model path",
                 value="" if default_model else config.get("defaults.rag_model_path", ""),
             ).classes("w-full")
-            ui.button("Browse...", on_click=lambda: _browse_file(model_path_input), icon="folder_open").props("flat")
+
+            async def browse_and_sync():
+                """Browse for a .gguf file and add it to the dropdown."""
+                import webview
+                result = await app.native.main_window.create_file_dialog(
+                    dialog_type=webview.FileDialog.OPEN,
+                    allow_multiple=False,
+                    file_types=("GGUF Models (*.gguf)",),
+                )
+                if result and len(result) > 0:
+                    path = result[0]
+                    # Add to dropdown and select it
+                    opts = dict(model_select.options)
+                    if path not in opts:
+                        opts[path] = os.path.basename(path)
+                        model_select.set_options(opts)
+                    model_select.set_value(path)
+                    model_path_input.set_value("")
+
+            ui.button("Browse...", on_click=browse_and_sync, icon="folder_open").props("flat")
 
             if not gguf_files:
                 ui.label("No models found. Visit the Downloads page to get a Qwen model.").classes("text-warning")
@@ -112,8 +135,9 @@ def rag_page():
                     ui.notify("Please select a documents directory.", type="warning")
                     return
 
-                # Resolve model path: prefer dropdown, fall back to custom input
-                chosen_model = model_select.value or model_path_input.value
+                # Resolve model path: custom input overrides dropdown when filled
+                custom = model_path_input.value.strip()
+                chosen_model = custom if custom else model_select.value
                 if not chosen_model or not os.path.exists(chosen_model):
                     ui.notify("Please select a valid model file.", type="warning")
                     return
