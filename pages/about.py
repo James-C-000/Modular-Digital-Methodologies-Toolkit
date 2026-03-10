@@ -235,21 +235,24 @@ summary report.
     with ui.expansion("RAG Chat", icon="smart_toy").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Lets you ask questions about your documents using a local
-Llama AI model. The system indexes your documents and uses Retrieval-Augmented
+Qwen AI model. The system indexes your documents and uses Retrieval-Augmented
 Generation (RAG) to find relevant passages and generate answers.
 
 **How to use:**
 1. Select a **Documents Directory** containing the files to index.
-2. Select a **Model File** \u2014 a `.gguf` format Llama model. If you don't have one,
-   see the **Downloads** page for instructions.
-3. Click **Initialize RAG** to load the model and index your documents.
-4. Once initialized, type questions in the chat box and press Enter or click
+2. Select a **Model File** — a Qwen 3.5 `.gguf` model. If you don't have one,
+   download it from the **Downloads** page.
+3. Optionally adjust **Context Length** and **Thinking Mode** settings.
+4. Click **Initialize RAG** to load the model and index your documents.
+5. Once initialized, type questions in the chat box and press Enter or click
    Send.
 
 **Tips:**
+- MDMT auto-detects your hardware and recommends the best model size.
 - Initialization can take a minute or more depending on the number of documents
   and model size.
 - The AI will cite which documents (and pages) it used to answer your question.
+- Enable **Thinking Mode** for more thorough reasoning on complex questions.
 - For best results, use focused document collections rather than very large
   mixed archives.
         """)
