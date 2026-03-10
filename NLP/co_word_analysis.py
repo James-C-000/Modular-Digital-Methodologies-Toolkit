@@ -195,5 +195,5 @@ def main(directory):
 
 if __name__ == "__main__":
     # Set your input directory path here.
-    directory = "/home/james/PycharmProjects/MDMT/NLP/input"  # <-- Update this path accordingly.
+    directory = os.path.join(os.path.dirname(__file__), "input")  # <-- Update this path accordingly.
     main(directory)

@@ -221,5 +221,5 @@ def main(directory):
 
 if __name__ == "__main__":
     # Set your input directory path here.
-    directory = "/home/james/School/Masters (2023-202x)/HIST 9308B/Term Paper"  # <-- Update this path accordingly.
+    directory = os.path.join(os.path.dirname(__file__), "input")  # <-- Update this path accordingly.
     main(directory)
