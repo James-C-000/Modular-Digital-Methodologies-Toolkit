@@ -202,9 +202,13 @@ class QwenRAGSystem:
     def _initialize_llm(self):
         """Initialize the Qwen language model with optimized parameters."""
         params = self._get_llm_params(self.enable_thinking)
-        extra_model_kwargs = {"presence_penalty": 1.5}
+        extra_model_kwargs = {}
         if self.n_gpu_layers != 0:
             extra_model_kwargs["flash_attn"] = True
+
+        kwargs = {}
+        if extra_model_kwargs:
+            kwargs["model_kwargs"] = extra_model_kwargs
 
         return LlamaCpp(
             model_path=self.llm_model_path,
@@ -218,7 +222,7 @@ class QwenRAGSystem:
             top_k=params["top_k"],
             repeat_penalty=params["repeat_penalty"],
             verbose=self.verbose,
-            model_kwargs=extra_model_kwargs,
+            **kwargs,
         )
 
     def _load_documents(self) -> Tuple[List[Document], int]:
@@ -471,7 +475,7 @@ Please provide a comprehensive and accurate answer based only on this informatio
             prompt = self._build_prompt(question, context, self.enable_thinking)
             # Invoke the LLM
             generation_start = time.time()
-            raw_answer = self.llm.invoke(prompt)
+            raw_answer = self.llm.invoke(prompt, presence_penalty=1.5)
             generation_time = time.time() - generation_start
 
             if self.verbose:
