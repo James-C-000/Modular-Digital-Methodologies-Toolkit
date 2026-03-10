@@ -14,4 +14,5 @@ nicegui~=3.8
 pywebview~=5.3
 platformdirs~=4.3
 huggingface_hub~=0.28
+nltk~=3.9
 pytest~=8.3
