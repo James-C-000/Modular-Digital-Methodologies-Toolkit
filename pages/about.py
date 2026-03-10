@@ -270,7 +270,7 @@ Generation (RAG) to find relevant passages and generate answers.
 | googletrans | MIT | [GitHub](https://github.com/ssut/py-googletrans) |
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
 | LangChain (core, community, huggingface, text-splitters) | MIT | [GitHub](https://github.com/langchain-ai/langchain) |
-| llama-cpp-python | MIT | [GitHub](https://github.com/abetlen/llama-cpp-python) |
+| llama-cpp-python (fork) | MIT | [GitHub](https://github.com/JamePeng/llama-cpp-python) |
 | Matplotlib | PSF-2.0 | [GitHub](https://github.com/matplotlib/matplotlib) |
 | NetworkX | BSD-3-Clause | [GitHub](https://github.com/networkx/networkx) |
 | NiceGUI | MIT | [GitHub](https://github.com/zauberzeug/nicegui) |
