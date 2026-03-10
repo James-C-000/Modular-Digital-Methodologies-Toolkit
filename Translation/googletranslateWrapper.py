@@ -5,6 +5,25 @@ import asyncio
 from googletrans import Translator
 from pypdf import PdfReader  # pypdf replaces PyPDF2
 
+# Language display names to Google Translate codes
+LANGUAGE_CODES = {
+    "Arabic": "ar",
+    "French": "fr",
+    "German": "de",
+    "Spanish": "es",
+    "Italian": "it",
+    "Japanese": "ja",
+    "Korean": "ko",
+    "Portuguese": "pt",
+    "Russian": "ru",
+    "Chinese Simplified": "zh-CN",
+    "Chinese Traditional": "zh-TW",
+    "Dutch": "nl",
+    "Hindi": "hi",
+    "Swedish": "sv",
+    "English": "en",
+}
+
 # ----- Default Configuration variables -----
 # These values will be overridden by settings from the UI
 DEFAULT_TARGET_LANG = "es"  # Default target language code (e.g., "en", "es", "fr", "de")
