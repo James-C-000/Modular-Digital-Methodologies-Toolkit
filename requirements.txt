@@ -1,5 +1,5 @@
 matplotlib==3.10.0
-ocrmypdf==16.8.0
+ocrmypdf~=17.3
 pandas~=2.2.3
 requests~=2.32.3
 openpyxl~=3.1.5
@@ -7,6 +7,10 @@ openai-whisper==20250625
 langchain-community~=0.3.20
 langchain~=0.3.22
 langchain-core~=0.3.49
+langchain-huggingface~=1.2
+sentence-transformers~=5.2
+faiss-cpu~=1.13
+llama-cpp-python~=0.3
 googletrans~=4.0.2
 pypdf~=5.4.0
 future~=1.0.0
@@ -15,4 +19,6 @@ pywebview~=5.3
 platformdirs~=4.3
 huggingface_hub~=0.28
 nltk~=3.9
+transformers~=5.3
+networkx~=3.6
 pytest~=8.3

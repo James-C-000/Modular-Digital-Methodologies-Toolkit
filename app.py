@@ -6,8 +6,30 @@ except RuntimeError:
     pass
 
 import os
+import webbrowser
 from nicegui import ui, app
 from config import AppConfig, get_app_data_dir, get_nltk_data_dir
+
+
+# Open external links in the system browser instead of navigating within pywebview
+@app.get('/api/open-external')
+async def _open_external_url(url: str):
+    webbrowser.open(url)
+    return {'ok': True}
+
+
+ui.add_head_html('''<script>
+document.addEventListener('click', function(e) {
+    var link = e.target.closest('a');
+    if (link && link.href &&
+        (link.href.startsWith('http://') || link.href.startsWith('https://')) &&
+        !link.href.startsWith(window.location.origin)) {
+        e.preventDefault();
+        e.stopPropagation();
+        fetch('/api/open-external?url=' + encodeURIComponent(link.href));
+    }
+}, true);
+</script>''', shared=True)
 
 
 def create_sidebar():
@@ -38,12 +60,7 @@ def create_sidebar():
 
 @ui.page("/")
 def index():
-    config = AppConfig()
-    if config.exists():
-        last_page = config.get("last_page", "/welcome")
-        ui.navigate.to(last_page)
-    else:
-        ui.navigate.to("/welcome")
+    ui.navigate.to("/welcome")
 
 
 @ui.page("/welcome")
@@ -130,7 +147,7 @@ def cowords():
 def rag():
     create_sidebar()
     from pages.rag import rag_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+    with ui.column().classes("w-full h-full p-4"):
         rag_page()
 
 

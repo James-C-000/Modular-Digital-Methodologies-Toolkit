@@ -58,7 +58,7 @@ def chunk_text(text, max_chars=DEFAULT_MAX_CHARS):
     return chunks
 
 
-async def translate_text_with_chunking(text, translator, dest_lang, max_chars=DEFAULT_MAX_CHARS):
+async def translate_text_with_chunking(text, translator, dest_lang, src_lang="auto", max_chars=DEFAULT_MAX_CHARS):
     """
     Translate the given text by splitting it into chunks (each < max_chars),
     translating each chunk asynchronously, and joining the results.
@@ -67,7 +67,7 @@ async def translate_text_with_chunking(text, translator, dest_lang, max_chars=DE
     translated_chunks = []
     for idx, chunk in enumerate(chunks, start=1):
         try:
-            translated_obj = await translator.translate(chunk, src="auto", dest=dest_lang)
+            translated_obj = await translator.translate(chunk, src=src_lang, dest=dest_lang)
             translated_chunk = translated_obj.text
             print(f"Chunk {idx}/{len(chunks)} translated.")
             translated_chunks.append(translated_chunk)
@@ -77,7 +77,7 @@ async def translate_text_with_chunking(text, translator, dest_lang, max_chars=DE
     return " ".join(translated_chunks)
 
 
-async def process_txt_file(file_path, translator, dest_lang, suffix):
+async def process_txt_file(file_path, translator, dest_lang, suffix, src_lang="auto"):
     """
     Read a .txt file, autodetect its language, translate its content in chunks,
     and write the translated text to a new file with the given suffix.
@@ -92,7 +92,7 @@ async def process_txt_file(file_path, translator, dest_lang, suffix):
         detected = await translator.detect(text)
         print(f"Processing TXT file '{file_path}' (detected language: {detected.lang})")
 
-        translated = await translate_text_with_chunking(text, translator, dest_lang)
+        translated = await translate_text_with_chunking(text, translator, dest_lang, src_lang=src_lang)
         base, ext = os.path.splitext(file_path)
         output_path = f"{base}{suffix}{ext}"
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -102,7 +102,7 @@ async def process_txt_file(file_path, translator, dest_lang, suffix):
         print(f"Error processing TXT file {file_path}: {e}")
 
 
-async def process_pdf_file(file_path, translator, dest_lang, suffix):
+async def process_pdf_file(file_path, translator, dest_lang, suffix, src_lang="auto"):
     """
     Extract text from a PDF file using pypdf, autodetect its language, translate it in chunks,
     and write the translated text as a .txt file with the given suffix.
@@ -122,7 +122,7 @@ async def process_pdf_file(file_path, translator, dest_lang, suffix):
         detected = await translator.detect(text)
         print(f"Processing PDF file '{file_path}' (detected language: {detected.lang})")
 
-        translated = await translate_text_with_chunking(text, translator, dest_lang)
+        translated = await translate_text_with_chunking(text, translator, dest_lang, src_lang=src_lang)
         base, _ = os.path.splitext(file_path)
         output_path = f"{base}{suffix}.txt"
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -140,11 +140,13 @@ async def translate_documents_async(settings=None):
     # Use provided settings or defaults
     if settings:
         TARGET_LANG = settings.get("TARGET_LANG", DEFAULT_TARGET_LANG)
+        SRC_LANG = settings.get("SRC_LANG", "auto")
         SUFFIX = settings.get("SUFFIX", DEFAULT_SUFFIX)
         DIRECTORY = settings.get("DIRECTORY", DEFAULT_DIRECTORY)
         MAX_CHARS = settings.get("MAX_CHARS", DEFAULT_MAX_CHARS)
     else:
         TARGET_LANG = DEFAULT_TARGET_LANG
+        SRC_LANG = "auto"
         SUFFIX = DEFAULT_SUFFIX
         DIRECTORY = DEFAULT_DIRECTORY
         MAX_CHARS = DEFAULT_MAX_CHARS
@@ -161,9 +163,9 @@ async def translate_documents_async(settings=None):
         for file in files:
             file_path = os.path.join(root, file)
             if file.lower().endswith(".txt"):
-                tasks.append(process_txt_file(file_path, translator, TARGET_LANG, SUFFIX))
+                tasks.append(process_txt_file(file_path, translator, TARGET_LANG, SUFFIX, src_lang=SRC_LANG))
             elif file.lower().endswith(".pdf"):
-                tasks.append(process_pdf_file(file_path, translator, TARGET_LANG, SUFFIX))
+                tasks.append(process_pdf_file(file_path, translator, TARGET_LANG, SUFFIX, src_lang=SRC_LANG))
     if tasks:
         await asyncio.gather(*tasks)
 

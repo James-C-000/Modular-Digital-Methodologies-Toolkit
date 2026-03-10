@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import re
-import webbrowser
 from collections import Counter
 import nltk
 import matplotlib.pyplot as plt
@@ -10,11 +9,24 @@ from pypdf import PdfReader
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 
-# Ensure required NLTK data is downloaded.
-nltk.data.path.append("nltk_data")
-nltk.download("punkt", download_dir="nltk_data")
-nltk.download("punkt_tab", download_dir="nltk_data")
-nltk.download("stopwords", download_dir="nltk_data")
+_nltk_ready = False
+
+
+def _ensure_nltk_data():
+    """Download required NLTK data on first use."""
+    global _nltk_ready
+    if _nltk_ready:
+        return
+    from config import get_nltk_data_dir
+    nltk_dir = get_nltk_data_dir()
+    if nltk_dir not in nltk.data.path:
+        nltk.data.path.insert(0, nltk_dir)
+    for package in ('punkt_tab', 'stopwords'):
+        try:
+            nltk.data.find(f'tokenizers/{package}' if 'punkt' in package else f'corpora/{package}')
+        except LookupError:
+            nltk.download(package, download_dir=nltk_dir, quiet=True)
+    _nltk_ready = True
 
 def process_pdf(file_path):
     """Extract text from a PDF file using pypdf."""
@@ -135,6 +147,7 @@ def generate_document_html(file_name, stats_html, network_img_file, output_path)
 
 
 def main(directory):
+    _ensure_nltk_data()
     overall_summary = """<html>
 <head><meta charset="utf-8"><title>Co-word Analysis Summary</title></head>
 <body>
@@ -178,7 +191,6 @@ def main(directory):
     with open(summary_file, "w", encoding="utf-8") as f:
         f.write(overall_summary)
     print(f"Overall Co-word Analysis Summary saved to {summary_file}")
-    webbrowser.open(summary_file)
 
 
 if __name__ == "__main__":

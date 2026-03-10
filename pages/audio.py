@@ -2,7 +2,6 @@
 import os
 from nicegui import app, ui, run
 from config import AppConfig, get_whisper_models_dir
-from Audio_Transcription.transcription_logic import transcribe_directory
 
 
 def audio_page():
@@ -11,6 +10,13 @@ def audio_page():
     ui.label("Audio Transcription").classes("text-h4")
     ui.label("Convert speech in audio files to text using OpenAI Whisper").classes("text-subtitle1")
     ui.separator()
+
+    try:
+        from Audio_Transcription.transcription_logic import transcribe_directory
+    except ImportError as e:
+        ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
+        ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
+        return
 
     input_dir = ui.input("Audio Directory").classes("w-full")
     ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
@@ -23,7 +29,7 @@ def audio_page():
 
     ui.separator()
 
-    progress = ui.linear_progress(value=0).classes("w-full")
+    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
     status_label = ui.label("Ready")
     results_area = ui.column().classes("w-full")

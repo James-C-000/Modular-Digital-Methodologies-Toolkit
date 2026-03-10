@@ -2,7 +2,6 @@
 import os
 from nicegui import app, ui, run
 from config import AppConfig
-from NLP.relationship_extraction import process_files_for_relationships
 
 ENTITY_TYPES = ["PERSON", "ORGANIZATION", "GPE", "LOCATION", "FACILITY", "DATE", "TIME", "MONEY", "PERCENT"]
 
@@ -31,7 +30,7 @@ def relationships_page():
 
     ui.separator()
 
-    progress = ui.linear_progress(value=0).classes("w-full")
+    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
     status_label = ui.label("Ready")
 
@@ -45,9 +44,10 @@ def relationships_page():
             return
 
         progress.set_visibility(True)
-        status_label.set_text("Extracting relationships...")
+        status_label.set_text("Downloading NLP data (if needed) and extracting relationships...")
 
         def do_extract():
+            from NLP.relationship_extraction import process_files_for_relationships
             return process_files_for_relationships(
                 input_dir=in_dir,
                 output_dir=in_dir,
@@ -70,6 +70,9 @@ def relationships_page():
             else:
                 status_label.set_text(results["message"])
                 ui.notify(results["message"], type="negative")
+        except ImportError as e:
+            status_label.set_text(f"Missing dependency: {e}")
+            ui.notify(f"Missing dependency: {e}", type="negative")
         except Exception as e:
             status_label.set_text(f"Error: {e}")
             ui.notify(f"Extraction error: {e}", type="negative")

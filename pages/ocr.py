@@ -2,7 +2,6 @@
 import os
 from nicegui import app, ui, run
 from config import AppConfig, get_tessdata_dir
-from OCR.ocr_logic import TESSERACT_LANGUAGES, run_ocr_batch
 
 
 def _find_tessdata_dir() -> str:
@@ -17,6 +16,15 @@ def _find_tessdata_dir() -> str:
 
 def ocr_page():
     config = AppConfig()
+
+    try:
+        from OCR.ocr_logic import TESSERACT_LANGUAGES, run_ocr_batch
+    except ImportError as e:
+        ui.label("OCR Processing").classes("text-h4")
+        ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
+        ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
+        return
+
     tessdata_dir = _find_tessdata_dir()
 
     available_langs = {
@@ -55,12 +63,12 @@ def ocr_page():
         extract_text = ui.checkbox("Extract Text", value=False)
 
     with ui.row().classes("w-full").bind_visibility_from(rotate, "value"):
-        ui.label("Rotation Confidence:")
-        rotate_threshold = ui.radio({2: "Low", 15: "Normal", 30: "High"}, value=15).props("inline")
+        ui.label("Rotation Sensitivity:")
+        rotate_threshold = ui.radio({2: "High", 6: "Normal", 15: "Low"}, value=6).props("inline")
 
     ui.separator()
 
-    progress = ui.linear_progress(value=0).classes("w-full")
+    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
     status_label = ui.label("Ready")
     results_table = ui.column().classes("w-full")

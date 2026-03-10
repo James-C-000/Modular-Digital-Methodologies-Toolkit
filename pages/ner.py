@@ -2,7 +2,6 @@
 import os
 from nicegui import app, ui, run
 from config import AppConfig
-from NLP.named_entity_recognition import main as ner_main
 
 
 def ner_page():
@@ -17,7 +16,7 @@ def ner_page():
 
     ui.separator()
 
-    progress = ui.linear_progress(value=0).classes("w-full")
+    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
     status_label = ui.label("Ready")
 
@@ -28,12 +27,19 @@ def ner_page():
             return
 
         progress.set_visibility(True)
-        status_label.set_text("Running NER analysis...")
+        status_label.set_text("Loading NER model (may download ~1.3 GB on first run)...")
 
         try:
-            await run.io_bound(ner_main, in_dir)
+            def do_ner():
+                from NLP.named_entity_recognition import main as ner_main
+                ner_main(in_dir)
+
+            await run.io_bound(do_ner)
             status_label.set_text("NER analysis complete! Results saved in input directory.")
             ui.notify("NER analysis complete!", type="positive")
+        except ImportError as e:
+            status_label.set_text(f"Missing dependency: {e}")
+            ui.notify(f"Missing dependency: {e}", type="negative")
         except Exception as e:
             status_label.set_text(f"Error: {e}")
             ui.notify(f"NER error: {e}", type="negative")

@@ -2,7 +2,6 @@
 import os
 from nicegui import app, ui, run
 from config import AppConfig
-from NLP.co_word_analysis import main as co_word_main
 
 
 def cowords_page():
@@ -17,7 +16,7 @@ def cowords_page():
 
     ui.separator()
 
-    progress = ui.linear_progress(value=0).classes("w-full")
+    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
     status_label = ui.label("Ready")
 
@@ -28,16 +27,23 @@ def cowords_page():
             return
 
         progress.set_visibility(True)
-        status_label.set_text("Running co-word analysis...")
+        status_label.set_text("Downloading NLP data (if needed) and running co-word analysis...")
 
         try:
-            await run.io_bound(co_word_main, in_dir)
+            def do_coword():
+                from NLP.co_word_analysis import main as co_word_main
+                co_word_main(in_dir)
+
+            await run.io_bound(do_coword)
             status_label.set_text("Co-word analysis complete! Results saved in input directory.")
             ui.notify("Co-word analysis complete!", type="positive")
 
             summary = os.path.join(in_dir, "Co_Word_Analysis_Summary.html")
             if os.path.exists(summary):
                 ui.label("Summary report generated.").classes("text-positive")
+        except ImportError as e:
+            status_label.set_text(f"Missing dependency: {e}")
+            ui.notify(f"Missing dependency: {e}", type="negative")
         except Exception as e:
             status_label.set_text(f"Error: {e}")
             ui.notify(f"Co-word analysis error: {e}", type="negative")

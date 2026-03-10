@@ -2,7 +2,6 @@
 import os
 from nicegui import app, ui, run
 from config import AppConfig
-from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
 
 
 def keywords_page():
@@ -11,6 +10,13 @@ def keywords_page():
     ui.label("Advanced Keyword Search").classes("text-h4")
     ui.label("Batch keyword analysis across PDF collections").classes("text-subtitle1")
     ui.separator()
+
+    try:
+        from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
+    except ImportError as e:
+        ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
+        ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
+        return
 
     pdf_dir = ui.input("PDF Input Directory").classes("w-full")
     ui.button("Browse...", on_click=lambda: _browse_dir(pdf_dir), icon="folder_open").props("flat")
@@ -35,7 +41,7 @@ def keywords_page():
 
     ui.separator()
 
-    progress = ui.linear_progress(value=0).classes("w-full")
+    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
     status_label = ui.label("Ready")
 
