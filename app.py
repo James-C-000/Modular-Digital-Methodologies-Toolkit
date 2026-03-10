@@ -70,27 +70,68 @@ def downloads():
         downloads_page()
 
 
-# Placeholder pages for modules not yet migrated
-def _placeholder_page(name: str):
-    def page_fn():
-        create_sidebar()
-        with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-            ui.label(f"{name}").classes("text-h4")
-            ui.label("This module is not yet migrated to the web UI.").classes("text-subtitle1")
-    return page_fn
+@ui.page("/ocr")
+def ocr():
+    create_sidebar()
+    from pages.ocr import ocr_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        ocr_page()
 
 
-for route, name in [
-    ("/ocr", "OCR"),
-    ("/audio", "Audio Transcription"),
-    ("/translation", "Translation"),
-    ("/keywords", "Advanced Keywords"),
-    ("/ner", "NER"),
-    ("/relationships", "Relationship Extraction"),
-    ("/cowords", "Co-Word Analysis"),
-    ("/rag", "RAG Chat"),
-]:
-    ui.page(route)(_placeholder_page(name))
+@ui.page("/audio")
+def audio():
+    create_sidebar()
+    from pages.audio import audio_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        audio_page()
+
+
+@ui.page("/translation")
+def translation():
+    create_sidebar()
+    from pages.translation import translation_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        translation_page()
+
+
+@ui.page("/keywords")
+def keywords():
+    create_sidebar()
+    from pages.keywords import keywords_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        keywords_page()
+
+
+@ui.page("/ner")
+def ner():
+    create_sidebar()
+    from pages.ner import ner_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        ner_page()
+
+
+@ui.page("/relationships")
+def relationships():
+    create_sidebar()
+    from pages.relationships import relationships_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        relationships_page()
+
+
+@ui.page("/cowords")
+def cowords():
+    create_sidebar()
+    from pages.cowords import cowords_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        cowords_page()
+
+
+@ui.page("/rag")
+def rag():
+    create_sidebar()
+    from pages.rag import rag_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        rag_page()
 
 
 def main():
