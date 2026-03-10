@@ -32,7 +32,6 @@ import shutil
 import time
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 
 # Setup logging with reduced verbosity
 logging.basicConfig(
@@ -148,6 +147,7 @@ class QwenRAGSystem:
 
         logger.info(f"Indexing documents from {self.documents_dir}...")
         self.vectorstore = self._create_vectorstore()
+        self._query_cache: Dict[str, List] = {}
 
         self.perf_metrics["indexing_time"] = time.time() - start_time
 
@@ -394,7 +394,6 @@ class QwenRAGSystem:
 
         return context
 
-    @lru_cache(maxsize=16)  # Cache recent queries for faster repeated access
     def _retrieve_documents(self, question: str) -> List[Document]:
         """
         Retrieve relevant documents for a question, with caching for performance.
@@ -405,16 +404,25 @@ class QwenRAGSystem:
         Returns:
             List of relevant documents
         """
+        if question in self._query_cache:
+            return list(self._query_cache[question])
+
         retriever = self.vectorstore.as_retriever(
             search_type="similarity",
             search_kwargs={"k": self.top_k}
         )
 
         try:
-            return retriever.invoke(question)
+            docs = retriever.invoke(question)
         except Exception as e:
             logger.error(f"Error during document retrieval: {str(e)}")
             return []
+
+        # Cache with bounded size (evict oldest entry if full)
+        if len(self._query_cache) >= 16:
+            self._query_cache.pop(next(iter(self._query_cache)))
+        self._query_cache[question] = docs
+        return list(docs)
 
     @staticmethod
     def _build_prompt(question: str, context: str, enable_thinking: bool) -> str:
@@ -592,6 +600,7 @@ Please provide a comprehensive and accurate answer based only on this informatio
                     print("\nReindexing documents...")
                     start_time = time.time()
                     self.vectorstore = self._create_vectorstore()
+                    self._query_cache.clear()
                     print(
                         f"Reindexing complete. Processed {self.perf_metrics['chunk_count']} chunks from {self.perf_metrics['doc_count']} documents in {time.time() - start_time:.2f}s")
                     continue

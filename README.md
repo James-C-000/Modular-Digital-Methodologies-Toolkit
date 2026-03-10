@@ -20,7 +20,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 - **Co-Word Analysis**: Generate word co-occurrence networks to reveal conceptual relationships
 
 ### AI Integration
-- **Retrieval-Augmented Generation (RAG)**: Chat with your documents using an AI assistant powered by Llama models
+- **Retrieval-Augmented Generation (RAG)**: Chat with your documents using an AI assistant powered by Qwen 3.5 models
 
 ## Installation
 
@@ -62,8 +62,8 @@ Optional assets (language models, NLTK data, Tesseract language files) are downl
 
 - **About page**: Add all required third-party licenses.
 - **Advanced Keywords UI**: Redesign the Advanced Keywords module interface — the large keyword textboxes make the page difficult to navigate.
-- **Evaluate alternative LLMs**: Investigate switching the RAG module from Llama 3.2 to a newer model such as Qwen 3.5 for improved quality and performance.
-- **Translation module: OCR prerequisite notice**: Update the Translation module UI and help page to explain that input PDFs must be OCR'd (text-searchable) before translation. Scanned PDFs without a text layer cannot be translated — users should run the OCR module first if needed.
+- **Verify cross-platform capability**: Ensure the program runs on Mac, Windows, and Linux.
+- **UI Theme Redesign**: Move away from the flat, minimal (basic) look currently used? At a minimum, offer a dark and light mode.
 
 ## Dependencies
 
