@@ -45,7 +45,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
     # Get user keywords
     if keywordFilePath != '':
         try:
-            userKeywords = open(keywordFilePath, "r")
+            userKeywords = open(keywordFilePath, "r", encoding="utf-8")
         except Exception as e:
             error = "ERROR: " + str(e) + ".\nCheck keywords file and retry."
             logic_error(error)
@@ -140,7 +140,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
             elif filterFilePath != '':
                 # use the filter file to get filters
                 try:
-                    with open(filterFilePath, 'r') as file:
+                    with open(filterFilePath, 'r', encoding='utf-8') as file:
                         userFilters = file.read().replace('\n', '')
                     translationTable = allText.maketrans('', '', userFilters)
                     allText = allText.translate(translationTable)
