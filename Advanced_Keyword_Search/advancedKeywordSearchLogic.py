@@ -18,9 +18,10 @@ def make_autopct(values):
 
 
 def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath,
-               manualKeywords, filterFilePath, manualFilters):
-    from aksWindow import logic_error
-    from aksWindow import logic_message
+               manualKeywords, filterFilePath, manualFilters,
+               on_error=None, on_message=None):
+    logic_error = on_error or print
+    logic_message = on_message or print
     # Turn off matplotlib interactive mode
     matplotlib.use('Agg')
     plt.ioff()

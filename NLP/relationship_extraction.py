@@ -18,37 +18,31 @@ import matplotlib
 
 matplotlib.use('Agg')
 
-nltk.data.path.append("nltk_data")
+_nltk_ready = False
 
-# Download NLTK resources if not already present
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt', download_dir="nltk_data")
-try:
-    nltk.data.find('taggers/averaged_perceptron_tagger')
-except LookupError:
-    nltk.download('averaged_perceptron_tagger', download_dir="nltk_data")
-try:
-    nltk.data.find('chunkers/maxent_ne_chunker')
-except LookupError:
-    nltk.download('maxent_ne_chunker', download_dir="nltk_data")
-try:
-    nltk.data.find('corpora/words')
-except LookupError:
-    nltk.download('words', download_dir="nltk_data")
-try:
-    nltk.data.find('tokenizers/punkt_tab')
-except LookupError:
-    nltk.download('punkt_tab', download_dir="nltk_data")
-try:
-    nltk.data.find('taggers/averaged_perceptron_tagger_eng')
-except LookupError:
-    nltk.download('averaged_perceptron_tagger_eng', download_dir="nltk_data")
-try:
-    nltk.data.find('chunkers/maxent_ne_chunker_tab')
-except LookupError:
-    nltk.download('maxent_ne_chunker_tab', download_dir="nltk_data")
+_NLTK_PACKAGES = [
+    ('tokenizers/punkt_tab', 'punkt_tab'),
+    ('taggers/averaged_perceptron_tagger_eng', 'averaged_perceptron_tagger_eng'),
+    ('chunkers/maxent_ne_chunker_tab', 'maxent_ne_chunker_tab'),
+    ('corpora/words', 'words'),
+]
+
+
+def _ensure_nltk_data():
+    """Download required NLTK data on first use."""
+    global _nltk_ready
+    if _nltk_ready:
+        return
+    from config import get_nltk_data_dir
+    nltk_dir = get_nltk_data_dir()
+    if nltk_dir not in nltk.data.path:
+        nltk.data.path.insert(0, nltk_dir)
+    for resource, package in _NLTK_PACKAGES:
+        try:
+            nltk.data.find(resource)
+        except LookupError:
+            nltk.download(package, download_dir=nltk_dir, quiet=True)
+    _nltk_ready = True
 
 
 def extract_text_from_file(file_path):
@@ -260,6 +254,8 @@ def generate_network_graph(df, output_dir):
 
 def process_files_for_relationships(input_dir, output_dir, model_name, extract_text, generate_graph, entity_types):
     """Process files and extract relationships"""
+    _ensure_nltk_data()
+
     # Set non-interactive backend for matplotlib at the beginning
     import matplotlib
     matplotlib.use('Agg')

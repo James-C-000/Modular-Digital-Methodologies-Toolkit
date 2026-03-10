@@ -4,7 +4,7 @@ A comprehensive suite of digital humanities and research tools designed to strea
 
 ## Overview
 
-MDMT is a desktop application that provides researchers, scholars, and digital humanists with a variety of specialized tools for working with text-based documents. It offers a modular approach, allowing users to perform tasks ranging from optical character recognition to language translation and advanced text analysis, all through a unified interface.
+MDMT is a desktop application that provides researchers, scholars, and digital humanists with a variety of specialized tools for working with text-based documents. It offers a modular approach, allowing users to perform tasks ranging from optical character recognition to language translation and advanced text analysis, all through a unified web-based interface running in a native window.
 
 ## Features
 
@@ -25,87 +25,81 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or newer
-- Required dependencies (see `requirements.txt`)
+- Python 3.12 or newer
+- Tesseract OCR (system package)
+- Required Python dependencies (see `requirements.txt`)
 
 ### Setup
 1. Clone this repository
-2. Install required dependencies:
+2. Create a virtual environment and install dependencies:
    ```
+   python -m venv .venv
+   source .venv/bin/activate
    pip install -r requirements.txt
    ```
 3. Run the application:
    ```
-   python MDMT_Launcher.py
+   python app.py
    ```
-
-### Pre-built Binaries
-Pre-built binaries for Windows, macOS, and Linux will be made available in the releases section.
 
 ## Usage
 
-Launch MDMT using `MDMT_Launcher.py` to access the main interface, which provides buttons for each module:
+Launch MDMT with `python app.py`. The application opens in a native desktop window with a sidebar for navigation between modules:
 
 1. **OCR**: Process PDFs to make them searchable with text selection
 2. **Audio Transcription**: Convert audio files to text transcriptions
 3. **Translation**: Translate documents between languages
-4. **RAG Chatbot**: Query your document collection using AI
-5. **Advanced Keyword Search**: Find and analyze keywords with visualizations
-6. **Named Entity Recognition**: Extract named entities from documents
-7. **Relationship Extraction**: Identify entity relationships
-8. **Co-Word Analysis**: Generate word co-occurrence networks
+4. **Advanced Keyword Search**: Find and analyze keywords with context
+5. **Named Entity Recognition**: Extract named entities from documents
+6. **Relationship Extraction**: Identify entity relationships and generate network graphs
+7. **Co-Word Analysis**: Generate word co-occurrence networks
+8. **RAG Chat**: Query your document collection using a local LLM
+9. **Downloads**: Manage optional assets (Tesseract languages, Whisper models, NLTK data, LLM models)
 
-Each module has its own interface with specific options and settings.
+Optional assets (language models, NLTK data, Tesseract language files) are downloaded on demand via the Downloads page. Large ML models are not bundled with the application.
 
-## Documentation
+## Known Issues
 
-Each tool includes in-app help documentation accessible through the Help menu. The documentation covers:
-- Input/output requirements
-- Available options and settings
-- Processing details
-- Output formats
+- **Relationship Extraction / Co-Word Analysis**: NLTK's pickle-based model loading causes a C-level stack overflow on Python 3.14 due to deeply nested deserialization. These modules may not work on Python 3.14+.
+
+## TODO
+
+- **Help / About page**: Add all required third-party licenses. Write a more comprehensive help page with module descriptions and usage instructions.
+- **Fix NLTK bugs**: Resolve the C-level stack overflow in NLTK's pickle deserialization affecting Relationship Extraction and Co-Word Analysis on Python 3.14+.
+- **Advanced Keywords UI**: Redesign the Advanced Keywords module interface — the large keyword textboxes make the page difficult to navigate.
+- **RAG / Sidebar scroll overflow**: Fix the RAG chat UI and sidebar so they don't require scrolling by default. Both currently have ~25px of excess height that forces unnecessary scrollbars.
+- **Evaluate alternative LLMs**: Investigate switching the RAG module from Llama 3.2 to a newer model such as Qwen 3.5 for improved quality and performance.
 
 ## Dependencies
 
 Major dependencies include:
-- `matplotlib`: For data visualization
-- `ocrmypdf`: For OCR functionality
-- `pygubu`: For the user interface
-- `pandas`: For data manipulation
-- `nltk`: For natural language processing
-- `transformers`: For NER and other NLP tasks
-- `whisper`: For audio transcription
-- `langchain`: For RAG implementation
-- `pypdf`: For PDF processing
+- `nicegui` + `pywebview`: Web-based UI in a native desktop window
+- `ocrmypdf`: OCR functionality
+- `openai-whisper`: Audio transcription
+- `transformers`: Named entity recognition
+- `nltk` + `networkx`: NLP and graph analysis
+- `langchain`: RAG implementation
+- `pandas`: Data manipulation
+- `matplotlib`: Data visualization
+- `pypdf`: PDF text extraction
 
 See `requirements.txt` for a complete list.
-Todo: make sure requirements.txt has complete coverage
 
-## Development
+## Building
 
-### Project Structure
-- Main modules are organized in subdirectories by function
-- UI files (`*.ui`) define the interface layouts
-- Window classes (`*Window.py`) handle UI logic
-- Core functionality is implemented in dedicated modules
-
-### Building
-To build executable versions:
+To build a standalone executable:
 ```
 pip install pyinstaller
-pyinstaller MDMT_Launcher.spec
+pyinstaller mdmt.spec
 ```
+
+The spec file uses `--onedir` mode to avoid multi-GB extraction on each launch.
 
 ## License
 
-This project uses several open-source libraries, each with their own licenses:
-- Matplotlib: Matplotlib Development Team (License included in the application)
-- pdftotext: Jason Alan Palmer (MIT License)
-- pygubu: Alejandro Autalán (MIT License)
-
-Todo: add complete list of licenses 
+This project uses several open-source libraries, each with their own licenses. See the Help/About page within the application for details.
 
 ## Contact
 
-Software by James C. Caldwell  
+Software by James C. Caldwell
 Email: James.Caldwell.000@gmail.com

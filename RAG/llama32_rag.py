@@ -51,12 +51,7 @@ try:
     from langchain_community.document_loaders import TextLoader, PyPDFLoader, DirectoryLoader
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-    try:
-        from langchain_huggingface import HuggingFaceEmbeddings
-    except ImportError:
-        logger.error("langchain_huggingface not installed. Please run:")
-        logger.error("pip install langchain-huggingface")
-        exit(1)
+    from langchain_huggingface import HuggingFaceEmbeddings
 
     from langchain_community.vectorstores import FAISS
     from langchain_community.llms import LlamaCpp

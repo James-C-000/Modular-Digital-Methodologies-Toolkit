@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 import os
-import webbrowser
-from transformers import pipeline
 from pypdf import PdfReader
 from collections import Counter
 
-# Initialize the Hugging Face NER pipeline with explicit model and aggregation strategy.
-ner_pipeline = pipeline(
-    "ner",
-    model="dbmdz/bert-large-cased-finetuned-conll03-english",
-    revision="4c53496",
-    aggregation_strategy="simple"
-)
+_ner_pipeline = None
+
+
+def _get_pipeline():
+    """Lazy-load the NER pipeline (downloads model on first use)."""
+    global _ner_pipeline
+    if _ner_pipeline is None:
+        from transformers import pipeline
+        _ner_pipeline = pipeline(
+            "ner",
+            model="dbmdz/bert-large-cased-finetuned-conll03-english",
+            revision="4c53496",
+            aggregation_strategy="simple"
+        )
+    return _ner_pipeline
 
 
 def process_pdf(file_path):
@@ -76,7 +82,7 @@ def run_ner_on_text(text, max_length=1000, overlap=200):
     chunks = chunk_text_by_char(text, max_length, overlap)
     aggregated_entities = []
     for chunk, offset in chunks:
-        entities = ner_pipeline(chunk)
+        entities = _get_pipeline()(chunk)
         for ent in entities:
             ent["start"] += offset
             ent["end"] += offset
@@ -211,7 +217,6 @@ def main(directory):
         f.write(summary_html_content)
 
     print(f"NER summary statistics saved to {output_summary_file}")
-    webbrowser.open(output_summary_file)
 
 
 if __name__ == "__main__":

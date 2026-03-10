@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# IDE
+.idea/
+
+# Claude
+CLAUDE.md
+
+# NLTK data
+nltk_data/
+
+# LLM models
+*.gguf
+
+# RAG runtime data
+RAG/documents/
+RAG/index/
+RAG/models/
+
+# OCR tessdata symlinks
+OCR/tessdata/configs
+OCR/tessdata/tessconfigs
+
+# Sample data and module output
+*.wav
+*.mp3
+*_translated.*
+*_translated_*.txt
+*_ocr.*
+
+# Superpowers planning docs
+docs/superpowers/
+.superpowers/
