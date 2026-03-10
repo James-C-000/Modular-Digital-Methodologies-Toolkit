@@ -815,7 +815,7 @@ def main():
         print("\nAn error occurred. Check the logs for details.")
         print("Please make sure all dependencies are installed:")
         print(
-            "pip install langchain langchain-community langchain-huggingface faiss-cpu pypdf sentence-transformers llama-cpp-python")
+            "pip install langchain langchain-community langchain-huggingface faiss-cpu pypdf sentence-transformers llama-cpp-python beautifulsoup4 docx2txt")
 
 
 if __name__ == "__main__":

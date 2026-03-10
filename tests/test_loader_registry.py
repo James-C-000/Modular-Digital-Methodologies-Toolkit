@@ -26,7 +26,7 @@ def sample_docs_dir():
 def test_get_loader_for_known_extensions():
     """Each supported extension maps to a loader class."""
     from RAG.qwen_rag import SUPPORTED_EXTENSIONS
-    for ext in [".txt", ".pdf", ".md", ".html", ".csv", ".json", ".docx"]:
+    for ext in [".txt", ".pdf", ".md", ".html", ".htm", ".csv", ".json", ".docx"]:
         assert ext in SUPPORTED_EXTENSIONS, f"Missing loader for {ext}"
 
 
