@@ -12,7 +12,7 @@ def rag_page():
     ui.query(".q-page").style("overflow: hidden")
 
     ui.label("RAG Chat").classes("text-h4")
-    ui.label("Chat with your documents using Llama AI").classes("text-subtitle1")
+    ui.label("Chat with your documents using Qwen AI").classes("text-subtitle1")
     ui.separator()
 
     @ui.refreshable
@@ -23,15 +23,84 @@ def rag_page():
             _chat_ui()
 
     def _setup_ui():
+        from RAG.hardware import detect_hardware
+        hw_info = detect_hardware()
+
+        # Migration notice for existing Llama users
+        saved_model = config.get("defaults.rag_model_path", "")
+        if saved_model and "llama" in os.path.basename(saved_model).lower():
+            config.set("defaults.rag_model_path", "")
+            config.save()
+            ui.notify(
+                "MDMT now uses Qwen 3.5 models for improved quality. "
+                "Please download a Qwen model from the Downloads page.",
+                type="info",
+                timeout=10000,
+            )
+
         with ui.card().classes("w-full"):
             doc_dir = ui.input("Documents Directory").classes("w-full")
             ui.button("Browse...", on_click=lambda: _browse_dir(doc_dir), icon="folder_open").props("flat")
 
-            model_path = ui.input(
-                "Model File (.gguf)",
-                value=config.get("defaults.rag_model_path", ""),
+            # Hardware info
+            hw_text = (
+                f"{hw_info.gpu_type.upper()} GPU — {hw_info.vram_mb} MB VRAM"
+                if hw_info.gpu_available
+                else f"No GPU — {hw_info.ram_mb} MB RAM"
+            )
+            ui.label(f"Detected hardware: {hw_text}").classes("text-caption")
+
+            # Model selector — dropdown of downloaded .gguf files + Browse option
+            models_dir = get_models_dir()
+            gguf_files = sorted(
+                [f for f in os.listdir(models_dir) if f.endswith(".gguf")]
+            ) if os.path.isdir(models_dir) else []
+
+            saved_path = config.get("defaults.rag_model_path", "")
+            default_model = ""
+            if saved_path and os.path.exists(saved_path):
+                default_model = saved_path
+            elif gguf_files:
+                # Try to pick the recommended model, else first available
+                for f in gguf_files:
+                    if hw_info.recommended_model.lower().replace("b", "") in f.lower():
+                        default_model = os.path.join(models_dir, f)
+                        break
+                if not default_model:
+                    default_model = os.path.join(models_dir, gguf_files[0])
+
+            model_options = {os.path.join(models_dir, f): f for f in gguf_files}
+            model_select = ui.select(
+                options=model_options,
+                value=default_model,
+                label="Model File (.gguf)",
             ).classes("w-full")
-            ui.button("Browse...", on_click=lambda: _browse_file(model_path), icon="folder_open").props("flat")
+
+            model_path_input = ui.input(
+                "Or enter custom model path",
+                value="" if default_model else config.get("defaults.rag_model_path", ""),
+            ).classes("w-full")
+            ui.button("Browse...", on_click=lambda: _browse_file(model_path_input), icon="folder_open").props("flat")
+
+            if not gguf_files:
+                ui.label("No models found. Visit the Downloads page to get a Qwen model.").classes("text-warning")
+
+            # Context length
+            ctx_length = ui.number(
+                "Context Length",
+                value=config.get("defaults.rag_context_window", 32768),
+                min=2048,
+                max=65536,
+                step=1024,
+            ).classes("w-48").tooltip(
+                "Higher values improve reasoning but use more memory. Range: 2048-65536"
+            )
+
+            # Thinking mode toggle
+            thinking = ui.switch(
+                "Enable thinking mode",
+                value=config.get("defaults.rag_thinking_mode", False),
+            ).tooltip("Enable chain-of-thought reasoning (slower but higher quality)")
 
             status_label = ui.label("Not initialized")
             progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
@@ -41,7 +110,10 @@ def rag_page():
                 if not doc_dir.value:
                     ui.notify("Please select a documents directory.", type="warning")
                     return
-                if not model_path.value or not os.path.exists(model_path.value):
+
+                # Resolve model path: prefer dropdown, fall back to custom input
+                chosen_model = model_select.value or model_path_input.value
+                if not chosen_model or not os.path.exists(chosen_model):
                     ui.notify("Please select a valid model file.", type="warning")
                     return
 
@@ -49,17 +121,22 @@ def rag_page():
                 status_label.set_text("Loading model and indexing documents...")
 
                 def do_init():
-                    from RAG.llama32_rag import Llama32RAGSystem
-                    return Llama32RAGSystem(
+                    from RAG.qwen_rag import QwenRAGSystem
+                    return QwenRAGSystem(
                         documents_dir=doc_dir.value,
-                        llm_model_path=model_path.value,
+                        llm_model_path=chosen_model,
+                        context_window=int(ctx_length.value),
+                        enable_thinking=thinking.value,
+                        n_gpu_layers=hw_info.n_gpu_layers,
                         verbose=False,
                     )
 
                 try:
                     rag_state["system"] = await run.io_bound(do_init)
                     rag_state["initialized"] = True
-                    config.set("defaults.rag_model_path", model_path.value)
+                    config.set("defaults.rag_model_path", chosen_model)
+                    config.set("defaults.rag_context_window", int(ctx_length.value))
+                    config.set("defaults.rag_thinking_mode", thinking.value)
                     config.save()
                     content.refresh()
                 except Exception as e:
