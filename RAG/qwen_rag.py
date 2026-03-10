@@ -10,7 +10,7 @@ Features:
 - Optimized specifically for Qwen 3.5 models
 - Efficient in-memory document indexing
 - Automatic resource cleanup
-- Support for text and PDF documents
+- Support for text, PDF, Markdown, HTML, CSV, JSON, and DOCX documents
 - Fast vector search with FAISS
 - Optimized chunking and retrieval strategies
 - Enhanced prompt engineering for Qwen 3.5
