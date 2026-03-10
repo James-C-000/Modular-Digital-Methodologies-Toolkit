@@ -41,6 +41,9 @@ def rag_page():
         with ui.card().classes("w-full"):
             doc_dir = ui.input("Documents Directory").classes("w-full")
             ui.button("Browse...", on_click=lambda: _browse_dir(doc_dir), icon="folder_open").props("flat")
+            ui.label(
+                "Supported formats: TXT, PDF, Markdown, HTML, CSV, JSON, DOCX"
+            ).classes("text-caption text-grey-7")
 
             # Hardware info
             hw_text = (
