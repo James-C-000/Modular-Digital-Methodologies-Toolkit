@@ -21,9 +21,8 @@ RAG/documents/
 RAG/index/
 RAG/models/
 
-# OCR tessdata symlinks
-OCR/tessdata/configs
-OCR/tessdata/tessconfigs
+# OCR tessdata (downloaded on demand)
+OCR/tessdata/
 
 # Sample data and module output
 *.wav

@@ -1,4 +1,4 @@
-"""Audio transcription business logic extracted from audioTranscriptionWindow.py."""
+"""Core audio transcription functions."""
 import os
 
 AUDIO_FORMATS = (".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm")
