@@ -166,5 +166,5 @@ No LLM models found. To add a model:
 1. Download a GGUF model from [HuggingFace](https://huggingface.co)
 2. Place it in the models directory shown above
 
-Recommended: `Llama-3.2-3B-Instruct-Q5_K_M.gguf` (~2.3 GB)
+Recommended: [`Llama-3.2-3B-Instruct-Q4_K_M.gguf`](https://huggingface.co/lmstudio-community/Llama-3.2-3B-Instruct-GGUF) (~2.0 GB)
             """)

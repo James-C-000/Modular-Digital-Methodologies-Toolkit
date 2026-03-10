@@ -62,6 +62,9 @@ def ocr_page():
         pdfa = ui.checkbox("PDF/A Output", value=False)
         extract_text = ui.checkbox("Extract Text", value=False)
 
+    deskew.bind_enabled_from(redo_ocr, "value", backward=lambda v: not v)
+    redo_ocr.bind_enabled_from(deskew, "value", backward=lambda v: not v)
+
     with ui.row().classes("w-full").bind_visibility_from(rotate, "value"):
         ui.label("Rotation Sensitivity:")
         rotate_threshold = ui.radio({2: "High", 6: "Normal", 15: "Low"}, value=6).props("inline")
@@ -134,7 +137,7 @@ def ocr_page():
 async def _browse_dir(target_input):
     import webview
     result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FOLDER_DIALOG,
+        dialog_type=webview.FileDialog.FOLDER,
         allow_multiple=False,
     )
     if result and len(result) > 0:

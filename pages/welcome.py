@@ -31,7 +31,7 @@ Some features require additional data to be downloaded:
 
 - **OCR**: Tesseract language files (~12-15 MB each)
 - **Audio Transcription**: Whisper models (75 MB - 1.5 GB)
-- **RAG Chat**: Llama LLM model (~2.3 GB)
+- **RAG Chat**: Llama LLM model (~2.0 GB)
 
 You can download these from the **Downloads** page, or they will prompt you when needed.
         """)

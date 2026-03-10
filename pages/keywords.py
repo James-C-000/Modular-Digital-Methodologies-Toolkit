@@ -99,7 +99,7 @@ def keywords_page():
 async def _browse_dir(target_input):
     import webview
     result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FOLDER_DIALOG,
+        dialog_type=webview.FileDialog.FOLDER,
         allow_multiple=False,
     )
     if result and len(result) > 0:
@@ -109,7 +109,7 @@ async def _browse_dir(target_input):
 async def _browse_file(target_input):
     import webview
     result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.OPEN_DIALOG,
+        dialog_type=webview.FileDialog.OPEN,
         allow_multiple=False,
     )
     if result and len(result) > 0:

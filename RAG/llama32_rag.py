@@ -49,7 +49,7 @@ for module in ["sentence_transformers", "faiss", "transformers", "filelock", "hu
 try:
     # Import from correct packages to avoid deprecation warnings
     from langchain_community.document_loaders import TextLoader, PyPDFLoader, DirectoryLoader
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
 
     from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -82,7 +82,7 @@ class Llama32RAGSystem:
     def __init__(
             self,
             documents_dir: str = "./documents",
-            llm_model_path: str = "./models/Llama-3.2-3B-Instruct-Q5_K_M.gguf",
+            llm_model_path: str = "./models/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
             embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
             chunk_size: int = 512,
             chunk_overlap: int = 64,
@@ -650,7 +650,7 @@ def main():
 
     parser.add_argument(
         "--llm",
-        default="./models/Llama-3.2-3B-Instruct-Q5_K_M.gguf",
+        default="./models/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
         help="Path to Llama-3.2 model file (.gguf)"
     )
 

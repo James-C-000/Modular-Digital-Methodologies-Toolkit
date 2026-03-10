@@ -69,6 +69,12 @@ Optional assets (language models, NLTK data, Tesseract language files) are downl
 - **Advanced Keywords UI**: Redesign the Advanced Keywords module interface — the large keyword textboxes make the page difficult to navigate.
 - **RAG / Sidebar scroll overflow**: Fix the RAG chat UI and sidebar so they don't require scrolling by default. Both currently have ~25px of excess height that forces unnecessary scrollbars.
 - **Evaluate alternative LLMs**: Investigate switching the RAG module from Llama 3.2 to a newer model such as Qwen 3.5 for improved quality and performance.
+- **Translation module: OCR prerequisite notice**: Update the Translation module UI and help page to explain that input PDFs must be OCR'd (text-searchable) before translation. Scanned PDFs without a text layer cannot be translated — users should run the OCR module first if needed.
+- **OCR module: Source language auto-detection**: Investigate whether Tesseract or ocrmypdf supports automatic source language detection, and enable it if feasible.
+- **OCR module: Language selection guidance**: Update the OCR UI and help page to explain that users must select the languages present in their source documents, and that additional languages can be downloaded from the Downloads page. Add a "Download more languages..." option in the language picker dropdown for discoverability.
+- **Audio Transcription: Whisper model descriptions**: Add explanations of each Whisper model size (tiny, base, small, medium) in the Audio Transcription UI and help page — describe the trade-offs between speed, accuracy, and resource usage for users unfamiliar with Whisper or AI models.
+- **Advanced Keyword Search: Filter explanations**: Add descriptions in the UI explaining what the "Basic Filter" toggle and the manual filter textbox do.
+- **Relationship Extraction: Extract text checkbox**: Add a description in the UI explaining what the "Extract text from PDFs" tickbox does.
 
 ## Dependencies
 

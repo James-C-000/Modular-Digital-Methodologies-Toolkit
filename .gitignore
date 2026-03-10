@@ -9,6 +9,7 @@ __pycache__/
 
 # Claude
 CLAUDE.md
+.claude/
 
 # NLTK data
 nltk_data/

@@ -88,7 +88,7 @@ def translation_page():
 async def _browse_dir(target_input):
     import webview
     result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FOLDER_DIALOG,
+        dialog_type=webview.FileDialog.FOLDER,
         allow_multiple=False,
     )
     if result and len(result) > 0:
