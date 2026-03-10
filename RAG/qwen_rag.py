@@ -475,7 +475,7 @@ Please provide a comprehensive and accurate answer based only on this informatio
             prompt = self._build_prompt(question, context, self.enable_thinking)
             # Invoke the LLM
             generation_start = time.time()
-            raw_answer = self.llm.invoke(prompt, presence_penalty=1.5)
+            raw_answer = self.llm.invoke(prompt, present_penalty=1.5)
             generation_time = time.time() - generation_start
 
             if self.verbose:
