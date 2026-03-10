@@ -69,6 +69,36 @@ async def _download_whisper_model(model_name: str, status_label: ui.label):
     status_label.set_text(f"{model_name} installed")
 
 
+async def _download_qwen_model(model: dict, status_label: ui.label):
+    """Download a Qwen GGUF model from HuggingFace."""
+    from huggingface_hub import hf_hub_download
+
+    status_label.set_text(f"Downloading {model['name']}...")
+    status_label.classes("text-warning", remove="text-grey")
+
+    def do_download():
+        hf_hub_download(
+            repo_id=model["repo_id"],
+            filename=model["filename"],
+            local_dir=get_models_dir(),
+        )
+
+    try:
+        await run.io_bound(do_download)
+        status_label.set_text("Installed")
+        status_label.classes("text-positive", remove="text-warning")
+    except Exception as e:
+        status_label.set_text(f"Download failed: {e}")
+        status_label.classes("text-negative", remove="text-warning")
+        # Clean up partial download if it exists
+        partial_path = os.path.join(get_models_dir(), model["filename"])
+        if os.path.exists(partial_path):
+            try:
+                os.remove(partial_path)
+            except OSError:
+                pass
+
+
 def downloads_page():
     ui.label("Downloads & Models").classes("text-h4")
     ui.label("Manage optional assets. Downloads come from official sources.").classes("text-subtitle1")
@@ -147,24 +177,65 @@ def downloads_page():
         nltk_status = ui.label("")
         ui.button("Download All NLTK Data", on_click=lambda: download_all_nltk(nltk_status)).props("flat")
 
-    # LLM Models
+    # LLM Models (Qwen 3.5)
     with ui.card().classes("w-full mt-4"):
         ui.label("LLM Models (RAG Chat)").classes("text-h5")
         ui.label(f"Install location: {get_models_dir()}").classes("text-caption")
 
+        from RAG.hardware import detect_hardware
+        hw_info = detect_hardware()
+
+        hw_text = f"{hw_info.gpu_type.upper()} GPU — {hw_info.vram_mb} MB VRAM" if hw_info.gpu_available else f"No GPU — {hw_info.ram_mb} MB RAM"
+        ui.label(f"Detected: {hw_text}").classes("text-caption")
+
+        qwen_models = [
+            {
+                "name": "Qwen3.5-0.8B-Q4_K_M",
+                "filename": "Qwen3.5-0.8B-Q4_K_M.gguf",
+                "repo_id": "unsloth/Qwen3.5-0.8B-GGUF",
+                "size": "~533 MB",
+                "desc": "Best for systems with < 2 GB available",
+                "key": "0.8B",
+            },
+            {
+                "name": "Qwen3.5-2B-Q4_K_M",
+                "filename": "Qwen3.5-2B-Q4_K_M.gguf",
+                "repo_id": "unsloth/Qwen3.5-2B-GGUF",
+                "size": "~1.28 GB",
+                "desc": "Good balance for 2–4 GB systems",
+                "key": "2B",
+            },
+            {
+                "name": "Qwen3.5-4B-Q4_K_M",
+                "filename": "Qwen3.5-4B-Q4_K_M.gguf",
+                "repo_id": "unsloth/Qwen3.5-4B-GGUF",
+                "size": "~2.74 GB",
+                "desc": "Best quality, requires 4+ GB",
+                "key": "4B",
+            },
+        ]
+
         models_dir = get_models_dir()
-        gguf_files = [f for f in os.listdir(models_dir) if f.endswith(".gguf")] if os.path.exists(models_dir) else []
 
-        if gguf_files:
-            for f in gguf_files:
-                size_mb = os.path.getsize(os.path.join(models_dir, f)) / (1024 * 1024)
-                ui.label(f"{f} ({size_mb:.0f} MB) - Installed").classes("text-positive")
-        else:
-            ui.markdown("""
-No LLM models found. To add a model:
+        for model in qwen_models:
+            model_path = os.path.join(models_dir, model["filename"])
+            installed = os.path.exists(model_path)
+            is_recommended = model["key"] == hw_info.recommended_model
 
-1. Download a GGUF model from [HuggingFace](https://huggingface.co)
-2. Place it in the models directory shown above
+            with ui.row().classes("items-center w-full"):
+                label_text = f"{model['name']} ({model['size']})"
+                if is_recommended:
+                    label_text += " ★ Recommended"
+                ui.label(label_text).classes("w-80")
 
-Recommended: [`Llama-3.2-3B-Instruct-Q4_K_M.gguf`](https://huggingface.co/lmstudio-community/Llama-3.2-3B-Instruct-GGUF) (~2.0 GB)
-            """)
+                if installed:
+                    size_mb = os.path.getsize(model_path) / (1024 * 1024)
+                    ui.label(f"Installed ({size_mb:.0f} MB)").classes("text-positive")
+                else:
+                    status = ui.label("Not installed").classes("text-grey")
+                    ui.button(
+                        "Download",
+                        on_click=lambda m=model, sl=status: _download_qwen_model(m, sl),
+                    ).props("flat dense")
+
+            ui.label(model["desc"]).classes("text-caption ml-2")
