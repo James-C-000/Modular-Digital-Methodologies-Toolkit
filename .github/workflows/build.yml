@@ -1,0 +1,143 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng ffmpeg cmake build-essential
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Build with PyInstaller
+        run: pyinstaller mdmt-linux.spec
+
+      - name: Package artifact
+        run: |
+          cd dist
+          zip -r ../mdmt-linux-x86_64.zip mdmt/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdmt-linux-x86_64
+          path: mdmt-linux-x86_64.zip
+
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system dependencies
+        run: |
+          brew install tesseract ffmpeg cmake
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Build with PyInstaller
+        run: pyinstaller mdmt-macos.spec
+
+      - name: Package artifact
+        run: |
+          cd dist
+          zip -r ../mdmt-macos-arm64.zip mdmt/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdmt-macos-arm64
+          path: mdmt-macos-arm64.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Tesseract
+        run: choco install tesseract --no-progress -y
+
+      - name: Install FFmpeg
+        run: choco install ffmpeg --no-progress -y
+
+      - name: Install C++ build tools
+        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --no-progress -y
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Build with PyInstaller
+        run: pyinstaller mdmt-windows.spec
+
+      - name: Package artifact
+        run: Compress-Archive -Path dist/mdmt -DestinationPath mdmt-windows-x64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdmt-windows-x64
+          path: mdmt-windows-x64.zip
+
+  release:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            mdmt-linux-x86_64/mdmt-linux-x86_64.zip
+            mdmt-macos-arm64/mdmt-macos-arm64.zip
+            mdmt-windows-x64/mdmt-windows-x64.zip
+          generate_release_notes: true
