@@ -57,7 +57,7 @@ def rag_page():
             ) if os.path.isdir(models_dir) else []
 
             saved_path = config.get("defaults.rag_model_path", "")
-            default_model = ""
+            default_model = None
             if saved_path and os.path.exists(saved_path):
                 default_model = saved_path
             elif gguf_files:
