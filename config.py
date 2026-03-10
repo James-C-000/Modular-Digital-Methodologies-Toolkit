@@ -49,7 +49,7 @@ class AppConfig:
         self._path = path or os.path.join(get_app_data_dir(), "config.json")
         self._data = {}
         if os.path.exists(self._path):
-            with open(self._path, "r") as f:
+            with open(self._path, "r", encoding="utf-8") as f:
                 self._data = json.load(f)
 
     def get(self, key: str, default=None):
@@ -78,8 +78,8 @@ class AppConfig:
     def save(self):
         """Write config to disk."""
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        with open(self._path, "w") as f:
-            json.dump(self._data, f, indent=2)
+        with open(self._path, "w", encoding="utf-8") as f:
+            json.dump(self._data, f, indent=2, ensure_ascii=False)
 
     def exists(self) -> bool:
         """Check if config file exists on disk."""

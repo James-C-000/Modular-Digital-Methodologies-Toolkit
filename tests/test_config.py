@@ -48,3 +48,16 @@ def test_config_exists_check(tmp_path):
     assert not config.exists()
     config.save()
     assert config.exists()
+
+
+def test_config_save_and_load_utf8(tmp_path):
+    """Config should handle UTF-8 characters (e.g., accented names, CJK)."""
+    config_path = str(tmp_path / "config.json")
+    config = AppConfig(config_path)
+    config.set("defaults.ocr_language", "français")
+    config.set("user.name", "日本語テスト")
+    config.save()
+
+    config2 = AppConfig(config_path)
+    assert config2.get("defaults.ocr_language") == "français"
+    assert config2.get("user.name") == "日本語テスト"
