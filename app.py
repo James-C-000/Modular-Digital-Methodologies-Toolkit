@@ -35,23 +35,23 @@ document.addEventListener('click', function(e) {
 def create_sidebar():
     """Build the persistent sidebar navigation."""
     with ui.left_drawer(value=True).classes("bg-blue-grey-1") as drawer:
-        ui.label("MDMT").classes("text-h5 q-mb-md")
+        ui.label("MDMT").classes("text-h5 q-mb-sm")
 
-        ui.label("Document Processing").classes("text-overline q-mt-md")
+        ui.label("Document Processing").classes("text-overline q-mt-sm")
         ui.button("OCR", on_click=lambda: ui.navigate.to("/ocr"), icon="document_scanner").props("flat align=left").classes("w-full")
         ui.button("Audio Transcription", on_click=lambda: ui.navigate.to("/audio"), icon="mic").props("flat align=left").classes("w-full")
         ui.button("Translation", on_click=lambda: ui.navigate.to("/translation"), icon="translate").props("flat align=left").classes("w-full")
 
-        ui.label("Analysis").classes("text-overline q-mt-lg")
-        ui.button("Advanced Keywords", on_click=lambda: ui.navigate.to("/keywords"), icon="search").props("flat align=left").classes("w-full")
-        ui.button("NER", on_click=lambda: ui.navigate.to("/ner"), icon="person_search").props("flat align=left").classes("w-full")
+        ui.label("Analysis").classes("text-overline q-mt-sm")
+        ui.button("Keyword Search", on_click=lambda: ui.navigate.to("/keywords"), icon="search").props("flat align=left").classes("w-full")
+        ui.button("Named Entity Recognition", on_click=lambda: ui.navigate.to("/ner"), icon="person_search").props("flat align=left").classes("w-full")
         ui.button("Relationships", on_click=lambda: ui.navigate.to("/relationships"), icon="hub").props("flat align=left").classes("w-full")
         ui.button("Co-Words", on_click=lambda: ui.navigate.to("/cowords"), icon="grain").props("flat align=left").classes("w-full")
 
-        ui.label("AI").classes("text-overline q-mt-lg")
-        ui.button("RAG Chat", on_click=lambda: ui.navigate.to("/rag"), icon="smart_toy").props("flat align=left").classes("w-full")
+        ui.label("AI").classes("text-overline q-mt-sm")
+        ui.button("RAGBot", on_click=lambda: ui.navigate.to("/rag"), icon="smart_toy").props("flat align=left").classes("w-full")
 
-        ui.separator().classes("q-mt-lg")
+        ui.separator().classes("q-mt-sm")
         ui.button("Downloads", on_click=lambda: ui.navigate.to("/downloads"), icon="download").props("flat align=left").classes("w-full")
         ui.button("Help / About", on_click=lambda: ui.navigate.to("/about"), icon="info").props("flat align=left").classes("w-full")
 
@@ -147,7 +147,7 @@ def cowords():
 def rag():
     create_sidebar()
     from pages.rag import rag_page
-    with ui.column().classes("w-full h-full p-4"):
+    with ui.column().classes("w-full h-full px-4 py-2").style("overflow: hidden"):
         rag_page()
 
 

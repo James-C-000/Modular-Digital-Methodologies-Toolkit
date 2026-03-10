@@ -27,6 +27,14 @@ def audio_page():
         value=config.get("defaults.whisper_model", "tiny"),
     ).classes("w-48")
 
+    ui.markdown(
+        "**tiny** \u2014 Fastest, lowest accuracy. Good for quick drafts or testing. ~75 MB  \n"
+        "**base** \u2014 Fast with improved accuracy over tiny. Suitable for clear audio. ~142 MB  \n"
+        "**small** \u2014 Balanced speed and accuracy. Good for most use cases. ~466 MB  \n"
+        "**medium** \u2014 Best accuracy, slowest. Recommended for difficult audio or non-English. ~1.5 GB  \n\n"
+        "Larger models require more RAM and processing time but produce more accurate transcriptions."
+    ).classes("text-caption text-grey")
+
     ui.separator()
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")

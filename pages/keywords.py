@@ -31,7 +31,15 @@ def keywords_page():
 
     with ui.row().classes("items-center"):
         basic_filter = ui.checkbox("Basic Filter (letters & numbers only)", value=False)
+    ui.label(
+        "When enabled, strips all characters except letters and numbers from extracted"
+        " text before searching. Useful for cleaning up OCR artifacts or special characters."
+    ).classes("text-caption text-grey")
     filters_text = ui.textarea(placeholder="Enter filter words, one per line...").classes("w-full")
+    ui.label(
+        "Filter words to exclude from results. Any keyword match containing a filter"
+        " word in its surrounding context will be removed. One filter word per line."
+    ).classes("text-caption text-grey")
 
     with ui.expansion("Or load from files...").classes("w-full"):
         keyword_file = ui.input("Keyword File Path").classes("w-full")

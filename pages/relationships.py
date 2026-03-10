@@ -27,6 +27,10 @@ def relationships_page():
     with ui.row():
         extract_text = ui.checkbox("Extract text from PDFs", value=False)
         generate_graph = ui.checkbox("Generate network graph", value=True)
+    ui.label(
+        "\"Extract text from PDFs\" extracts raw text from PDF files before processing."
+        " Leave unchecked if your input directory already contains plain text files."
+    ).classes("text-caption text-grey")
 
     ui.separator()
 

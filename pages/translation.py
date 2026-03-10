@@ -10,6 +10,10 @@ def translation_page():
 
     ui.label("Translation").classes("text-h4")
     ui.label("Translate documents using Google Translate").classes("text-subtitle1")
+    ui.label(
+        "Input PDFs must contain selectable text (be OCR'd). Scanned image-only PDFs"
+        " cannot be translated \u2014 use the OCR module first to add a text layer."
+    ).classes("text-caption text-grey")
     ui.separator()
 
     try:

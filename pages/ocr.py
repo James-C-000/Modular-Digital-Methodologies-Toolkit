@@ -48,12 +48,23 @@ def ocr_page():
     output_dir = ui.input("Output Directory", value=config.get("defaults.ocr_output_dir", "")).classes("w-full")
     ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
 
+    lang_options = list(available_langs.keys()) + ["\u2913 Download more languages..."]
     lang_select = ui.select(
-        list(available_langs.keys()),
+        lang_options,
         multiple=True,
         label="Languages",
         value=["English"] if "English" in available_langs else [],
     ).classes("w-full")
+
+    def _on_lang_change(e):
+        if "\u2913 Download more languages..." in (e.value or []):
+            lang_select.set_value([v for v in e.value if v != "\u2913 Download more languages..."])
+            ui.navigate.to("/downloads")
+
+    lang_select.on_value_change(_on_lang_change)
+    ui.label(
+        "Select the languages present in your source documents for best results."
+    ).classes("text-caption text-grey")
 
     with ui.row().classes("w-full"):
         deskew = ui.checkbox("Deskew", value=False)

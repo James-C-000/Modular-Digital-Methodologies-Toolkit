@@ -8,6 +8,9 @@ def rag_page():
     config = AppConfig()
     rag_state = {"system": None, "initialized": False, "chat_messages": None}
 
+    # Prevent the Quasar QPage from scrolling
+    ui.query(".q-page").style("overflow: hidden")
+
     ui.label("RAG Chat").classes("text-h4")
     ui.label("Chat with your documents using Llama AI").classes("text-subtitle1")
     ui.separator()
@@ -67,21 +70,26 @@ def rag_page():
             ui.button("Initialize RAG", on_click=initialize, icon="play_arrow").props("color=primary")
 
     def _chat_ui():
-        chat_messages = ui.column().classes("w-full").style(
-            "height: calc(100vh - 220px); overflow-y: auto; padding: 8px"
-        )
-        rag_state["chat_messages"] = chat_messages
+        # Self-contained flex column with its own height constraint.
+        # This avoids needing flex to chain through the refreshable container.
+        with ui.column().classes("w-full").style(
+            "height: calc(100vh - 165px); overflow: hidden"
+        ):
+            chat_messages = ui.column().classes("w-full").style(
+                "flex: 1; min-height: 0; overflow-y: auto; padding: 8px"
+            )
+            rag_state["chat_messages"] = chat_messages
 
-        with chat_messages:
-            ui.chat_message(
-                "Hello! I've indexed your documents. Ask me anything about them.",
-                name="Assistant",
-                stamp="System",
-            ).props("bg-color=blue-2")
+            with chat_messages:
+                ui.chat_message(
+                    "Hello! I've indexed your documents. Ask me anything about them.",
+                    name="Assistant",
+                    stamp="System",
+                ).props("bg-color=blue-2")
 
-        with ui.row().classes("w-full items-center q-mt-sm").style("flex-shrink: 0"):
-            message_input = ui.input(placeholder="Type your question...").classes("flex-grow")
-            send_btn = ui.button("Send", icon="send").props("color=primary")
+            with ui.row().classes("w-full items-center q-mt-sm").style("flex-shrink: 0"):
+                message_input = ui.input(placeholder="Type your question...").classes("flex-grow")
+                send_btn = ui.button("Send", icon="send").props("color=primary")
 
         async def send_message():
             question = message_input.value
