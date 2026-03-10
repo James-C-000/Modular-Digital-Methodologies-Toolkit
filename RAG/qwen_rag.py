@@ -202,9 +202,9 @@ class QwenRAGSystem:
     def _initialize_llm(self):
         """Initialize the Qwen language model with optimized parameters."""
         params = self._get_llm_params(self.enable_thinking)
-        kwargs = {}
+        extra_model_kwargs = {"presence_penalty": 1.5}
         if self.n_gpu_layers != 0:
-            kwargs["flash_attn"] = True
+            extra_model_kwargs["flash_attn"] = True
 
         return LlamaCpp(
             model_path=self.llm_model_path,
@@ -218,8 +218,7 @@ class QwenRAGSystem:
             top_k=params["top_k"],
             repeat_penalty=params["repeat_penalty"],
             verbose=self.verbose,
-            model_kwargs={"presence_penalty": 1.5},
-            **kwargs,
+            model_kwargs=extra_model_kwargs,
         )
 
     def _load_documents(self) -> Tuple[List[Document], int]:
