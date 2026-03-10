@@ -62,6 +62,14 @@ def about():
         about_page()
 
 
+@ui.page("/downloads")
+def downloads():
+    create_sidebar()
+    from pages.downloads import downloads_page
+    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+        downloads_page()
+
+
 # Placeholder pages for modules not yet migrated
 def _placeholder_page(name: str):
     def page_fn():
@@ -81,7 +89,6 @@ for route, name in [
     ("/relationships", "Relationship Extraction"),
     ("/cowords", "Co-Word Analysis"),
     ("/rag", "RAG Chat"),
-    ("/downloads", "Downloads"),
 ]:
     ui.page(route)(_placeholder_page(name))
 
