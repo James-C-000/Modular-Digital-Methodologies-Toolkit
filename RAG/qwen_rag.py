@@ -47,7 +47,10 @@ for module in ["sentence_transformers", "faiss", "transformers", "filelock", "hu
 # Try to import required components
 try:
     # Import from correct packages to avoid deprecation warnings
-    from langchain_community.document_loaders import TextLoader, PyPDFLoader, DirectoryLoader
+    from langchain_community.document_loaders import (
+        TextLoader, PyPDFLoader, DirectoryLoader,
+        BSHTMLLoader, CSVLoader, Docx2txtLoader,
+    )
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
     from langchain_huggingface import HuggingFaceEmbeddings
@@ -63,8 +66,22 @@ except ImportError as e:
     logger.error(f"Required packages not installed. Error: {e}")
     logger.error("Please run:")
     logger.error(
-        "pip install langchain langchain-community langchain-huggingface faiss-cpu pypdf sentence-transformers llama-cpp-python")
+        "pip install langchain langchain-community langchain-huggingface faiss-cpu pypdf sentence-transformers llama-cpp-python beautifulsoup4 docx2txt")
     exit(1)
+
+
+# Registry mapping file extensions to their LangChain document loader.
+# TextLoader handles plain-text formats (txt, md, json) directly.
+# Specialised loaders handle structured/binary formats (pdf, html, csv, docx).
+SUPPORTED_EXTENSIONS = {
+    ".txt": TextLoader,
+    ".pdf": PyPDFLoader,
+    ".md": TextLoader,
+    ".json": TextLoader,
+    ".html": BSHTMLLoader,
+    ".csv": CSVLoader,
+    ".docx": Docx2txtLoader,
+}
 
 
 class QwenRAGSystem:
@@ -239,11 +256,12 @@ class QwenRAGSystem:
         if self.verbose:
             logger.info(f"Scanning documents in {self.documents_dir}")
 
-        # Find all eligible documents
-        txt_files = glob.glob(os.path.join(self.documents_dir, "**/*.txt"), recursive=True)
-        pdf_files = glob.glob(os.path.join(self.documents_dir, "**/*.pdf"), recursive=True)
-
-        all_files = txt_files + pdf_files
+        # Discover all files matching supported extensions
+        all_files = []
+        for ext in SUPPORTED_EXTENSIONS:
+            all_files.extend(
+                glob.glob(os.path.join(self.documents_dir, f"**/*{ext}"), recursive=True)
+            )
         file_count = len(all_files)
 
         if file_count == 0:
@@ -251,49 +269,32 @@ class QwenRAGSystem:
             return [], 0
 
         if self.verbose:
-            logger.info(f"Found {len(txt_files)} text files and {len(pdf_files)} PDF files")
+            by_ext = {}
+            for f in all_files:
+                ext = os.path.splitext(f)[1].lower()
+                by_ext[ext] = by_ext.get(ext, 0) + 1
+            logger.info(f"Found {file_count} files: {by_ext}")
+
+        def load_file(file_path: str) -> List[Document]:
+            ext = os.path.splitext(file_path)[1].lower()
+            loader_cls = SUPPORTED_EXTENSIONS.get(ext)
+            if loader_cls is None:
+                return []
+            try:
+                return loader_cls(file_path).load()
+            except Exception as e:
+                logger.warning(f"Error loading {file_path}: {e}")
+                return []
 
         documents = []
 
-        # For small number of files, don't parallelize to avoid overhead
         if file_count <= 5:
-            # Load text files
-            for file_path in txt_files:
-                try:
-                    loader = TextLoader(file_path)
-                    documents.extend(loader.load())
-                except Exception as e:
-                    logger.warning(f"Error loading {file_path}: {str(e)}")
-
-            # Load PDF files
-            for file_path in pdf_files:
-                try:
-                    loader = PyPDFLoader(file_path)
-                    documents.extend(loader.load())
-                except Exception as e:
-                    logger.warning(f"Error loading {file_path}: {str(e)}")
+            for file_path in all_files:
+                documents.extend(load_file(file_path))
         else:
-            # Use parallel processing for larger document sets
-            def load_file(file_path):
-                try:
-                    if file_path.lower().endswith('.txt'):
-                        loader = TextLoader(file_path)
-                    elif file_path.lower().endswith('.pdf'):
-                        loader = PyPDFLoader(file_path)
-                    else:
-                        return []
-                    return loader.load()
-                except Exception as e:
-                    logger.warning(f"Error loading {file_path}: {str(e)}")
-                    return []
-
-            # Use ThreadPoolExecutor for parallel loading
             with ThreadPoolExecutor(max_workers=min(self.n_threads, file_count)) as executor:
-                results = list(executor.map(load_file, all_files))
-
-            # Flatten results
-            for docs in results:
-                documents.extend(docs)
+                for docs in executor.map(load_file, all_files):
+                    documents.extend(docs)
 
         if self.verbose:
             logger.info(f"Loaded {len(documents)} document sections from {file_count} files")
