@@ -10,7 +10,7 @@ langchain-core~=1.2
 langchain-huggingface~=1.2
 sentence-transformers~=5.2
 faiss-cpu~=1.13
-llama-cpp-python~=0.3
+llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git
 googletrans~=4.0.2
 pypdf~=6.8
 future~=1.0.0

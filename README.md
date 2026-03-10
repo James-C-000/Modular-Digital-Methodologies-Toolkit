@@ -21,7 +21,6 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 
 ### AI Integration
 - **Retrieval-Augmented Generation (RAG)**: Chat with your documents using an AI assistant powered by Qwen 3.5 models
-  - **Note (2026-03-10):** RAG is currently non-functional. The Qwen 3.5 model architecture (`qwen35`) is not yet supported by the latest `llama-cpp-python` release on PyPI (0.3.16). This will be resolved once an updated release is published. See [llama.cpp #19468](https://github.com/ggml-org/llama.cpp/pull/19468).
 
 ## Installation
 
