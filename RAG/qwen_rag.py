@@ -475,9 +475,10 @@ Documents:
             # is applied (LangChain's invoke() silently drops it).
             generation_start = time.time()
             p = self._inference_params
+            max_tokens = 4096 if self.enable_thinking else 768
             completion = self.llm.client.create_completion(
                 prompt,
-                max_tokens=768,
+                max_tokens=max_tokens,
                 temperature=p["temperature"],
                 top_p=p["top_p"],
                 top_k=p["top_k"],
@@ -537,7 +538,16 @@ Documents:
         if not response:
             return "I could not generate an answer based on the available documents."
 
-        # Strip thinking blocks first (before any other processing)
+        # Strip thinking blocks.  The prompt may start inside a <think> block
+        # (no opening tag in the output), so handle both cases.
+        if '</think>' in response:
+            # Take only the answer after the thinking block
+            response = response.split('</think>', 1)[1]
+        elif self.enable_thinking:
+            # Thinking mode is on but no </think> found — the model exhausted
+            # max_tokens during reasoning and never produced an answer.
+            response = ""
+        # Clean any remaining complete <think>...</think> pairs
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
 
         # Remove Qwen ChatML tags
