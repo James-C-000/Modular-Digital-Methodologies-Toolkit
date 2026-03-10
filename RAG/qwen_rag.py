@@ -48,7 +48,7 @@ for module in ["sentence_transformers", "faiss", "transformers", "filelock", "hu
 try:
     # Import from correct packages to avoid deprecation warnings
     from langchain_community.document_loaders import (
-        TextLoader, PyPDFLoader, DirectoryLoader,
+        TextLoader, PyPDFLoader,
         BSHTMLLoader, CSVLoader, Docx2txtLoader,
     )
     from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -79,6 +79,7 @@ SUPPORTED_EXTENSIONS = {
     ".md": TextLoader,
     ".json": TextLoader,
     ".html": BSHTMLLoader,
+    ".htm": BSHTMLLoader,
     ".csv": CSVLoader,
     ".docx": Docx2txtLoader,
 }
