@@ -42,6 +42,28 @@ def get_index_dir() -> str:
     return path
 
 
+def get_tesseract_path() -> str:
+    """Return the path to the Tesseract binary.
+
+    When running as a frozen PyInstaller app, checks for a bundled binary first.
+    Falls back to system PATH.
+    """
+    import shutil
+    import sys
+
+    # Check for bundled Tesseract in frozen app
+    if getattr(sys, "frozen", False):
+        base = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+        bin_dir = os.path.join(base, "tesseract_bin")
+        exe_name = "tesseract.exe" if os.name == "nt" else "tesseract"
+        bundled = os.path.join(bin_dir, exe_name)
+        if os.path.isfile(bundled):
+            return bundled
+
+    # Fall back to system PATH
+    return shutil.which("tesseract") or "tesseract"
+
+
 class AppConfig:
     """Simple JSON config with dot-notation access for nested keys."""
 

@@ -42,6 +42,21 @@ document.addEventListener('click', function(e) {
 </script>''', shared=True)
 
 
+def _setup_frozen_env(base_path: str = None):
+    """Configure environment for bundled Tesseract when running as a frozen app."""
+    import sys
+    if base_path is None:
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+
+    tess_bin_dir = os.path.join(base_path, "tesseract_bin")
+    tessdata_dir = os.path.join(base_path, "tessdata")
+
+    if os.path.isdir(tess_bin_dir):
+        os.environ["PATH"] = tess_bin_dir + os.pathsep + os.environ.get("PATH", "")
+    if os.path.isdir(tessdata_dir):
+        os.environ["TESSDATA_PREFIX"] = tessdata_dir
+
+
 def create_sidebar():
     """Build the persistent sidebar navigation."""
     config = AppConfig()
@@ -177,6 +192,10 @@ def rag():
 
 def main():
     """Initialize app data directory and start NiceGUI."""
+    import sys
+    if getattr(sys, "frozen", False):
+        _setup_frozen_env()
+
     get_app_data_dir()
 
     # Point NLTK to our managed data directory
