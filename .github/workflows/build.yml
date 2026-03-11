@@ -130,14 +130,11 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            mdmt-linux-x86_64/mdmt-linux-x86_64.zip
-            mdmt-macos-arm64/mdmt-macos-arm64.zip
-            mdmt-windows-x64/mdmt-windows-x64.zip
+          body: |
+            Download builds from [jamescaldwell.net/software.html](https://jamescaldwell.net/software.html).
+
+            Build artifacts are also available on the [Actions run page](https://github.com/James-C-000/Modular-Digital-Methodologies-Toolkit/actions) for this tag.
           generate_release_notes: true
