@@ -265,7 +265,7 @@ Generation (RAG) to find relevant passages and generate answers.
 |---|---|---|
 | BeautifulSoup4 | MIT | [crummy.com](https://www.crummy.com/software/BeautifulSoup/) |
 | docx2txt | MIT | [GitHub](https://github.com/ankushshah89/python-docx2txt) |
-| FAISS | MIT AND BSD-3-Clause | [GitHub](https://github.com/facebookresearch/faiss) |
+| FAISS | MIT | [GitHub](https://github.com/facebookresearch/faiss) |
 | future | MIT | [GitHub](https://github.com/PythonCharmers/python-future) |
 | googletrans | MIT | [GitHub](https://github.com/ssut/py-googletrans) |
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
