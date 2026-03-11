@@ -48,6 +48,8 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 
 Launch MDMT with `python app.py`. The application opens in a native desktop window with a sidebar for navigation between modules:
 
+<p align="center"><img src="MDMT_Welcome.png" alt="MDMT Welcome Screen"></p>
+
 1. **OCR**: Process PDFs to make them searchable with text selection
 2. **Audio Transcription**: Convert audio files to text transcriptions
 3. **Translation**: Translate documents between languages
