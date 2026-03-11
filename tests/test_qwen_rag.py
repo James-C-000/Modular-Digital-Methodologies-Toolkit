@@ -77,6 +77,7 @@ class TestResponseCleaning:
         from RAG.qwen_rag import QwenRAGSystem
         system = QwenRAGSystem.__new__(QwenRAGSystem)
         system.verbose = False
+        system.enable_thinking = False
         return system
 
     def test_strips_think_blocks(self):
