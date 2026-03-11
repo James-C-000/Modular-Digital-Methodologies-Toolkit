@@ -16,7 +16,8 @@ except RuntimeError:
     pass
 
 import os
-import webbrowser
+import subprocess
+import sys
 from nicegui import ui, app
 from config import AppConfig, get_app_data_dir, get_nltk_data_dir
 
@@ -24,8 +25,43 @@ from config import AppConfig, get_app_data_dir, get_nltk_data_dir
 # Open external links in the system browser instead of navigating within pywebview
 @app.get('/api/open-external')
 async def _open_external_url(url: str):
-    webbrowser.open(url)
+    _open_url_in_browser(url)
     return {'ok': True}
+
+
+def _open_url_in_browser(url: str):
+    """Open a URL in the default browser without polluting the shell environment.
+
+    When running as a frozen PyInstaller app, bundled libraries (e.g. readline)
+    can poison child processes that inherit LD_LIBRARY_PATH.  We strip
+    PyInstaller's library directory from the environment before spawning the
+    browser so that system tools like xdg-open work correctly.
+    """
+    env = os.environ.copy()
+    if getattr(sys, "frozen", False):
+        # Remove PyInstaller's _MEIPASS lib paths so system tools aren't
+        # affected by bundled shared libraries (readline, ncurses, etc.)
+        base = getattr(sys, "_MEIPASS", "")
+        for var in ("LD_LIBRARY_PATH", "LD_PRELOAD"):
+            val = env.get(var, "")
+            if val and base:
+                cleaned = os.pathsep.join(
+                    p for p in val.split(os.pathsep) if not p.startswith(base)
+                )
+                if cleaned:
+                    env[var] = cleaned
+                else:
+                    env.pop(var, None)
+    if sys.platform == "linux":
+        subprocess.Popen(["xdg-open", url], env=env,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", url], env=env)
+    elif sys.platform == "win32":
+        os.startfile(url)
+    else:
+        import webbrowser
+        webbrowser.open(url)
 
 
 ui.add_head_html('''<script>
@@ -43,18 +79,32 @@ document.addEventListener('click', function(e) {
 
 
 def _setup_frozen_env(base_path: str = None):
-    """Configure environment for bundled Tesseract when running as a frozen app."""
-    import sys
+    """Configure environment for bundled assets when running as a frozen app."""
     if base_path is None:
         base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
 
+    # --- Tesseract ---
     tess_bin_dir = os.path.join(base_path, "tesseract_bin")
     tessdata_dir = os.path.join(base_path, "tessdata")
 
     if os.path.isdir(tess_bin_dir):
         os.environ["PATH"] = tess_bin_dir + os.pathsep + os.environ.get("PATH", "")
+        # Tesseract's bundled shared libs need to be discoverable via LD_LIBRARY_PATH
+        os.environ["LD_LIBRARY_PATH"] = (
+            tess_bin_dir + os.pathsep + os.environ.get("LD_LIBRARY_PATH", "")
+        )
     if os.path.isdir(tessdata_dir):
         os.environ["TESSDATA_PREFIX"] = tessdata_dir
+
+    # --- SSL certificates ---
+    # PyInstaller doesn't bundle system CA certs; point SSL at certifi's bundle.
+    try:
+        import certifi
+        ca_bundle = certifi.where()
+        os.environ.setdefault("SSL_CERT_FILE", ca_bundle)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", ca_bundle)
+    except ImportError:
+        pass
 
 
 def create_sidebar():
@@ -192,7 +242,6 @@ def rag():
 
 def main():
     """Initialize app data directory and start NiceGUI."""
-    import sys
     if getattr(sys, "frozen", False):
         _setup_frozen_env()
 

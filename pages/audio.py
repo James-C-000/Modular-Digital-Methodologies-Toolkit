@@ -81,6 +81,8 @@ def audio_page():
                         preview = r["text"][:500] + ("..." if len(r["text"]) > 500 else "")
                         with ui.expansion("Preview transcript"):
                             ui.label(preview).classes("font-mono text-sm")
+                    elif r["status"] == "error" and r.get("message"):
+                        ui.label(r["message"]).classes("text-negative text-caption")
 
         config.set("defaults.whisper_model", model_select.value)
         config.set("last_page", "/audio")

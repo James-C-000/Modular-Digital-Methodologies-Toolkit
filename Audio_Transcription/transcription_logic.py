@@ -1,5 +1,6 @@
 """Core audio transcription functions."""
 import os
+import torch
 
 AUDIO_FORMATS = (".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm")
 
@@ -28,7 +29,7 @@ def transcribe_file(model, audio_path: str, output_path: str = None) -> dict:
     if output_path is None:
         output_path = audio_path + ".txt"
     try:
-        result = model.transcribe(audio_path)
+        result = model.transcribe(audio_path, fp16=torch.cuda.is_available())
         with open(output_path, "w") as f:
             f.write(result["text"])
         return {

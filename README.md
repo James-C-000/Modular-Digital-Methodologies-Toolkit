@@ -62,6 +62,11 @@ Optional assets (language models, NLTK data, Tesseract language files) are downl
 
 A dark mode toggle is available in the sidebar.
 
+## TODO
+
+- Find an Apple Silicon Mac I can use for testing the MacOS binary
+- Create a VM for testing windows binaries
+   
 ## Dependencies
 
 Major dependencies include:

@@ -9,9 +9,36 @@ datas = [
     ('Advanced_Keyword_Search/*.txt', 'Advanced_Keyword_Search'),
 ]
 datas.extend(nicegui_datas)
+datas.extend(collect_data_files('ocrmypdf'))
+datas.extend(collect_data_files('whisper'))
+
+# Bundle certifi CA certificates so SSL works in the frozen app
+try:
+    import certifi
+    datas.append((certifi.where(), 'certifi'))
+except ImportError:
+    pass
+
+# --- llama-cpp-python native libraries ---
+binaries = []
+try:
+    import llama_cpp
+    _llama_pkg = os.path.dirname(llama_cpp.__file__)
+    for _subdir in ('lib', 'bin'):
+        _llama_dir = os.path.join(_llama_pkg, _subdir)
+        if os.path.isdir(_llama_dir):
+            for _f in os.listdir(_llama_dir):
+                if _f.endswith('.dll'):
+                    binaries.append((os.path.join(_llama_dir, _f), f'llama_cpp/{_subdir}'))
+except ImportError:
+    pass
+
+# --- ffmpeg bundling (needed by Whisper for audio loading) ---
+ffmpeg_bin = shutil.which('ffmpeg')
+if ffmpeg_bin:
+    binaries.append((ffmpeg_bin, '.'))
 
 # --- Tesseract bundling (Windows) ---
-binaries = []
 # Check common install locations
 tesseract_candidates = [
     os.path.join(os.environ.get('PROGRAMFILES', r'C:\Program Files'), 'Tesseract-OCR', 'tesseract.exe'),
@@ -37,6 +64,13 @@ hiddenimports += collect_submodules('webview')
 hiddenimports += [
     'engineio.async_drivers.threading',
     'ocrmypdf',
+    'ocrmypdf.builtin_plugins.tesseract_ocr',
+    'ocrmypdf.builtin_plugins.ghostscript',
+    'ocrmypdf.builtin_plugins.concurrency',
+    'ocrmypdf.builtin_plugins.default_filters',
+    'ocrmypdf.builtin_plugins.null_ocr',
+    'ocrmypdf.builtin_plugins.optimize',
+    'ocrmypdf.builtin_plugins.pypdfium',
     'googletrans',
     'langchain',
     'langchain_community',
@@ -44,6 +78,8 @@ hiddenimports += [
     'transformers',
     'nltk',
     'networkx',
+    'llama_cpp',
+    'certifi',
 ]
 
 a = Analysis(
