@@ -282,7 +282,7 @@ Generation (RAG) to find relevant passages and generate answers.
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
 | psutil | BSD-3-Clause | [GitHub](https://github.com/giampaolo/psutil) |
 | pypdf | BSD-3-Clause | [GitHub](https://github.com/py-pdf/pypdf) |
-| PyQt6 / PyQt6-WebEngine | GPL-3.0-only | [riverbankcomputing.com](https://riverbankcomputing.com/software/pyqt/) |
+| PySide6 | LGPL-3.0 | [qt.io/qt-for-python](https://wiki.qt.io/Qt_for_Python) |
 | pywebview | BSD-3-Clause | [GitHub](https://github.com/r0x0r/pywebview) |
 | QtPy | MIT | [GitHub](https://github.com/spyder-ide/qtpy) |
 | Requests | Apache-2.0 | [GitHub](https://github.com/psf/requests) |
