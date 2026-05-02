@@ -259,7 +259,9 @@ Generation (RAG) to find relevant passages and generate answers.
 
     # License
     with ui.expansion("License", icon="gavel").classes("w-full mt-2"):
-        ui.markdown("See project LICENSE file for full license terms.")
+        ui.markdown("MDMT is MIT-licensed -- see the project's `LICENSE` file. "
+                    "License texts for bundled third-party libraries are in "
+                    "`THIRD_PARTY_LICENSES`.")
         ui.markdown("""
 | Library | License | Project |
 |---|---|---|
