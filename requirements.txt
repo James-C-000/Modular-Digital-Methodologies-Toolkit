@@ -1,6 +1,6 @@
 matplotlib~=3.10
 ocrmypdf~=17.3
-pandas~=3.0
+pandas>=2.2,<4.0
 requests~=2.32.3
 openpyxl~=3.1.5
 openai-whisper==20250625
