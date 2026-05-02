@@ -9,6 +9,8 @@ nicegui_datas = collect_data_files('nicegui')
 
 datas = [
     ('Advanced_Keyword_Search/*.txt', 'Advanced_Keyword_Search'),
+    ('LICENSE', '.'),
+    ('THIRD_PARTY_LICENSES', '.'),
 ]
 datas.extend(nicegui_datas)
 datas.extend(collect_data_files('ocrmypdf'))
