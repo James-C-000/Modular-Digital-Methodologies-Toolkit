@@ -105,6 +105,8 @@ Automated cross-platform builds and releases are handled by GitHub Actions. A re
 
 This project uses several open-source libraries, each with their own licenses. See the Help/About page within the application for a full attribution table with license types and project links.
 
+On Linux, the application bundles PySide6 (LGPL-3.0) for its native window backend. PySide6 is bundled as dynamically-linked shared libraries inside the PyInstaller distribution, satisfying the LGPL's relinking requirement — users who wish to substitute a different version of PySide6 can replace the bundled `.so` files in the application directory.
+
 ## Contact
 
 Software by James C. Caldwell
