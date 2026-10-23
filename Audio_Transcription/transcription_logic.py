@@ -41,8 +41,8 @@ def model_dir(name: str, models_root: str) -> str:
 
 
 def is_model_installed(name: str, models_root: str) -> bool:
-    path = model_dir(name, models_root)
-    return all(os.path.isfile(os.path.join(path, f)) for f in _MODEL_FILES)
+    from common.hf_models import is_snapshot_complete
+    return is_snapshot_complete(model_dir(name, models_root), _MODEL_FILES)
 
 
 def legacy_model_files(models_root: str) -> list[str]:
@@ -56,34 +56,10 @@ def legacy_model_files(models_root: str) -> list[str]:
 
 
 def download_model(name: str, models_root: str) -> str:
-    """Download a Whisper model into ``models_root/<name>`` atomically.
-
-    Files go to ``<name>.part`` first; the directory is renamed only after
-    every file has arrived, so an interrupted download never looks installed.
-    """
-    import shutil
-    from huggingface_hub import snapshot_download
-
+    """Download a Whisper model into ``models_root/<name>`` atomically."""
+    from common.hf_models import download_snapshot
     info = WHISPER_MODELS[name]
-    final = model_dir(name, models_root)
-    if is_model_installed(name, models_root):
-        return final
-    part = final + ".part"
-    shutil.rmtree(part, ignore_errors=True)
-    try:
-        snapshot_download(
-            repo_id=info["repo_id"],
-            revision=info["revision"],
-            allow_patterns=list(_MODEL_FILES),
-            local_dir=part,
-        )
-        shutil.rmtree(os.path.join(part, ".cache"), ignore_errors=True)
-        shutil.rmtree(final, ignore_errors=True)
-        os.replace(part, final)
-    except BaseException:
-        shutil.rmtree(part, ignore_errors=True)
-        raise
-    return final
+    return download_snapshot(info["repo_id"], info["revision"], _MODEL_FILES, model_dir(name, models_root))
 
 
 def load_model(name: str, models_root: str):
