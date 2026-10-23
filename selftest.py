@@ -260,8 +260,7 @@ class SelfTest:
                 raise RuntimeError(f"bundled FFmpeg is not LGPL-only: {codec.get('license')} {gpl_flags}")
             return {"text": result["text"], "downloaded_now": downloaded,
                     "ffmpeg": av.ffmpeg_version_info, "libavcodec_license": codec.get("license"),
-                    "libavcodec_gpl_flags": [f for f in codec.get("configuration", "").split()
-                                             if "gpl" in f or "x264" in f or "x265" in f or "nonfree" in f]}
+                    "libavcodec_gpl_flags": gpl_flags}
 
         @self.check("llama.cpp")
         def _():
