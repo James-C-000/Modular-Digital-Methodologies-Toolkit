@@ -1,67 +1,38 @@
 """MDMT main application entry point with NiceGUI sidebar navigation."""
 import multiprocessing
-import platform
 
-
-def _preferred_start_method() -> str:
-    """Return the preferred multiprocessing start method for the current OS."""
-    if platform.system() == "Windows":
-        return "spawn"
-    return "fork"
-
-
-try:
-    multiprocessing.set_start_method(_preferred_start_method())
-except RuntimeError:
-    pass
+# Must come first.  In a frozen build every multiprocessing child (NiceGUI's
+# native-window process, ocrmypdf workers) re-executes this program;
+# freeze_support() hands such a child to its target and exits, so it never
+# reaches the imports and setup below.
+multiprocessing.freeze_support()
 
 import os
-import subprocess
+
+# Jobs run in worker threads.  matplotlib's default macOS backend must not be
+# used off the main thread, so force the non-interactive Agg backend before
+# anything can import matplotlib.
+os.environ["MPLBACKEND"] = "Agg"
+
+import argparse
+import logging
 import sys
+
 from nicegui import ui, app
+
+from common.opener import open_external
 from config import AppConfig, get_app_data_dir, get_nltk_data_dir
+from version import __version__
+
+log = logging.getLogger("mdmt")
 
 
 # Open external links in the system browser instead of navigating within pywebview
 @app.get('/api/open-external')
 async def _open_external_url(url: str):
-    _open_url_in_browser(url)
+    if url.startswith(("http://", "https://")):
+        open_external(url)
     return {'ok': True}
-
-
-def _open_url_in_browser(url: str):
-    """Open a URL in the default browser without polluting the shell environment.
-
-    When running as a frozen PyInstaller app, bundled libraries (e.g. readline)
-    can poison child processes that inherit LD_LIBRARY_PATH.  We strip
-    PyInstaller's library directory from the environment before spawning the
-    browser so that system tools like xdg-open work correctly.
-    """
-    env = os.environ.copy()
-    if getattr(sys, "frozen", False):
-        # Remove PyInstaller's _MEIPASS lib paths so system tools aren't
-        # affected by bundled shared libraries (readline, ncurses, etc.)
-        base = getattr(sys, "_MEIPASS", "")
-        for var in ("LD_LIBRARY_PATH", "LD_PRELOAD"):
-            val = env.get(var, "")
-            if val and base:
-                cleaned = os.pathsep.join(
-                    p for p in val.split(os.pathsep) if not p.startswith(base)
-                )
-                if cleaned:
-                    env[var] = cleaned
-                else:
-                    env.pop(var, None)
-    if sys.platform == "linux":
-        subprocess.Popen(["xdg-open", url], env=env,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", url], env=env)
-    elif sys.platform == "win32":
-        os.startfile(url)
-    else:
-        import webbrowser
-        webbrowser.open(url)
 
 
 ui.add_head_html('''<script>
@@ -84,17 +55,15 @@ def _setup_frozen_env(base_path: str = None):
         base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
 
     # --- Tesseract ---
+    # Language data is handled by OCR.tessdata.configure_tessdata().
     tess_bin_dir = os.path.join(base_path, "tesseract_bin")
-    tessdata_dir = os.path.join(base_path, "tessdata")
-
     if os.path.isdir(tess_bin_dir):
         os.environ["PATH"] = tess_bin_dir + os.pathsep + os.environ.get("PATH", "")
-        # Tesseract's bundled shared libs need to be discoverable via LD_LIBRARY_PATH
-        os.environ["LD_LIBRARY_PATH"] = (
-            tess_bin_dir + os.pathsep + os.environ.get("LD_LIBRARY_PATH", "")
-        )
-    if os.path.isdir(tessdata_dir):
-        os.environ["TESSDATA_PREFIX"] = tessdata_dir
+        if sys.platform == "linux":
+            # Tesseract's bundled shared libs need to be discoverable via LD_LIBRARY_PATH
+            os.environ["LD_LIBRARY_PATH"] = (
+                tess_bin_dir + os.pathsep + os.environ.get("LD_LIBRARY_PATH", "")
+            )
 
     # --- SSL certificates ---
     # PyInstaller doesn't bundle system CA certs; point SSL at certifi's bundle.
@@ -105,6 +74,21 @@ def _setup_frozen_env(base_path: str = None):
         os.environ.setdefault("REQUESTS_CA_BUNDLE", ca_bundle)
     except ImportError:
         pass
+
+
+def _append_user_tool_paths():
+    """Let a frozen macOS app find user-installed tools such as Ghostscript.
+
+    Apps launched from Finder get a minimal PATH without Homebrew.  The
+    directories are appended, so bundled tools always win.
+    """
+    if sys.platform != "darwin":
+        return
+    path = os.environ.get("PATH", "").split(os.pathsep)
+    for extra in ("/opt/homebrew/bin", "/usr/local/bin"):
+        if extra not in path and os.path.isdir(extra):
+            path.append(extra)
+    os.environ["PATH"] = os.pathsep.join(p for p in path if p)
 
 
 def create_sidebar():
@@ -240,12 +224,45 @@ def rag():
         rag_page()
 
 
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(prog="mdmt", description="Modular Digital Methodologies Toolkit")
+    parser.add_argument("--self-test", action="store_true",
+                        help="check the installation without opening a window, then exit")
+    parser.add_argument("--self-test-out", metavar="PATH.json",
+                        help="write the self-test report to this file")
+    # parse_known_args: macOS may pass e.g. -psn_0_12345 to app bundles.
+    args, _unknown = parser.parse_known_args(argv)
+    return args
+
+
 def main():
     """Initialize app data directory and start NiceGUI."""
+    if multiprocessing.current_process().name != "MainProcess":
+        # Source runs: NiceGUI's window process is spawned, re-imports this
+        # module as __mp_main__ and lands here.  It needs none of the setup.
+        return
+
+    args = _parse_args()
+
+    from common.logs import setup_logging
+    log_path = setup_logging()
+    log.info("MDMT %s starting: pid=%d frozen=%s python=%s log=%s",
+             __version__, os.getpid(), bool(getattr(sys, "frozen", False)),
+             sys.version.split()[0], log_path)
+
     if getattr(sys, "frozen", False):
         _setup_frozen_env()
+    _append_user_tool_paths()
 
     get_app_data_dir()
+
+    from OCR.tessdata import configure_tessdata
+    log.info("TESSDATA_PREFIX=%s", configure_tessdata())
+
+    from common.downloads import remove_stale_parts
+    from config import get_models_dir, get_tessdata_dir, get_whisper_models_dir
+    for folder in (get_tessdata_dir(), get_whisper_models_dir(), get_models_dir()):
+        remove_stale_parts(folder)
 
     # Point NLTK to our managed data directory
     import nltk
@@ -253,10 +270,14 @@ def main():
     if nltk_dir not in nltk.data.path:
         nltk.data.path.insert(0, nltk_dir)
 
+    if args.self_test:
+        from selftest import run_self_test
+        sys.exit(run_self_test(args.self_test_out))
+
     app.native.window_args["text_select"] = True
     ui.run(
         native=True,
-        title="MDMT - Modular Digital Methodologies Toolkit",
+        title=f"MDMT {__version__} - Modular Digital Methodologies Toolkit",
         window_size=(1200, 800),
         reload=False,
     )
