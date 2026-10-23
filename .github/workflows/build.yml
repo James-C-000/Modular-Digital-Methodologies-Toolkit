@@ -25,7 +25,7 @@ jobs:
           - os: ubuntu-latest
             name: linux
             artifact: mdmt-linux-x86_64
-          - os: macos-14
+          - os: macos-15
             name: macos
             artifact: mdmt-macos-arm64
           - os: windows-latest
@@ -213,5 +213,5 @@ jobs:
           body: |
             Also available at [jamescaldwell.net/software.html](https://jamescaldwell.net/software.html).
 
-            **Unsigned builds.** MDMT is an independent open-source project without paid code-signing certificates, so these apps are not signed or notarized; the source code and the CI build logs that produced these files are public. On first launch, macOS needs one approval in System Settings → Privacy & Security → Open Anyway (or run `xattr -dr com.apple.quarantine /path/to/MDMT.app`), and Windows SmartScreen needs "More info" → "Run anyway". The macOS build requires Apple Silicon and macOS 14 or newer; the Linux build is x86-64. See the README for details.
+            **Unsigned builds.** MDMT is an independent open-source project without paid code-signing certificates, so these apps are not signed or notarized; the source code and the CI build logs that produced these files are public. On first launch, macOS needs one approval in System Settings → Privacy & Security → Open Anyway (or run `xattr -dr com.apple.quarantine /path/to/MDMT.app`), and Windows SmartScreen needs "More info" → "Run anyway". The macOS build requires Apple Silicon and macOS 15 or newer; the Linux build is x86-64. See the README for details.
           generate_release_notes: true

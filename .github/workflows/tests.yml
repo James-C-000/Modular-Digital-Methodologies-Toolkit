@@ -19,7 +19,7 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux
-          - os: macos-14
+          - os: macos-15
             name: macos
           - os: windows-latest
             name: windows

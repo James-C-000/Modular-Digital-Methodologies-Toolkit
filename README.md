@@ -29,7 +29,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 | Platform | Prebuilt app | Notes |
 |---|---|---|
 | Windows 10/11, x64 | `mdmt-windows-x64.zip` | |
-| macOS 14 (Sonoma) or newer, Apple Silicon | `mdmt-macos-arm64.zip` | No Intel Mac build. |
+| macOS 15 (Sequoia) or newer, Apple Silicon | `mdmt-macos-arm64.zip` | No Intel Mac build. |
 | Linux, x86-64 | `mdmt-linux-x86_64.zip` | Built on Ubuntu 24.04; needs a similarly recent distribution. |
 
 Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. The native window and file dialogs are not covered by CI.

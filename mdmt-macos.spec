@@ -102,7 +102,7 @@ app = BUNDLE(
         'CFBundleShortVersionString': VERSION,
         'CFBundleVersion': VERSION,
         'NSHighResolutionCapable': True,
-        'LSMinimumSystemVersion': '14.0',  # faiss-cpu/onnxruntime wheels need macOS 14+
+        'LSMinimumSystemVersion': '15.0',  # locked wheels (pikepdf) need macOS 15+
         'NSHumanReadableCopyright': 'Copyright (c) 2026 James C. Caldwell. MIT License.',
     },
 )

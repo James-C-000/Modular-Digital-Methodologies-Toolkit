@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Regenerate the per-platform lock files. Run whenever requirements/*.in change.
-#   pip install uv && requirements/compile.sh
+#   pip install uv && requirements/compile.sh [--upgrade | --upgrade-package NAME ...]
+# Existing pins are kept as preferences; extra arguments are passed to uv.
 # Locks target Python 3.12 (the CI/release interpreter). PyTorch is resolved
 # from the CPU-only index (no CUDA wheels) while it is still a dependency.
-# macOS targets 14.0 (Sonoma): faiss-cpu and onnxruntime only publish
-# macosx_14_0_arm64 wheels, so the app cannot support older macOS anyway.
+# macOS targets 15.0 (Sequoia): current pikepdf (needed by ocrmypdf 17.13)
+# only ships macosx_15_0_arm64 wheels, and requiring macOS 15 keeps all three
+# platforms on the same versions.
 # Locks must never depend on building a native package from source, so only
 # wheels are allowed, except for the pure-Python packages that only publish an
-# sdist (listed in SDIST_OK).  Consequence: macOS resolves pikepdf 10.13 /
-# ocrmypdf 17.12.1, because newer pikepdf only ships macOS 15 wheels.
+# sdist (listed in SDIST_OK).
 SDIST_OK=(--no-binary proxy-tools)
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -21,10 +22,10 @@ declare -A PLATFORMS=(
 
 for name in "${!PLATFORMS[@]}"; do
   target=${PLATFORMS[$name]}
-  if [[ $name == macos ]]; then export MACOSX_DEPLOYMENT_TARGET=14.0; else unset MACOSX_DEPLOYMENT_TARGET; fi
+  if [[ $name == macos ]]; then export MACOSX_DEPLOYMENT_TARGET=15.0; else unset MACOSX_DEPLOYMENT_TARGET; fi
   uv pip compile base.in --quiet --python-version 3.12 --python-platform "$target" \
     --torch-backend cpu --no-header --annotation-style line \
-    --only-binary :all: "${SDIST_OK[@]}" -o "lock-$name.txt"
+    --only-binary :all: "${SDIST_OK[@]}" "$@" -o "lock-$name.txt"
   uv pip compile dev.in --quiet --python-version 3.12 --python-platform "$target" \
     -c "lock-$name.txt" --no-header --annotation-style line \
     --only-binary :all: "${SDIST_OK[@]}" -o "dev-$name.txt"
