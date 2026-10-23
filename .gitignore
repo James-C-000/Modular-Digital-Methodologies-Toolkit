@@ -35,3 +35,7 @@ OCR/tessdata/
 # Superpowers planning docs
 docs/superpowers/
 .superpowers/
+
+# PyInstaller output
+build/
+dist/
