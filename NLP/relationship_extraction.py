@@ -10,7 +10,7 @@ import csv
 import nltk
 import pandas as pd
 import networkx as nx
-from pypdf import PdfReader
+from common.pdf_text import extract_text as extract_pdf_text
 from collections import defaultdict
 
 from matplotlib.figure import Figure
@@ -49,14 +49,7 @@ def extract_text_from_file(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
         elif file_path.lower().endswith('.pdf'):
-            text = ""
-            with open(file_path, 'rb') as f:
-                reader = PdfReader(f)
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-            return text
+            return extract_pdf_text(file_path)
     except Exception as e:
         print(f"Error extracting text from {file_path}: {str(e)}")
     return ""

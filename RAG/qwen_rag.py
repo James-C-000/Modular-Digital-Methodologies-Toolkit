@@ -48,7 +48,7 @@ for module in ["sentence_transformers", "faiss", "transformers", "filelock", "hu
 try:
     # Import from correct packages to avoid deprecation warnings
     from langchain_community.document_loaders import (
-        TextLoader, PyPDFLoader,
+        TextLoader,
         BSHTMLLoader, CSVLoader, Docx2txtLoader,
     )
     from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -71,12 +71,31 @@ except ImportError as e:
     ) from e
 
 
+class PdfPageLoader:
+    """One Document per PDF page, via the shared pypdfium2 helper.
+
+    Same interface and metadata (source, 0-based page) as LangChain's
+    PyPDFLoader, which needed pypdf.
+    """
+
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
+    def load(self) -> List[Document]:
+        from common.pdf_text import extract_pages
+        return [
+            Document(page_content=text, metadata={"source": self.file_path, "page": i})
+            for i, text in enumerate(extract_pages(self.file_path))
+            if text.strip()
+        ]
+
+
 # Registry mapping file extensions to their LangChain document loader.
 # TextLoader handles plain-text formats (txt, md, json) directly.
 # Specialised loaders handle structured/binary formats (pdf, html, csv, docx).
 SUPPORTED_EXTENSIONS = {
     ".txt": TextLoader,
-    ".pdf": PyPDFLoader,
+    ".pdf": PdfPageLoader,
     ".md": TextLoader,
     ".json": TextLoader,
     ".html": BSHTMLLoader,
@@ -816,7 +835,7 @@ def main():
         print("\nAn error occurred. Check the logs for details.")
         print("Please make sure all dependencies are installed:")
         print(
-            "pip install langchain langchain-community langchain-huggingface faiss-cpu pypdf sentence-transformers llama-cpp-python beautifulsoup4 docx2txt")
+            "pip install langchain langchain-community langchain-huggingface faiss-cpu sentence-transformers llama-cpp-python beautifulsoup4 docx2txt")
 
 
 if __name__ == "__main__":

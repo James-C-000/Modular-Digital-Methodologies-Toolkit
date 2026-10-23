@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-from pypdf import PdfReader
+from common.pdf_text import extract_text
 from collections import Counter
 
 _ner_pipeline = None
@@ -21,18 +21,12 @@ def _get_pipeline():
 
 
 def process_pdf(file_path):
-    """Extract text from a PDF file using pypdf."""
-    text = ""
+    """Extract text from a PDF file."""
     try:
-        with open(file_path, "rb") as f:
-            reader = PdfReader(f)
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        return extract_text(file_path)
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
-    return text
+        return ""
 
 
 def process_txt(file_path):

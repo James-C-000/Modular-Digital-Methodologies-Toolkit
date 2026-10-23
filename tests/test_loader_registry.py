@@ -56,3 +56,12 @@ def test_load_documents_finds_all_types(sample_docs_dir):
     # Check sources include each file
     sources = {os.path.basename(d.metadata["source"]) for d in documents}
     assert sources == {"note.txt", "readme.md", "data.csv", "config.json", "page.html"}
+
+
+def test_pdf_loader_yields_one_document_per_page():
+    from RAG.qwen_rag import SUPPORTED_EXTENSIONS
+    pdf = os.path.join(os.path.dirname(__file__), "fixtures", "text_sample.pdf")
+    docs = SUPPORTED_EXTENSIONS[".pdf"](pdf).load()
+    assert [d.metadata["page"] for d in docs] == [0, 1]
+    assert "Ada Lovelace" in docs[1].page_content
+    assert docs[0].metadata["source"] == pdf

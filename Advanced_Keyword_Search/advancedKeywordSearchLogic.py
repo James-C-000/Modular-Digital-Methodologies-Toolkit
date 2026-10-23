@@ -1,4 +1,3 @@
-import pypdf
 import re
 import collections
 import csv
@@ -8,6 +7,7 @@ import os
 from matplotlib.figure import Figure
 
 from common.paths import unique_safe_filenames
+from common.pdf_text import extract_pages
 
 log = logging.getLogger(__name__)
 
@@ -131,9 +131,8 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
     # Open each pdf in a for loop
     for i in pdfsInDirectory:
         try:
-            # Open PDF file with pypdf instead of pdftotext
-            pdf_reader = pypdf.PdfReader(os.path.join(PDFDirectory, str(i)))
-            numOfPages = len(pdf_reader.pages)  # Get number of pages in open pdf
+            pageTexts = extract_pages(os.path.join(PDFDirectory, str(i)))
+            numOfPages = len(pageTexts)  # Get number of pages in open pdf
         except Exception as e:
             error = "ERROR: " + str(e) + " in file: " + str(i) + ".\nCheck PDFs and retry."
             logic_error(error)
@@ -142,20 +141,11 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
         pageNumber = 0  # Set current page
 
         # Check for hits page by page
-        for page in pdf_reader.pages:
+        for allText in pageTexts:
             # Running page number
             pageNumber += 1
-
-            try:
-                # Extract text from current page
-                allText = page.extract_text()
-                if not allText:
-                    continue  # Skip empty pages
-            except Exception as e:
-                error = "ERROR: " + str(e) + " in file: " + str(i) + " on page: " + str(
-                    pageNumber) + ".\nCheck PDF and retry."
-                logic_error(error)
-                continue
+            if not allText:
+                continue  # Skip empty pages
 
             # Strip user filters from text
             if basicFilterState == 1:
