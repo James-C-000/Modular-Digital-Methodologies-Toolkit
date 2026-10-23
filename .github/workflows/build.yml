@@ -191,10 +191,10 @@ jobs:
         if: runner.os == 'macOS'
         run: dist/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
 
-      # A GUI process inherits its parent's std handles, so a child of this
-      # job's shell starts *with* stdout/stderr. Launching through WMI gives it
-      # none, like a double-click in Explorer: the case where v2.0.7 crashed in
-      # tqdm. This first run also downloads the Whisper model.
+      # Launched through WMI, detached from this job like a double-click in
+      # Explorer, so it starts with no stdout/stderr: the case where v2.0.7
+      # crashed in tqdm. This first run also downloads the Whisper model, and
+      # the report must show that both streams were missing (and handled).
       - name: Self-test (Windows, detached like an Explorer launch)
         if: runner.os == 'Windows'
         shell: pwsh
