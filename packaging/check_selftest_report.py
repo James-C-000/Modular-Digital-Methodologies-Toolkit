@@ -18,7 +18,8 @@ def main(argv):
     if "--expect-missing-stdio" in argv:
         missing = set(report["info"].get("stdio_originally_missing", []))
         if missing != {"stdout", "stderr"}:
-            problems.append(f"expected the app to start without stdout/stderr, missing were: {sorted(missing)}")
+            problems.append(f"expected the app to start without stdout/stderr, missing were: {sorted(missing)};"
+                            f" streams at launch: {report['info'].get('stdio_at_launch')}")
     for p in problems:
         print("ERROR:", p)
     print(f"{path}: {'OK' if not problems else 'FAILED'}")

@@ -7,6 +7,7 @@ import multiprocessing
 # reaches the imports and setup below.
 multiprocessing.freeze_support()
 
+import common.launch  # noqa: F401  (records the std streams we were started with)
 import os
 
 # Jobs run in worker threads.  matplotlib's default macOS backend must not be
