@@ -15,7 +15,7 @@ bottle==0.13.4            # via pywebview
 certifi==2026.10.23       # via httpcore, httpx, nicegui, requests
 cffi==2.1.1               # via clr-loader, cryptography
 charset-normalizer==3.5.2  # via pdfminer-six, requests
-click==8.5.0              # via huggingface-hub, nltk, uvicorn
+click==8.5.0              # via huggingface-hub, uvicorn
 cloudpickle==3.1.2        # via joblib
 clr-loader==0.3.1         # via pythonnet
 colorama==0.4.6           # via tqdm, typer
@@ -23,7 +23,7 @@ contourpy==1.4.0          # via matplotlib
 cryptography==50.0.2      # via pdfminer-six
 ctranslate2==4.8.3        # via faster-whisper
 cycler==0.12.1            # via matplotlib
-defusedxml==0.7.1         # via fpdf2, nltk
+defusedxml==0.7.1         # via fpdf2
 diskcache==5.6.3          # via -r base.in
 distro==1.9.0             # via langsmith
 docutils==0.23            # via nicegui
@@ -55,7 +55,7 @@ ifaddr==0.2.0             # via nicegui
 img2pdf==0.6.3            # via ocrmypdf
 itsdangerous==2.2.0       # via nicegui
 jinja2==3.1.6             # via nicegui, torch, -r base.in
-joblib==1.6.0             # via nltk, scikit-learn
+joblib==1.6.0             # via scikit-learn
 jsonpatch==1.36           # via langchain-core
 jsonpointer==3.4          # via jsonpatch
 jsonschema==4.26.0        # via pikepdf
@@ -84,15 +84,13 @@ multidict==7.1.0          # via aiohttp, nicegui, yarl
 narwhals==2.27.1          # via scikit-learn
 networkx==3.7             # via torch, -r base.in
 nicegui==3.18.0           # via -r base.in
-nltk==3.10.4              # via -r base.in
-numpy==2.3.2              # via contourpy, ctranslate2, faiss-cpu, langchain-community, matplotlib, onnxruntime, pandas, scikit-learn, scipy, sentence-transformers, transformers, -r base.in
+numpy==2.3.2              # via contourpy, ctranslate2, faiss-cpu, langchain-community, matplotlib, onnxruntime, scikit-learn, scipy, sentence-transformers, transformers, -r base.in
 ocrmypdf==17.13.0         # via -r base.in
 onnxruntime==1.31.0       # via faster-whisper
 opentelemetry-api==1.45.1  # via fastapi
 orjson==3.13.0            # via langgraph-sdk, langsmith, nicegui
 ormsgpack==1.13.0         # via langgraph-checkpoint
 packaging==26.3           # via faiss-cpu, huggingface-hub, langchain-core, langsmith, matplotlib, ocrmypdf, onnxruntime, pikepdf, transformers
-pandas==3.1.0             # via -r base.in
 pdfminer-six==20260107    # via ocrmypdf
 pikepdf==10.17.0          # via img2pdf, ocrmypdf
 pillow==13.0.0            # via fpdf2, img2pdf, matplotlib, ocrmypdf, pikepdf
@@ -110,7 +108,7 @@ pygments==2.21.0          # via nicegui, rich
 pyparsing==3.3.3          # via matplotlib
 pypdf==6.21.2             # via -r base.in
 pypdfium2==5.14.0         # via ocrmypdf
-python-dateutil==3.0.0    # via matplotlib, pandas
+python-dateutil==3.0.0    # via matplotlib
 python-dotenv==1.2.4      # via nicegui, pydantic-settings, uvicorn
 python-engineio==4.14.0   # via python-socketio
 python-multipart==0.0.32  # via nicegui
@@ -119,7 +117,7 @@ pythonnet==3.2.1          # via pywebview
 pywebview==6.2.1          # via -r base.in
 pyyaml==6.0.3             # via ctranslate2, huggingface-hub, langchain-classic, langchain-community, langchain-core, transformers, uvicorn
 referencing==0.37.0       # via jsonschema, jsonschema-specifications, pikepdf
-regex==2026.9.29          # via nltk, transformers
+regex==2026.9.29          # via transformers
 requests==2.32.5          # via langchain-classic, langchain-community, langsmith, requests-toolbelt
 requests-toolbelt==1.0.0  # via langsmith
 rich==15.0.0              # via ocrmypdf, typer
@@ -142,13 +140,13 @@ threadpoolctl==3.7.0      # via scikit-learn
 tinycss2==1.5.1           # via nicegui
 tokenizers==0.23.3        # via faster-whisper, langchain-huggingface, sentence-transformers, transformers
 torch==2.14.1+cpu         # via sentence-transformers
-tqdm==4.70.1              # via faster-whisper, huggingface-hub, nltk, sentence-transformers, transformers
+tqdm==4.70.1              # via faster-whisper, huggingface-hub, sentence-transformers, transformers
 transformers==5.20.2      # via sentence-transformers, -r base.in
 truststore==0.10.5        # via httpcore2, httpx2
 typer==0.27.3             # via transformers
 typing-extensions==4.16.0  # via aiohttp, aiosignal, anyio, beautifulsoup4, fastapi, httpx2, huggingface-hub, langchain-core, langchain-protocol, langsmith, nicegui, ocrmypdf, opentelemetry-api, pydantic, pydantic-core, pydantic-settings, pywebview, referencing, sentence-transformers, sqlalchemy, starlette, torch, typing-inspection, -r base.in
 typing-inspection==0.4.4  # via fastapi, pydantic, pydantic-settings
-tzdata==2026.5            # via pandas, python-dateutil
+tzdata==2026.5            # via python-dateutil
 uharfbuzz==0.57.0         # via ocrmypdf
 urllib3==2.8.0            # via requests
 uuid-utils==0.18.0        # via langchain-core, langsmith

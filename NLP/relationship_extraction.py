@@ -1,45 +1,29 @@
 #!/usr/bin/env python3
 """
-Relationship Extraction Logic Script
-Contains functions for extracting entity relationships from text using regex and NLTK.
+Relationship extraction: pairs of named entities that occur in the same sentence.
+
+Entities come from the NER model (NLP.ner_onnx), so entity types are the
+model's labels (PER, ORG, LOC, DATE) rather than NLTK's PERSON/ORGANIZATION/GPE.
+The "Relationship" column holds the connecting words between the two entities
+in the sentence (up to eight, excluding other entities' text), or
+"is connected to" when there are none.  (v2.0.x used NLTK's part-of-speech
+tagger to keep only the verbs; MDMT no longer ships a POS tagger.)
 """
 
-import os
-import re
 import csv
-import nltk
-import pandas as pd
-import networkx as nx
-from common.pdf_text import extract_text as extract_pdf_text
-from collections import defaultdict
+import os
 
+import networkx as nx
 from matplotlib.figure import Figure
 
-_nltk_ready = False
+from common.pdf_text import extract_text as extract_pdf_text
+from NLP.ner_onnx import load_model
+from NLP.text_utils import sentence_spans, word_spans
 
-_NLTK_PACKAGES = [
-    ('tokenizers/punkt_tab', 'punkt_tab'),
-    ('taggers/averaged_perceptron_tagger_eng', 'averaged_perceptron_tagger_eng'),
-    ('chunkers/maxent_ne_chunker_tab', 'maxent_ne_chunker_tab'),
-    ('corpora/words', 'words'),
-]
-
-
-def _ensure_nltk_data():
-    """Download required NLTK data on first use."""
-    global _nltk_ready
-    if _nltk_ready:
-        return
-    from config import get_nltk_data_dir
-    nltk_dir = get_nltk_data_dir()
-    if nltk_dir not in nltk.data.path:
-        nltk.data.path.insert(0, nltk_dir)
-    for resource, package in _NLTK_PACKAGES:
-        try:
-            nltk.data.find(resource)
-        except LookupError:
-            nltk.download(package, download_dir=nltk_dir, quiet=True)
-    _nltk_ready = True
+DEFAULT_RELATIONSHIP = "is connected to"
+MAX_CONNECTING_WORDS = 8
+MIN_SENTENCE_WORDS = 5
+CSV_COLUMNS = ['Source', 'Source_Type', 'Relationship', 'Target', 'Target_Type', 'Sentence', 'File']
 
 
 def extract_text_from_file(file_path):
@@ -55,87 +39,39 @@ def extract_text_from_file(file_path):
     return ""
 
 
-def find_verbs_between(tokens, start_idx, end_idx):
-    """Find verbs between two positions in a tagged token list"""
-    verbs = []
-
-    # Ensure indices are valid
-    if start_idx >= end_idx or start_idx < 0 or end_idx >= len(tokens):
-        return "is connected to"
-
-    # Look for verbs between the entities
-    for i in range(start_idx, end_idx):
-        token, tag = tokens[i]
-        if tag.startswith('VB'):  # All verb forms (VB, VBD, VBG, etc.)
-            verbs.append(token)
-
-    if verbs:
-        return " ".join(verbs)
-
-    return "is connected to"  # Default relationship
+def connecting_words(text, start, end, other_entities):
+    """Words in text[start:end] that are not part of another entity."""
+    tokens = [w for w, s, e in word_spans(text[start:end])
+              if not any(o["start"] <= start + s and start + e <= o["end"] for o in other_entities)]
+    if not tokens:
+        return DEFAULT_RELATIONSHIP
+    if len(tokens) > MAX_CONNECTING_WORDS:
+        return " ".join(tokens[:MAX_CONNECTING_WORDS]) + " …"
+    return " ".join(tokens)
 
 
 def extract_entities_and_relationships(text, entity_types):
     """
-    Extract named entities and their relationships from text
-    using NLTK's named entity recognition.
+    Relationship rows [source, source_type, relationship, target, target_type,
+    sentence] for every pair of entities (of the selected types) that share a
+    sentence, in reading order.
     """
+    entities = [e for e in load_model().predict(text) if e["entity_group"] in entity_types]
     relationships = []
-    sentences = nltk.sent_tokenize(text)
-
-    for sentence in sentences:
-        # Skip very short sentences
-        if len(sentence.split()) < 5:
+    for s_start, s_end in sentence_spans(text):
+        sentence = text[s_start:s_end]
+        if len(sentence.split()) < MIN_SENTENCE_WORDS:
             continue
-
-        # Tokenize and tag the sentence
-        tokens = nltk.word_tokenize(sentence)
-        tagged_tokens = nltk.pos_tag(tokens)
-
-        # Extract named entities
-        tree = nltk.ne_chunk(tagged_tokens)
-
-        # Extract entities from the parse tree
-        entities = []
-        for subtree in tree:
-            if isinstance(subtree, nltk.Tree) and subtree.label() in entity_types:
-                entity_text = ' '.join([token for token, pos in subtree.leaves()])
-                entity_type = subtree.label()
-                # Find start and end positions in the tagged tokens
-                start_pos = -1
-                end_pos = -1
-                for i, (token, _) in enumerate(tagged_tokens):
-                    if start_pos == -1 and token == subtree.leaves()[0][0]:
-                        start_pos = i
-                    if start_pos != -1 and token == subtree.leaves()[-1][0]:
-                        end_pos = i + 1
-                        break
-
-                entities.append((entity_text, entity_type, start_pos, end_pos))
-
-        # Look for relationships between entity pairs
-        for i, (entity1_text, entity1_type, e1_start, e1_end) in enumerate(entities):
-            for (entity2_text, entity2_type, e2_start, e2_end) in entities[i + 1:]:
-                # Determine if entity1 comes before entity2
-                if e1_start < e2_start:
-                    # Find relationship (verbs) between the entities
-                    relationship = find_verbs_between(tagged_tokens, e1_end, e2_start)
-                    relationships.append([
-                        entity1_text, entity1_type,
-                        relationship,
-                        entity2_text, entity2_type,
-                        sentence
-                    ])
-                else:
-                    # Reverse the order
-                    relationship = find_verbs_between(tagged_tokens, e2_end, e1_start)
-                    relationships.append([
-                        entity2_text, entity2_type,
-                        relationship,
-                        entity1_text, entity1_type,
-                        sentence
-                    ])
-
+        in_sentence = [e for e in entities if s_start <= e["start"] and e["end"] <= s_end]
+        for i, first in enumerate(in_sentence):
+            for second in in_sentence[i + 1:]:
+                others = [e for e in in_sentence if e is not first and e is not second]
+                relationships.append([
+                    text[first["start"]:first["end"]], first["entity_group"],
+                    connecting_words(text, first["end"], second["start"], others),
+                    text[second["start"]:second["end"]], second["entity_group"],
+                    sentence,
+                ])
     return relationships
 
 
@@ -145,7 +81,6 @@ def extract_relationships_from_file(file_path, entity_types):
     if not text:
         return []
 
-    # Extract entities and relationships
     relationships = extract_entities_and_relationships(text, entity_types)
 
     # Add filename to each relationship
@@ -156,81 +91,57 @@ def extract_relationships_from_file(file_path, entity_types):
     return relationships
 
 
-def generate_network_graph(df, output_dir):
-    """Generate and save network graphs of the extracted relationships"""
-    # Create entity graph
+ENTITY_COLORS = {
+    'PER': 'skyblue',
+    'ORG': 'lightgreen',
+    'LOC': 'salmon',
+    'DATE': 'yellow',
+    'MISC': 'plum',
+}
+
+
+def generate_network_graph(rows, output_dir):
+    """Generate and save network graphs of the extracted relationships.
+
+    rows: dicts with the CSV_COLUMNS keys.
+    """
     G = nx.Graph()
-
-    # Define entity colors
-    entity_colors = {
-        'PERSON': 'skyblue',
-        'ORGANIZATION': 'lightgreen',
-        'GPE': 'salmon',
-        'LOCATION': 'orange',
-        'FACILITY': 'purple',
-        'DATE': 'yellow',
-        'TIME': 'brown',
-        'MONEY': 'green',
-        'PERCENT': 'pink',
-        'PRODUCT': 'gray'
-    }
-
-    # Add nodes and edges
-    for _, row in df.iterrows():
-        source = row['Source']
-        target = row['Target']
-        source_type = row['Source_Type']
-        target_type = row['Target_Type']
-
-        # Add nodes with entity type attribute
+    for row in rows:
+        source, target = row['Source'], row['Target']
         if not G.has_node(source):
-            G.add_node(source, entity_type=source_type)
+            G.add_node(source, entity_type=row['Source_Type'])
         if not G.has_node(target):
-            G.add_node(target, entity_type=target_type)
-
-        # Add edge
+            G.add_node(target, entity_type=row['Target_Type'])
         if not G.has_edge(source, target):
             G.add_edge(source, target, relationship=row['Relationship'])
 
     # Save the full graph
     fig = Figure(figsize=(12, 10), layout="tight")
     ax = fig.subplots()
-
-    # Get node colors based on entity type
-    node_colors = [entity_colors.get(G.nodes[node]['entity_type'], 'gray') for node in G.nodes()]
-
+    node_colors = [ENTITY_COLORS.get(G.nodes[node]['entity_type'], 'gray') for node in G.nodes()]
     pos = nx.spring_layout(G, seed=42)
     nx.draw(G, pos, ax=ax, with_labels=True, node_color=node_colors, node_size=1500, font_size=8, alpha=0.8)
-
-    # Save full network graph
     ax.set_title("Entity Relationship Network")
     fig.savefig(os.path.join(output_dir, "relationship_network.png"), dpi=300, bbox_inches='tight')
 
     # Create subgraphs for each entity type
-    entity_types = set()
-    for node in G.nodes():
-        entity_types.add(G.nodes[node]['entity_type'])
-
+    entity_types = {G.nodes[node]['entity_type'] for node in G.nodes()}
     for entity_type in entity_types:
         subgraph_nodes = [node for node in G.nodes() if G.nodes[node]['entity_type'] == entity_type]
         if len(subgraph_nodes) > 1:  # Only create graphs with at least 2 nodes
             subgraph = G.subgraph(subgraph_nodes)
-
             fig = Figure(figsize=(10, 8), layout="tight")
             ax = fig.subplots()
             pos = nx.spring_layout(subgraph, seed=42)
             nx.draw(subgraph, pos, ax=ax, with_labels=True,
-                    node_color=entity_colors.get(entity_type, 'gray'),
+                    node_color=ENTITY_COLORS.get(entity_type, 'gray'),
                     node_size=1500, font_size=8, alpha=0.8)
-
             ax.set_title(f"{entity_type} Relationship Network")
             fig.savefig(os.path.join(output_dir, f"{entity_type.lower()}_network.png"), dpi=300, bbox_inches='tight')
 
 
 def process_files_for_relationships(input_dir, output_dir, model_name, extract_text, generate_graph, entity_types):
-    """Process files and extract relationships"""
-    _ensure_nltk_data()
-
+    """Process files and extract relationships (model_name is unused)."""
     results = {
         'status': 'success',
         'message': '',
@@ -239,10 +150,7 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         'processed_files': []
     }
 
-    # Since we're not using spaCy, model_name is ignored
-
     try:
-        # Get all files in input directory
         files = []
         for root, _, filenames in os.walk(input_dir):
             for filename in filenames:
@@ -254,22 +162,18 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
             results['message'] = 'No text or PDF files found in the input directory.'
             return results
 
-        # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
-
-        # Process each file
         all_relationships = []
 
-        for file_path in files:
+        for file_path in sorted(files):
             try:
-                # Extract text from file
                 text = extract_text_from_file(file_path)
-
                 if not text:
                     continue
 
-                # Extract relationships
-                file_relationships = extract_relationships_from_file(file_path, entity_types)
+                file_relationships = extract_entities_and_relationships(text, entity_types)
+                for relation in file_relationships:
+                    relation.append(os.path.basename(file_path))
                 all_relationships.extend(file_relationships)
 
                 # Save extracted text if requested
@@ -285,23 +189,19 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
             except Exception as e:
                 print(f"Error processing file {file_path}: {str(e)}")
 
-        # Create output files
         if all_relationships:
-            # Convert to DataFrame
-            df = pd.DataFrame(all_relationships,
-                              columns=['Source', 'Source_Type', 'Relationship',
-                                       'Target', 'Target_Type', 'Sentence', 'File'])
-
-            # Save to CSV
+            # utf-8-sig + newline='' so Excel shows non-Latin names and no blank rows.
             csv_path = os.path.join(output_dir, "relationships.csv")
-            df.to_csv(csv_path, index=False)
+            with open(csv_path, 'w', encoding='utf-8-sig', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(CSV_COLUMNS)
+                writer.writerows(all_relationships)
 
-            # Generate network graph if requested
             if generate_graph:
-                generate_network_graph(df, output_dir)
+                generate_network_graph([dict(zip(CSV_COLUMNS, row)) for row in all_relationships], output_dir)
 
-            results['relationship_count'] = len(df)
-            results['message'] = f"Extraction complete. Found {len(df)} relationships."
+            results['relationship_count'] = len(all_relationships)
+            results['message'] = f"Extraction complete. Found {len(all_relationships)} relationships."
         else:
             results['status'] = 'warning'
             results['message'] = "No relationships found in the specified files."
@@ -318,9 +218,9 @@ if __name__ == "__main__":
     results = process_files_for_relationships(
         input_dir="./test_docs",
         output_dir="./test_output",
-        model_name=None,  # Not used with NLTK implementation
+        model_name=None,
         extract_text=True,
         generate_graph=True,
-        entity_types=["PERSON", "ORGANIZATION", "GPE"]
+        entity_types=["PER", "ORG", "LOC"]
     )
     print(results)

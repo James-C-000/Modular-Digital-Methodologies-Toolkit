@@ -181,56 +181,59 @@ contain one keyword or filter word per line.
     # Named Entity Recognition
     with ui.expansion("Named Entity Recognition", icon="person_search").classes("w-full mt-2"):
         ui.markdown("""
-**What it does:** Identifies and extracts named entities \u2014 people, organizations,
-locations, dates, and other proper nouns \u2014 from your documents using a
-HuggingFace BERT model.
+**What it does:** Identifies people (PER), organizations (ORG), places (LOC)
+and dates (DATE) in your documents with a multilingual BERT model that runs
+offline (ONNX Runtime). Trained on news text in Arabic, Chinese, Dutch,
+English, French, German, Italian, Latvian, Portuguese and Spanish; other
+languages may work less well.
 
 **How to use:**
 1. Select an **Input Directory** containing text or PDF files.
 2. Click **Run NER**.
-3. Results are saved in the input directory.
+3. Results are saved in the input directory: a summary table and, for each
+   document, a copy with the entities highlighted.
 
-**Note:** On first run, the NER model (~1.3 GB) will be downloaded automatically.
-This is a one-time download.
+**Note:** The model (~182 MB) downloads on first use, or in advance from the
+**Downloads** page.
 
 **Tips:**
 - Works best on clean, well-structured text. Running OCR first on scanned
   documents will improve entity detection.
-- The model recognizes entities in English. For other languages, results may
-  vary.
+- Historical spellings and very old texts are harder for any modern model;
+  spot-check the highlighted files.
         """)
 
     # Relationship Extraction
     with ui.expansion("Relationship Extraction", icon="hub").classes("w-full mt-2"):
         ui.markdown("""
-**What it does:** Discovers connections between named entities (people,
-organizations, places, etc.) found in your documents. Can produce a network
-graph visualizing these relationships.
+**What it does:** Finds pairs of named entities that appear in the same
+sentence, records the words connecting them, and can draw a network graph of
+these connections.
 
 **How to use:**
 1. Select an **Input Directory** containing your documents.
-2. Choose which **Entity Types** to look for (e.g. PERSON, ORGANIZATION, GPE).
+2. Choose which **Entity Types** to include.
 3. Configure options:
-   - **Extract text from PDFs** \u2014 Enable this to extract raw text from PDF files
-     before processing. Leave unchecked if your input directory already contains
-     plain text (`.txt`) files.
-   - **Generate network graph** \u2014 Produces an interactive HTML graph showing
-     entity connections.
-4. Click **Extract Relationships**.
+   - **Extract text from PDFs** \u2014 Also saves the text extracted from each PDF.
+   - **Generate network graph** \u2014 Saves network images (PNG) of all entities
+     and of each entity type.
+4. Click **Extract Relationships**. Results go to `relationships.csv`
+   (Excel-friendly) in the input directory.
 
-**Entity types explained:**
-- **PERSON** \u2014 People's names
-- **ORGANIZATION** \u2014 Companies, agencies, institutions
-- **GPE** \u2014 Geopolitical entities (countries, cities, states)
-- **LOCATION** \u2014 Non-GPE locations (mountains, rivers, regions)
-- **FACILITY** \u2014 Buildings, airports, highways
-- **DATE / TIME / MONEY / PERCENT** \u2014 Numeric and temporal entities
+**Entity types** (from the NER model):
+- **PER** \u2014 people
+- **ORG** \u2014 organizations and institutions
+- **LOC** \u2014 places: countries, cities, regions, landmarks
+- **DATE** \u2014 dates
+
+**The Relationship column** contains the words between the two entities in the
+sentence (up to eight, without other entities' names), or "is connected to"
+when they are adjacent. Versions before 2.1 used NLTK's entity types
+(PERSON, ORGANIZATION, GPE, ...) and kept only the verbs.
 
 **Tips:**
-- NLTK data packages are required. They will download automatically on first
-  run, or you can pre-download them from the **Downloads** page.
-- Start with the default entity types (PERSON, ORGANIZATION, GPE) for the most
-  useful relationship maps.
+- The NER model (~182 MB) downloads on first use, or from the **Downloads** page.
+- Start with PER, ORG and LOC for the most useful relationship maps.
         """)
 
     # Co-Word Analysis
@@ -242,12 +245,18 @@ summary report.
 
 **How to use:**
 1. Select an **Input Directory** containing text or PDF files.
-2. Click **Run Analysis**.
-3. Results, including an HTML summary report, are saved in the input directory.
+2. Choose the **Stopword list** for the documents' language, and optionally add
+   your own words to ignore.
+3. Click **Run Analysis**.
+4. Results, including an HTML summary report, are saved in the input directory.
+
+**Stopword lists:** Snowball lists (17 languages) contain only function words.
+For other languages MDMT uses the broader stopwords-iso lists, marked
+"extended", which may also remove some content words.
 
 **Tips:**
-- Like Relationship Extraction, this module requires NLTK data packages.
-  Download them from the **Downloads** page if they haven't been installed yet.
+- Words in any script are counted; Chinese and Japanese are counted per
+  character, because MDMT does not segment text written without spaces.
 - Works best with larger document collections where word co-occurrence patterns
   are meaningful.
         """)
@@ -300,10 +309,8 @@ Generation (RAG) to find relevant passages and generate answers.
 | Matplotlib | PSF-2.0 | [GitHub](https://github.com/matplotlib/matplotlib) |
 | NetworkX | BSD-3-Clause | [GitHub](https://github.com/networkx/networkx) |
 | NiceGUI | MIT | [GitHub](https://github.com/zauberzeug/nicegui) |
-| NLTK | Apache-2.0 | [GitHub](https://github.com/nltk/nltk) |
 | OCRmyPDF | MPL-2.0 | [GitHub](https://github.com/ocrmypdf/OCRmyPDF) |
 | ONNX Runtime | MIT | [GitHub](https://github.com/microsoft/onnxruntime) |
-| pandas | BSD-3-Clause | [GitHub](https://github.com/pandas-dev/pandas) |
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
 | PyTorch | BSD-3-Clause | [GitHub](https://github.com/pytorch/pytorch) |
 | Snowball stopword lists (bundled data) | BSD-3-Clause | [snowballstem.org](https://snowballstem.org/) |

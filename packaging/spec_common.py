@@ -89,7 +89,6 @@ def common_hiddenimports() -> list:
         "langchain_community",
         "sentence_transformers",
         "transformers",
-        "nltk",
         "networkx",
         "llama_cpp",
         "certifi",

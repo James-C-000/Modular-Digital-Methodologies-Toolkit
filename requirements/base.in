@@ -4,7 +4,6 @@
 # llama-cpp-python is pinned separately in requirements/llama.txt.
 matplotlib~=3.10
 ocrmypdf~=17.3
-pandas>=2.2,<4.0
 faster-whisper~=1.2
 # av 19 removed the metadata_errors= argument that faster-whisper 1.2.1 passes to av.open()
 av>=16,<19
@@ -24,7 +23,6 @@ qtpy~=2.4; sys_platform == 'linux'
 PySide6~=6.9; sys_platform == 'linux'
 platformdirs~=4.3
 huggingface_hub~=1.3
-nltk~=3.9
 transformers~=5.3
 networkx~=3.6
 psutil~=7.0

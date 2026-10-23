@@ -3,7 +3,12 @@ import os
 from nicegui import app, ui, run
 from config import AppConfig
 
-ENTITY_TYPES = ["PERSON", "ORGANIZATION", "GPE", "LOCATION", "FACILITY", "DATE", "TIME", "MONEY", "PERCENT"]
+from NLP.ner_onnx import DEFAULT_NER_MODEL, NER_MODELS
+
+ENTITY_TYPES = {"PER": "PER \u2014 people", "ORG": "ORG \u2014 organizations",
+                "LOC": "LOC \u2014 places", "DATE": "DATE \u2014 dates"}
+ENTITY_TYPES = {k: v for k, v in ENTITY_TYPES.items() if k in NER_MODELS[DEFAULT_NER_MODEL]["labels"]}
+DEFAULT_TYPES = ["PER", "ORG", "LOC"]
 
 
 def relationships_page():
@@ -14,7 +19,7 @@ def relationships_page():
     ui.separator()
 
     with ui.card().classes("w-full"):
-        input_dir = ui.input("Input Directory").classes("w-full")
+        input_dir = ui.input("Input Directory", value=config.get("defaults.relationships_input_dir", "")).classes("w-full")
         ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
 
     with ui.card().classes("w-full"):
@@ -23,8 +28,12 @@ def relationships_page():
             ENTITY_TYPES,
             multiple=True,
             label="Select entity types",
-            value=["PERSON", "ORGANIZATION", "GPE"],
+            value=[t for t in config.get("defaults.relationships_types", DEFAULT_TYPES) if t in ENTITY_TYPES],
         ).classes("w-full")
+        ui.label(
+            "Entities come from the multilingual NER model (Downloads page). The Relationship"
+            " column lists the words connecting each pair of entities in a sentence."
+        ).classes("text-caption text-grey")
 
     with ui.card().classes("w-full"):
         with ui.row():
@@ -49,7 +58,7 @@ def relationships_page():
             return
 
         progress.set_visibility(True)
-        status_label.set_text("Downloading NLP data (if needed) and extracting relationships...")
+        status_label.set_text("Loading NER model (downloads ~182 MB on first use) and extracting relationships...")
 
         def do_extract():
             from NLP.relationship_extraction import process_files_for_relationships
@@ -84,6 +93,8 @@ def relationships_page():
         finally:
             progress.set_visibility(False)
 
+        config.set("defaults.relationships_input_dir", in_dir)
+        config.set("defaults.relationships_types", entity_select.value)
         config.set("last_page", "/relationships")
         config.save()
 

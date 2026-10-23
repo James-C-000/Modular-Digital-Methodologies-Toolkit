@@ -1,7 +1,7 @@
 """Asset manager / downloads page."""
 import os
 from nicegui import ui, run
-from config import get_tessdata_dir, get_models_dir, get_whisper_models_dir, get_nltk_data_dir
+from config import get_tessdata_dir, get_models_dir, get_whisper_models_dir
 
 
 TESSDATA_GITHUB_URL = "https://github.com/tesseract-ocr/tessdata/raw/main"
@@ -154,6 +154,42 @@ def _whisper_section():
         rows()
 
 
+def _ner_section():
+    from NLP.ner_onnx import NER_MODELS, download_model, is_model_installed, model_dir
+
+    with ui.card().classes("w-full mt-4"):
+        ui.label("Named Entity Model (NER, Relationships)").classes("text-h5")
+        ui.label(f"Install location: {os.path.join(get_models_dir(), 'ner')}").classes("text-caption")
+
+        @ui.refreshable
+        def rows():
+            for key, info in NER_MODELS.items():
+                installed = is_model_installed(key)
+                with ui.row().classes("items-center w-full"):
+                    ui.label(f"{info['name']} ({info['size']})").classes("w-80")
+                    status = ui.label("Installed" if installed else "Not installed").classes(
+                        "text-positive" if installed else "text-grey")
+                    if not installed:
+                        ui.button("Download", on_click=lambda k=key, sl=status: download(k, sl)).props("flat dense")
+                ui.label(
+                    f"{info['languages']}. Labels: {', '.join(info['labels'])}. License: {info['license']}."
+                ).classes("text-caption ml-2")
+
+        async def download(key, status_label):
+            status_label.set_text("Downloading...")
+            status_label.classes("text-warning", remove="text-grey")
+            try:
+                await run.io_bound(download_model, key)
+            except Exception as e:
+                status_label.set_text(f"Download failed: {e}")
+                status_label.classes("text-negative", remove="text-warning")
+                ui.notify(f"NER model download failed: {e}", type="negative")
+                return
+            rows.refresh()
+
+        rows()
+
+
 async def _download_qwen_model(model: dict, status_label: ui.label):
     """Download a Qwen GGUF model from HuggingFace."""
     from huggingface_hub import hf_hub_download
@@ -192,42 +228,7 @@ def downloads_page():
     _tessdata_section()
     _whisper_section()
 
-    # NLTK Data
-    with ui.card().classes("w-full mt-4"):
-        ui.label("NLTK Data (NER, Co-Word Analysis)").classes("text-h5")
-        ui.label(f"Install location: {get_nltk_data_dir()}").classes("text-caption")
-
-        nltk_packages = {
-            "punkt_tab": "Sentence tokenizer",
-            "averaged_perceptron_tagger_eng": "POS tagger",
-            "maxent_ne_chunker_tab": "Named entity chunker",
-            "words": "English word list",
-            "stopwords": "Stop words",
-        }
-
-        for pkg_name, description in nltk_packages.items():
-            pkg_dir = os.path.join(get_nltk_data_dir(), "tokenizers" if "punkt" in pkg_name else "taggers" if "tagger" in pkg_name else "chunkers" if "chunker" in pkg_name else "corpora", pkg_name)
-            installed = os.path.exists(pkg_dir)
-            with ui.row().classes("items-center w-full"):
-                ui.label(f"{description} ({pkg_name})").classes("w-64")
-                status = ui.label("Installed" if installed else "Not installed").classes(
-                    "text-positive" if installed else "text-grey"
-                )
-
-        async def download_all_nltk(status_label):
-            status_label.set_text("Downloading NLTK data...")
-
-            def do_download():
-                import nltk
-                nltk_dir = get_nltk_data_dir()
-                for pkg in nltk_packages:
-                    nltk.download(pkg, download_dir=nltk_dir, quiet=True)
-
-            await run.io_bound(do_download)
-            status_label.set_text("All NLTK data installed")
-
-        nltk_status = ui.label("")
-        ui.button("Download All NLTK Data", on_click=lambda: download_all_nltk(nltk_status)).props("flat")
+    _ner_section()
 
     # LLM Models (Qwen 3.5)
     with ui.card().classes("w-full mt-4"):

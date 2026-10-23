@@ -30,7 +30,7 @@ import sys
 from nicegui import ui, app
 
 from common.opener import open_external
-from config import AppConfig, get_app_data_dir, get_nltk_data_dir
+from config import AppConfig, get_app_data_dir
 from version import __version__
 
 log = logging.getLogger("mdmt")
@@ -272,12 +272,6 @@ def main():
     from config import get_models_dir, get_tessdata_dir, get_whisper_models_dir
     for folder in (get_tessdata_dir(), get_whisper_models_dir(), get_models_dir()):
         remove_stale_parts(folder)
-
-    # Point NLTK to our managed data directory
-    import nltk
-    nltk_dir = get_nltk_data_dir()
-    if nltk_dir not in nltk.data.path:
-        nltk.data.path.insert(0, nltk_dir)
 
     if args.self_test:
         from selftest import run_self_test

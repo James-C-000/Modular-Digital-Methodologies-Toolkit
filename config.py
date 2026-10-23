@@ -30,12 +30,6 @@ def get_whisper_models_dir() -> str:
     return path
 
 
-def get_nltk_data_dir() -> str:
-    path = os.path.join(get_app_data_dir(), "nltk_data")
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
 def get_index_dir() -> str:
     path = os.path.join(get_app_data_dir(), "index")
     os.makedirs(path, exist_ok=True)
