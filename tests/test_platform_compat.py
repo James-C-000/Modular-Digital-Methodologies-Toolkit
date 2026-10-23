@@ -120,3 +120,13 @@ def test_main_runs_only_as_a_script():
     guards = [ast.unparse(n.test) for n in _app_tree().body if isinstance(n, ast.If)]
     assert "__name__ == '__main__'" in guards
     assert not any("__mp_main__" in g for g in guards)
+
+
+def test_missing_streams_are_patched_before_nicegui_is_imported():
+    import ast
+    body = _app_tree().body
+    patch_idx = next(i for i, n in enumerate(body)
+                     if isinstance(n, ast.If) and "setup_logging()" in ast.unparse(n))
+    nicegui_idx = next(i for i, n in enumerate(body)
+                       if isinstance(n, ast.ImportFrom) and n.module == "nicegui")
+    assert patch_idx < nicegui_idx

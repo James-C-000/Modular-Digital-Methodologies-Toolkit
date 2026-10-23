@@ -15,6 +15,14 @@ import os
 # anything can import matplotlib.
 os.environ["MPLBACKEND"] = "Agg"
 
+# Windowed builds launched without a console (double-click) have no
+# stdout/stderr.  Route them to the log file now, before importing NiceGUI:
+# its dependencies install their own stand-in streams on import, which would
+# silently discard output (CI showed this on Windows).
+if __name__ == "__main__":
+    from common.logs import setup_logging
+    setup_logging()
+
 import argparse
 import logging
 import sys
