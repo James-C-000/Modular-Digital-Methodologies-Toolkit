@@ -1,0 +1,5 @@
+# Test and build tools (not shipped). Compiled against each runtime lock.
+pytest==9.0.3
+ruff==0.17.2
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9

@@ -1,0 +1,4 @@
+# JamePeng's llama-cpp-python fork (MIT), pinned to a commit.
+# fe38cbf = "Bump version to 0.3.37" (2026-05-02), the version v2.0.7 shipped with.
+# Its runtime dependencies are locked via requirements/base.in.
+llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git@fe38cbfac424973ccd9cfaa199a64a02502af4d1
