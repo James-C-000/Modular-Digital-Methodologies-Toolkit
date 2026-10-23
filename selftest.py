@@ -265,6 +265,41 @@ class SelfTest:
                     "ffmpeg": av.ffmpeg_version_info, "libavcodec_license": codec.get("license"),
                     "libavcodec_gpl_flags": gpl_flags}
 
+        @self.check("named entities (multilingual ONNX)")
+        def _():
+            from NLP.ner_onnx import is_model_installed, load_model
+            downloaded = not is_model_installed()
+            ents = load_model().predict("In 1843 Ada Lovelace corresponded with Charles Babbage in London.")
+            found = sorted({(e["entity_group"], e["word"]) for e in ents})
+            if ("PER", "Ada Lovelace") not in found:
+                raise RuntimeError(f"expected PER 'Ada Lovelace', got {found}")
+            return {"entities": found, "downloaded_now": downloaded}
+
+        @self.check("translation (Argos fr -> en)")
+        def _():
+            from Translation import offline_translation as ot
+            downloaded = not ot.is_installed("fr", "en")
+            ot.download_package("fr", "en")
+            out = ot.translate_text("Le chat dort sur la chaise.", "fr", "en")
+            if "cat" not in out.lower():
+                raise RuntimeError(f"expected 'cat' in translation, got {out!r}")
+            return {"translation": out, "downloaded_now": downloaded,
+                    "detected": ot.detect_language("Le notaire a rédigé l'acte de vente.")}
+
+        @self.check("co-words with stopwords")
+        def _():
+            from NLP.co_word_analysis import main as co_words
+            folder = os.path.join(work, "cowords")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "ledger.txt"), "w", encoding="utf-8") as f:
+                f.write("The miller sold grain at the market. The miller paid the toll. " * 10)
+            co_words(folder, stopword_language="en")
+            with open(os.path.join(folder, "ledger_co_word_analysis.html"), encoding="utf-8") as f:
+                report = f.read()
+            if "<td>miller</td>" not in report or "<td>the</td>" in report:
+                raise RuntimeError("stopwords were not applied")
+            return {"report_bytes": len(report)}
+
         @self.check("llama.cpp")
         def _():
             import llama_cpp

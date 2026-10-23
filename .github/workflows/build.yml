@@ -163,7 +163,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
-      - name: Run tests
+      - name: Run tests (including model downloads)
+        env:
+          MDMT_NETWORK_TESTS: '1'
         run: pytest -v
 
       - name: Build with PyInstaller
