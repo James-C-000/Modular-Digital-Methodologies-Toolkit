@@ -98,3 +98,27 @@ class TestDetectHardware:
         assert info.gpu_available is False
         assert info.recommended_model == "0.8B"
         assert info.n_gpu_layers == 0
+
+
+class TestNoConsoleWindows:
+    """The windowed Windows build must not flash a console for each probe."""
+
+    @patch("RAG.hardware.subprocess.run")
+    def test_gpu_probes_pass_no_window_flags_on_windows(self, mock_run, monkeypatch):
+        import sys
+        import RAG.hardware as hw
+        from common import proc
+        monkeypatch.setattr(proc.sys, "platform", "win32")
+        monkeypatch.setattr(proc.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+        mock_run.return_value = MagicMock(returncode=1, stdout="")
+        hw._detect_nvidia_gpu()
+        hw._detect_amd_gpu()
+        assert mock_run.call_count == 2
+        for call in mock_run.call_args_list:
+            assert call.kwargs.get("creationflags") == 0x08000000
+
+    def test_no_flags_elsewhere(self, monkeypatch):
+        from common import proc
+        monkeypatch.setattr(proc.sys, "platform", "linux")
+        assert proc.no_window_kwargs() == {}
+

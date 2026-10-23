@@ -63,11 +63,12 @@ try:
     from langchain_core.messages import AIMessage, HumanMessage
 
 except ImportError as e:
-    logger.error(f"Required packages not installed. Error: {e}")
-    logger.error("Please run:")
-    logger.error(
-        "pip install langchain langchain-community langchain-huggingface faiss-cpu pypdf sentence-transformers llama-cpp-python beautifulsoup4 docx2txt")
-    exit(1)
+    # Raise rather than exit(): this module is imported by the RAG page, and a
+    # missing dependency must surface as an error there, not kill the server.
+    raise ImportError(
+        f"RAG dependencies are not installed ({e}). Install them with: "
+        "pip install -r requirements.txt"
+    ) from e
 
 
 # Registry mapping file extensions to their LangChain document loader.

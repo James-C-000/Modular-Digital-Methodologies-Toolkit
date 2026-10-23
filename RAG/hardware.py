@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 import psutil
 
+from common.proc import no_window_kwargs
+
 logger = logging.getLogger("rag-hardware")
 
 # Minimum VRAM (MB) to justify GPU offloading (model + KV cache overhead)
@@ -92,7 +94,7 @@ def _detect_nvidia_gpu():
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, **no_window_kwargs(),
         )
         if result.returncode == 0 and result.stdout.strip():
             vram_mb = int(result.stdout.strip().splitlines()[0].strip())
@@ -107,7 +109,7 @@ def _detect_amd_gpu():
     try:
         result = subprocess.run(
             ["rocm-smi", "--showmeminfo", "vram"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, **no_window_kwargs(),
         )
         if result.returncode == 0 and result.stdout.strip():
             for line in result.stdout.splitlines():
@@ -134,7 +136,7 @@ def _detect_metal():
     try:
         result = subprocess.run(
             ["sysctl", "-n", "hw.memsize"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, **no_window_kwargs(),
         )
         if result.returncode == 0 and result.stdout.strip():
             ram_bytes = int(result.stdout.strip())

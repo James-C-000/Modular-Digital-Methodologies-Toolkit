@@ -158,3 +158,15 @@ class TestModelValidation:
 
         with pytest.raises(FileNotFoundError):
             system._validate_models()
+
+
+class TestImportFailure:
+    def test_missing_dependency_raises_instead_of_exiting(self):
+        """A page import must never kill the server: no exit() on ImportError."""
+        import ast
+        import os
+        src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "RAG", "qwen_rag.py")
+        with open(src, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        calls = [ast.unparse(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)]
+        assert "exit" not in calls and "sys.exit" not in calls
