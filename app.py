@@ -238,8 +238,8 @@ def _parse_args(argv=None):
 def main():
     """Initialize app data directory and start NiceGUI."""
     if multiprocessing.current_process().name != "MainProcess":
-        # Source runs: NiceGUI's window process is spawned, re-imports this
-        # module as __mp_main__ and lands here.  It needs none of the setup.
+        # Defensive: a spawned child that somehow calls main() needs none of
+        # the setup (see the __name__ guard at the bottom of this file).
         return
 
     args = _parse_args()
@@ -283,5 +283,9 @@ def main():
     )
 
 
-if __name__ in {"__main__", "__mp_main__"}:
+# Only when run as a script.  Multiprocessing re-imports this module as
+# "__mp_main__" in spawned children and in Python 3.14's forkserver process
+# (which still calls itself "MainProcess"); neither must run main().  NiceGUI
+# only needs "__mp_main__" here for reload mode, which MDMT does not use.
+if __name__ == "__main__":
     main()

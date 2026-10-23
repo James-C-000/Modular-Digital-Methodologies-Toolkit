@@ -112,3 +112,11 @@ def test_setup_frozen_tesseract_env_sets_path(tmp_path):
     finally:
         os.environ["PATH"] = old_path
         os.environ.pop("TESSDATA_PREFIX", None)
+
+
+def test_main_runs_only_as_a_script():
+    """Spawned children and the 3.14 forkserver import app.py as __mp_main__."""
+    import ast
+    guards = [ast.unparse(n.test) for n in _app_tree().body if isinstance(n, ast.If)]
+    assert "__name__ == '__main__'" in guards
+    assert not any("__mp_main__" in g for g in guards)
