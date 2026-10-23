@@ -64,17 +64,21 @@ def ocr_page():
     with ui.card().classes("w-full"):
         with ui.row().classes("w-full"):
             deskew = ui.checkbox("Deskew", value=False)
-            rotate = ui.checkbox("Rotate Pages", value=False)
+            # Disabled Quasar controls ignore the mouse, so explanatory
+            # tooltips go on wrapper elements.
+            with ui.element("div") as rotate_wrap:
+                rotate = ui.checkbox("Rotate Pages", value=False)
             redo_ocr = ui.checkbox("Redo OCR", value=False)
-            pdfa = ui.checkbox("PDF/A Output", value=False)
+            with ui.element("div") as pdfa_wrap:
+                pdfa = ui.checkbox("PDF/A Output", value=False)
             extract_text = ui.checkbox("Extract Text", value=False)
 
         if not has_osd:
             rotate.disable()
-            rotate.tooltip("Needs the 'osd' data file — install it from the Downloads page.")
+            rotate_wrap.tooltip("Needs the 'osd' data file — install it from the Downloads page.")
         if not ghostscript:
             pdfa.disable()
-            pdfa.tooltip("PDF/A output needs Ghostscript, which is not installed.")
+            pdfa_wrap.tooltip("PDF/A output needs Ghostscript, which is not installed (see below).")
             with ui.row().classes("items-center text-caption text-grey"):
                 ui.label("PDF/A output requires Ghostscript (not bundled with MDMT). Install it from")
                 ui.link("ghostscript.com", GHOSTSCRIPT_DOWNLOAD_URL, new_tab=True)
