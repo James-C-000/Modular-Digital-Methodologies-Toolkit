@@ -128,7 +128,9 @@ jobs:
         run: |
           $ff = Join-Path $PWD 'ffmpeg-lgpl'
           $env:INCLUDE = "$ff\include;$env:INCLUDE"
-          $env:LIB = "$ff\lib;$env:LIB"
+          # FFmpeg's MSVC build installs its import libraries (avformat.lib, ...)
+          # next to the DLLs in bin\, not in lib\.
+          $env:LIB = "$ff\bin;$ff\lib;$env:LIB"
           $av = (Select-String -Path requirements/lock-windows.txt -Pattern '^av==\S+').Matches[0].Value
           pip wheel --no-binary av --no-deps $av -w av-raw
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
