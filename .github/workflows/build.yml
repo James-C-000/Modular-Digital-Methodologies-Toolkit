@@ -1,5 +1,7 @@
 name: Build & Release
 
+# Full frozen builds: on version tags (which also publish a release) and on
+# demand. Every build runs the frozen app's --self-test on its own OS.
 on:
   push:
     tags:
@@ -9,128 +11,168 @@ on:
 permissions:
   contents: write
 
+env:
+  # Portable llama.cpp: compile for a baseline CPU (AVX2/FMA/F16C on x86-64),
+  # not for the CI runner's CPU, or the app crashes on older user machines.
+  CMAKE_ARGS: '-DGGML_NATIVE=OFF'
+
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            artifact: mdmt-linux-x86_64
+          - os: macos-14
+            name: macos
+            artifact: mdmt-macos-arm64
+          - os: windows-latest
+            name: windows
+            artifact: mdmt-windows-x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng ffmpeg cmake build-essential
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Run tests
-        run: pytest -v
-
-      - name: Build with PyInstaller
-        run: pyinstaller mdmt-linux.spec
-
-      - name: Package artifact
-        run: |
-          cd dist
-          zip -r ../mdmt-linux-x86_64.zip mdmt/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mdmt-linux-x86_64
-          path: mdmt-linux-x86_64.zip
-
-  build-macos:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install system dependencies
-        run: |
-          brew install tesseract ffmpeg cmake
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Run tests
-        run: pytest -v
-
-      - name: Build with PyInstaller
-        run: pyinstaller mdmt-macos.spec
-
-      - name: Package artifact
-        run: |
-          cd dist
-          zip -r ../mdmt-macos-arm64.zip mdmt/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mdmt-macos-arm64
-          path: mdmt-macos-arm64.zip
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Enable long paths
+        if: runner.os == 'Windows'
         run: git config --system core.longpaths true
 
+      - uses: actions/checkout@v4
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/*-${{ matrix.name }}.txt
 
-      - name: Install Tesseract
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd cmake build-essential
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tesseract cmake
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
         run: choco install tesseract --no-progress -y
 
-      - name: Install FFmpeg
-        run: choco install ffmpeg --no-progress -y
+      - name: Report UPX availability (specs set upx=False)
+        run: command -v upx && upx --version | head -1 || echo "upx: not installed"
 
-      - name: Install C++ build tools
-        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --no-progress -y
-
-      - name: Install Python dependencies
+      - name: Install locked Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install -r requirements/lock-${{ matrix.name }}.txt
+          pip install -r requirements/dev-${{ matrix.name }}.txt
+
+      - name: Read pinned llama-cpp-python commit
+        id: llama
+        run: echo "sha=$(grep -oE '@[0-9a-f]{40}' requirements/llama.txt | tr -d @)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache llama-cpp-python wheel
+        id: llama-cache
+        uses: actions/cache@v4
+        with:
+          path: wheels
+          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.sha }}-${{ env.CMAKE_ARGS }}
+
+      - name: Build llama-cpp-python wheel
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        run: pip wheel --no-deps -r requirements/llama.txt -w wheels
+
+      - name: Install llama-cpp-python
+        run: pip install --no-deps wheels/llama_cpp_python-*.whl
+
+      - name: Lint (ruff)
+        run: ruff check .
 
       - name: Run tests
         run: pytest -v
 
       - name: Build with PyInstaller
-        run: pyinstaller mdmt-windows.spec
+        run: pyinstaller --noconfirm mdmt-${{ matrix.name }}.spec
 
-      - name: Package artifact
-        run: Compress-Archive -Path dist/mdmt -DestinationPath mdmt-windows-x64.zip
+      # ---- verify the bundle ---------------------------------------------
+
+      - name: Check bundled library dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: python packaging/check_bundle_libs.py dist/mdmt
+
+      - name: Check bundled library dependencies and signature (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          python packaging/check_bundle_libs.py dist/MDMT.app
+          # arm64 code must carry at least an ad-hoc signature (not a
+          # distribution signature: the builds are intentionally unsigned).
+          codesign --verify --deep --strict --verbose=2 dist/MDMT.app
+
+      - name: Self-test (Linux, windowed executable)
+        if: runner.os == 'Linux'
+        run: dist/mdmt/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
+
+      - name: Self-test (macOS, inside MDMT.app)
+        if: runner.os == 'macOS'
+        run: dist/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
+
+      - name: Self-test (Windows, windowed executable)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $report = Join-Path $PWD 'selftest-windows.json'
+          $p = Start-Process -FilePath 'dist\mdmt\mdmt.exe' `
+                 -ArgumentList '--self-test', '--self-test-out', "`"$report`"" `
+                 -Wait -PassThru
+          Write-Host "mdmt.exe exited with $($p.ExitCode)"
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 40 }
+          exit $p.ExitCode
+
+      - name: Upload self-test report and log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-${{ matrix.name }}
+          path: |
+            selftest-${{ matrix.name }}.json
+            selftest-${{ matrix.name }}.json.log
+          if-no-files-found: warn
+
+      # ---- package ---------------------------------------------------------
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: cd dist && zip -r -y -q ../${{ matrix.artifact }}.zip mdmt/
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        # ditto keeps the bundle's symlinks; `zip -r` would dereference them,
+        # bloating the archive and breaking the code signature.
+        run: ditto -c -k --keepParent dist/MDMT.app ${{ matrix.artifact }}.zip
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/mdmt -DestinationPath ${{ matrix.artifact }}.zip
+
+      - name: Report bundle size
+        run: |
+          du -sh dist/* || true
+          ls -l ${{ matrix.artifact }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mdmt-windows-x64
-          path: mdmt-windows-x64.zip
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
 
   release:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -146,4 +188,6 @@ jobs:
             mdmt-windows-x64/mdmt-windows-x64.zip
           body: |
             Also available at [jamescaldwell.net/software.html](https://jamescaldwell.net/software.html).
+
+            **Unsigned builds.** MDMT is an independent open-source project without paid code-signing certificates, so these apps are not signed or notarized; the source code and the CI build logs that produced these files are public. On first launch, macOS needs one approval in System Settings → Privacy & Security → Open Anyway (or run `xattr -dr com.apple.quarantine /path/to/MDMT.app`), and Windows SmartScreen needs "More info" → "Run anyway". The macOS build requires Apple Silicon and macOS 14 or newer; the Linux build is x86-64. See the README for details.
           generate_release_notes: true
