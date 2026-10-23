@@ -1,7 +1,22 @@
-"""OCR batch processing using ocrmypdf."""
+"""OCR batch processing using ocrmypdf.
+
+Tesseract finds its language data through ``TESSDATA_PREFIX``, which
+``OCR.tessdata.configure_tessdata()`` points at MDMT's managed tessdata
+directory at startup.
+"""
 
 import os
+import shutil
+import sys
+
 import ocrmypdf
+import ocrmypdf.subprocess
+
+from common.proc import hide_console_windows_in
+
+hide_console_windows_in(ocrmypdf.subprocess)
+
+GHOSTSCRIPT_DOWNLOAD_URL = "https://ghostscript.com/releases/gsdnld.html"
 
 TESSERACT_LANGUAGES = {
     "Afrikaans": "afr",
@@ -126,6 +141,35 @@ TESSERACT_LANGUAGES = {
 }
 
 
+# Data files that are not languages but can be downloaded alongside them.
+TESSERACT_EXTRA_DATA = {
+    "Orientation & script detection (needed for Rotate Pages)": "osd",
+}
+
+
+def downloadable_tessdata() -> dict[str, str]:
+    """All tessdata files offered on the Downloads page: display name -> code."""
+    return {**TESSERACT_LANGUAGES, **TESSERACT_EXTRA_DATA}
+
+
+def find_ghostscript() -> str | None:
+    """Return the Ghostscript executable ocrmypdf would use, or None.
+
+    PDF/A output needs Ghostscript, which MDMT does not bundle (it is AGPL).
+    On Windows ocrmypdf only supports the 64-bit ``gswin64c`` and also looks
+    in the registry and Program Files, so we reuse its search path there.
+    """
+    if sys.platform == "win32":
+        search_path = None
+        try:
+            from ocrmypdf.subprocess._windows import shim_env_path
+            search_path = shim_env_path()
+        except Exception:
+            pass
+        return shutil.which("gswin64c", path=search_path)
+    return shutil.which("gs")
+
+
 def find_pdfs_in_directory(directory: str) -> list[str]:
     """Recursively find all PDF files in a directory."""
     pdfs = []
@@ -160,10 +204,37 @@ def build_ocr_params(
     return params
 
 
+def run_ocr_file(
+    pdf_path: str,
+    out_path: str,
+    language_codes: list[str],
+    deskew: bool = False,
+    rotate_pages: bool = False,
+    rotate_threshold: int = 6,
+    redo_ocr: bool = False,
+    output_type: str = "pdf",
+    sidecar_path: str | None = None,
+) -> dict:
+    """OCR one PDF. Returns a result dict with 'status' and 'input'."""
+    params = build_ocr_params(
+        language_codes=language_codes,
+        deskew=deskew,
+        rotate_pages=rotate_pages,
+        rotate_threshold=rotate_threshold,
+        redo_ocr=redo_ocr,
+        output_type=output_type,
+        sidecar_path=sidecar_path,
+    )
+    try:
+        ocrmypdf.ocr(pdf_path, out_path, progress_bar=False, **params)
+        return {"status": "success", "input": pdf_path}
+    except Exception as e:
+        return {"status": "error", "input": pdf_path, "message": str(e)}
+
+
 def run_ocr_batch(
     input_dir: str,
     output_dir: str,
-    tessdata_dir: str,
     language_names: list[str],
     deskew: bool = False,
     rotate_pages: bool = False,
@@ -191,25 +262,16 @@ def run_ocr_batch(
         if extract_text:
             sidecar_path = os.path.splitext(out_path)[0] + ".txt"
 
-        params = build_ocr_params(
-            language_codes=language_codes,
+        results.append(run_ocr_file(
+            pdf_path,
+            out_path,
+            language_codes,
             deskew=deskew,
             rotate_pages=rotate_pages,
             rotate_threshold=rotate_threshold,
             redo_ocr=redo_ocr,
             output_type=output_type,
             sidecar_path=sidecar_path,
-        )
-
-        try:
-            ocrmypdf.ocr(
-                pdf_path,
-                out_path,
-                tessdata_dir=tessdata_dir,
-                **params,
-            )
-            results.append({"status": "success", "input": pdf_path})
-        except Exception as e:
-            results.append({"status": "error", "input": pdf_path, "message": str(e)})
+        ))
 
     return results

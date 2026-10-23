@@ -1,36 +1,29 @@
 """OCR processing page."""
 import os
 from nicegui import app, ui, run
-from config import AppConfig, get_tessdata_dir
-
-
-def _find_tessdata_dir() -> str:
-    app_tessdata = get_tessdata_dir()
-    bundled_tessdata = os.path.join(os.path.dirname(os.path.dirname(__file__)), "OCR", "tessdata")
-    if os.path.isdir(app_tessdata) and any(f.endswith(".traineddata") for f in os.listdir(app_tessdata)):
-        return app_tessdata
-    if os.path.isdir(bundled_tessdata):
-        return bundled_tessdata
-    return app_tessdata
+from config import AppConfig
 
 
 def ocr_page():
     config = AppConfig()
 
     try:
-        from OCR.ocr_logic import TESSERACT_LANGUAGES, run_ocr_batch
+        from OCR.ocr_logic import (
+            GHOSTSCRIPT_DOWNLOAD_URL, TESSERACT_LANGUAGES, find_ghostscript, run_ocr_batch,
+        )
+        from OCR.tessdata import installed_languages
     except ImportError as e:
         ui.label("OCR Processing").classes("text-h4")
         ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
         ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
         return
 
-    tessdata_dir = _find_tessdata_dir()
-
+    installed = installed_languages()
     available_langs = {
-        name: code for name, code in TESSERACT_LANGUAGES.items()
-        if os.path.exists(os.path.join(tessdata_dir, f"{code}.traineddata"))
+        name: code for name, code in TESSERACT_LANGUAGES.items() if code in installed
     }
+    has_osd = "osd" in installed
+    ghostscript = find_ghostscript()
 
     if not available_langs:
         with ui.card().classes("w-full"):
@@ -76,6 +69,17 @@ def ocr_page():
             pdfa = ui.checkbox("PDF/A Output", value=False)
             extract_text = ui.checkbox("Extract Text", value=False)
 
+        if not has_osd:
+            rotate.disable()
+            rotate.tooltip("Needs the 'osd' data file — install it from the Downloads page.")
+        if not ghostscript:
+            pdfa.disable()
+            pdfa.tooltip("PDF/A output needs Ghostscript, which is not installed.")
+            with ui.row().classes("items-center text-caption text-grey"):
+                ui.label("PDF/A output requires Ghostscript (not bundled with MDMT). Install it from")
+                ui.link("ghostscript.com", GHOSTSCRIPT_DOWNLOAD_URL, new_tab=True)
+                ui.label("and restart MDMT.")
+
         deskew.bind_enabled_from(redo_ocr, "value", backward=lambda v: not v)
         redo_ocr.bind_enabled_from(deskew, "value", backward=lambda v: not v)
 
@@ -110,7 +114,6 @@ def ocr_page():
             return run_ocr_batch(
                 input_dir=in_dir,
                 output_dir=out_dir,
-                tessdata_dir=tessdata_dir,
                 language_names=lang_select.value,
                 deskew=deskew.value,
                 rotate_pages=rotate.value,
