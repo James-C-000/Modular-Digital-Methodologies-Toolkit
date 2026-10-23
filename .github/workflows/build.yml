@@ -127,6 +127,24 @@ jobs:
         if: runner.os == 'macOS'
         run: dist/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
 
+      # A GUI process inherits its parent's std handles, so a child of this
+      # job's shell starts *with* stdout/stderr. Launching through WMI gives it
+      # none, like a double-click in Explorer: the case where v2.0.7 crashed in
+      # tqdm. This first run also downloads the Whisper model.
+      - name: Self-test (Windows, detached like an Explorer launch)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist\mdmt\mdmt.exe').Path
+          $report = Join-Path $PWD 'selftest-windows-detached.json'
+          $cmd = "`"$exe`" --self-test --self-test-out `"$report`""
+          $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+                 -Arguments @{ CommandLine = $cmd; CurrentDirectory = $PWD.Path }
+          if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create failed: $($r.ReturnValue)" }
+          Wait-Process -Id $r.ProcessId -Timeout 1800
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 25 }
+          python packaging/check_selftest_report.py $report --expect-missing-stdio
+
       - name: Self-test (Windows, windowed executable)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -145,8 +163,8 @@ jobs:
         with:
           name: selftest-${{ matrix.name }}
           path: |
-            selftest-${{ matrix.name }}.json
-            selftest-${{ matrix.name }}.json.log
+            selftest-${{ matrix.name }}*.json
+            selftest-${{ matrix.name }}*.json.log
           if-no-files-found: warn
 
       # ---- package ---------------------------------------------------------

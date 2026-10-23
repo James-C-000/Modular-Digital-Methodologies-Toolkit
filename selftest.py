@@ -75,10 +75,14 @@ def _bundle_dir() -> str | None:
 
 
 def _inside_bundle(path: str) -> bool:
+    """True for files in the frozen app: _MEIPASS, or next to the executable
+    (Windows/Linux: dist/mdmt/; macOS: MDMT.app/Contents/MacOS/)."""
     bundle = _bundle_dir()
     if bundle is None:
         return True
-    return os.path.normcase(os.path.realpath(path)).startswith(bundle + os.sep)
+    real = os.path.normcase(os.path.realpath(path))
+    exe_dir = os.path.normcase(os.path.realpath(os.path.dirname(sys.executable)))
+    return real.startswith(bundle + os.sep) or real.startswith(exe_dir + os.sep)
 
 
 def _is_core_system_library(path: str) -> bool:
