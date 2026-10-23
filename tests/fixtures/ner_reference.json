@@ -1,0 +1,237 @@
+{
+ "text_file": "ner_sample.txt",
+ "v2_0_7_dbmdz": [
+  [
+   "LOC",
+   "Belgium"
+  ],
+  [
+   "LOC",
+   "Berlin"
+  ],
+  [
+   "LOC",
+   "France"
+  ],
+  [
+   "LOC",
+   "London"
+  ],
+  [
+   "LOC",
+   "Paris"
+  ],
+  [
+   "LOC",
+   "Somerset"
+  ],
+  [
+   "LOC",
+   "Turin"
+  ],
+  [
+   "LOC",
+   "è"
+  ],
+  [
+   "MISC",
+   "Analytical Engine"
+  ],
+  [
+   "MISC",
+   "Difference Engine No. 2"
+  ],
+  [
+   "MISC",
+   "French"
+  ],
+  [
+   "MISC",
+   "Italian"
+  ],
+  [
+   "MISC",
+   "Prussian"
+  ],
+  [
+   "ORG",
+   "Académie des sciences"
+  ],
+  [
+   "ORG",
+   "Bibliothèque universelle de Gen"
+  ],
+  [
+   "ORG",
+   "British Library"
+  ],
+  [
+   "ORG",
+   "Hewlett-Packard"
+  ],
+  [
+   "ORG",
+   "Royal Society"
+  ],
+  [
+   "ORG",
+   "Science Museum"
+  ],
+  [
+   "ORG",
+   "Scientific Memoirs"
+  ],
+  [
+   "ORG",
+   "University College London"
+  ],
+  [
+   "ORG",
+   "University of"
+  ],
+  [
+   "ORG",
+   "ve"
+  ],
+  [
+   "PER",
+   "Ada Lovelace"
+  ],
+  [
+   "PER",
+   "Augustus De Morgan"
+  ],
+  [
+   "PER",
+   "Babbage"
+  ],
+  [
+   "PER",
+   "Charles Babbage"
+  ],
+  [
+   "PER",
+   "Doron Swade"
+  ],
+  [
+   "PER",
+   "Lovelace"
+  ],
+  [
+   "PER",
+   "Luigi Menabrea"
+  ],
+  [
+   "PER",
+   "Michael Faraday"
+  ],
+  [
+   "PER",
+   "Richard Taylor"
+  ],
+  [
+   "PER",
+   "Thomas de Colmar"
+  ]
+ ],
+ "v2_0_7_dbmdz_model": "dbmdz/bert-large-cased-finetuned-conll03-english@4c53496",
+ "same_model_pytorch": [
+  [
+   "LOC",
+   "Belgium"
+  ],
+  [
+   "LOC",
+   "Berlin"
+  ],
+  [
+   "LOC",
+   "France"
+  ],
+  [
+   "LOC",
+   "London"
+  ],
+  [
+   "LOC",
+   "Paris"
+  ],
+  [
+   "LOC",
+   "Science Museum"
+  ],
+  [
+   "LOC",
+   "Somerset"
+  ],
+  [
+   "ORG",
+   "Académie des sciences"
+  ],
+  [
+   "ORG",
+   "Bibliothèque universelle de Genève"
+  ],
+  [
+   "ORG",
+   "British Library"
+  ],
+  [
+   "ORG",
+   "Hewlett-Packard"
+  ],
+  [
+   "ORG",
+   "Royal Society"
+  ],
+  [
+   "ORG",
+   "University College London"
+  ],
+  [
+   "ORG",
+   "University of Turin"
+  ],
+  [
+   "PER",
+   "Ada Lovelace"
+  ],
+  [
+   "PER",
+   "Augustus De Morgan"
+  ],
+  [
+   "PER",
+   "Babbage"
+  ],
+  [
+   "PER",
+   "Charles Babbage"
+  ],
+  [
+   "PER",
+   "Doron Swade"
+  ],
+  [
+   "PER",
+   "Lovelace"
+  ],
+  [
+   "PER",
+   "Luigi Menabrea"
+  ],
+  [
+   "PER",
+   "Michael Faraday"
+  ],
+  [
+   "PER",
+   "Richard Taylor"
+  ],
+  [
+   "PER",
+   "Thomas de Colmar"
+  ]
+ ],
+ "same_model_pytorch_model": "Davlan/bert-base-multilingual-cased-ner-hrl@e756de7f7b8f64fea0c3d7c3872f1322fab747b1"
+}

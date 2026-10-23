@@ -26,7 +26,7 @@ def ner_page():
             return
 
         progress.set_visibility(True)
-        status_label.set_text("Loading NER model (may download ~1.3 GB on first run)...")
+        status_label.set_text("Loading NER model (downloads ~182 MB on first use)...")
 
         try:
             def do_ner():
