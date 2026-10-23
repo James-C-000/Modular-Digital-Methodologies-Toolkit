@@ -13,10 +13,7 @@ import networkx as nx
 from pypdf import PdfReader
 from collections import defaultdict
 
-# Set the matplotlib backend to Agg (non-interactive) to avoid thread-related warnings
-import matplotlib
-
-matplotlib.use('Agg')
+from matplotlib.figure import Figure
 
 _nltk_ready = False
 
@@ -168,11 +165,6 @@ def extract_relationships_from_file(file_path, entity_types):
 
 def generate_network_graph(df, output_dir):
     """Generate and save network graphs of the extracted relationships"""
-    # Use the Agg backend which is thread-safe and doesn't require a GUI
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-
     # Create entity graph
     G = nx.Graph()
 
@@ -208,23 +200,18 @@ def generate_network_graph(df, output_dir):
             G.add_edge(source, target, relationship=row['Relationship'])
 
     # Save the full graph
-    plt.figure(figsize=(12, 10))
+    fig = Figure(figsize=(12, 10), layout="tight")
+    ax = fig.subplots()
 
     # Get node colors based on entity type
     node_colors = [entity_colors.get(G.nodes[node]['entity_type'], 'gray') for node in G.nodes()]
 
     pos = nx.spring_layout(G, seed=42)
-    nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=1500, font_size=8, alpha=0.8)
+    nx.draw(G, pos, ax=ax, with_labels=True, node_color=node_colors, node_size=1500, font_size=8, alpha=0.8)
 
     # Save full network graph
-    plt.title("Entity Relationship Network")
-
-    # Use Figure.tight_layout() instead of plt.tight_layout() to avoid warnings
-    fig = plt.gcf()
-    fig.set_tight_layout(True)
-
-    plt.savefig(os.path.join(output_dir, "relationship_network.png"), dpi=300, bbox_inches='tight')
-    plt.close()
+    ax.set_title("Entity Relationship Network")
+    fig.savefig(os.path.join(output_dir, "relationship_network.png"), dpi=300, bbox_inches='tight')
 
     # Create subgraphs for each entity type
     entity_types = set()
@@ -236,29 +223,20 @@ def generate_network_graph(df, output_dir):
         if len(subgraph_nodes) > 1:  # Only create graphs with at least 2 nodes
             subgraph = G.subgraph(subgraph_nodes)
 
-            plt.figure(figsize=(10, 8))
+            fig = Figure(figsize=(10, 8), layout="tight")
+            ax = fig.subplots()
             pos = nx.spring_layout(subgraph, seed=42)
-            nx.draw(subgraph, pos, with_labels=True,
+            nx.draw(subgraph, pos, ax=ax, with_labels=True,
                     node_color=entity_colors.get(entity_type, 'gray'),
                     node_size=1500, font_size=8, alpha=0.8)
 
-            plt.title(f"{entity_type} Relationship Network")
-
-            # Use Figure.tight_layout() instead of plt.tight_layout()
-            fig = plt.gcf()
-            fig.set_tight_layout(True)
-
-            plt.savefig(os.path.join(output_dir, f"{entity_type.lower()}_network.png"), dpi=300, bbox_inches='tight')
-            plt.close()
+            ax.set_title(f"{entity_type} Relationship Network")
+            fig.savefig(os.path.join(output_dir, f"{entity_type.lower()}_network.png"), dpi=300, bbox_inches='tight')
 
 
 def process_files_for_relationships(input_dir, output_dir, model_name, extract_text, generate_graph, entity_types):
     """Process files and extract relationships"""
     _ensure_nltk_data()
-
-    # Set non-interactive backend for matplotlib at the beginning
-    import matplotlib
-    matplotlib.use('Agg')
 
     results = {
         'status': 'success',

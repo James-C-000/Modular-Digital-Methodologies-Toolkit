@@ -3,7 +3,7 @@ import os
 import re
 from collections import Counter
 import nltk
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import networkx as nx
 from pypdf import PdfReader
 from nltk.tokenize import word_tokenize
@@ -101,13 +101,13 @@ def visualize_network(cooccurrence, output_path, top_n=30):
     for (w1, w2), freq in top_pairs:
         G.add_edge(w1, w2, weight=freq)
 
-    plt.figure(figsize=(10, 8))
+    fig = Figure(figsize=(10, 8))
+    ax = fig.subplots()
     pos = nx.spring_layout(G, k=0.5, seed=42)
     weights = [G[u][v]["weight"] for u, v in G.edges()]
-    nx.draw(G, pos, with_labels=True, node_color="skyblue", edge_color="gray", width=weights, font_size=10)
-    plt.title("Co-word Network")
-    plt.savefig(output_path)
-    plt.close()
+    nx.draw(G, pos, ax=ax, with_labels=True, node_color="skyblue", edge_color="gray", width=weights, font_size=10)
+    ax.set_title("Co-word Network")
+    fig.savefig(output_path)
 
 
 def generate_statistics_html(word_counts, cooccurrence, top_words=20, top_pairs=20):
