@@ -17,7 +17,7 @@ def sample_docs_dir():
         "page.html": "<html><body><p>Hello HTML</p></body></html>",
     }
     for name, content in files.items():
-        with open(os.path.join(d, name), "w") as f:
+        with open(os.path.join(d, name), "w", encoding="utf-8") as f:
             f.write(content)
     yield d
     shutil.rmtree(d)
