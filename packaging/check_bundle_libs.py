@@ -110,10 +110,13 @@ def check_macos(bundle: str) -> list[str]:
         loader_dir = os.path.dirname(path)
         rpaths = [r.replace("@loader_path", loader_dir).replace("@executable_path", macos_dir)
                   for r in _rpaths(path)]
+        # A dylib's own install name (LC_ID_DYLIB) is listed by otool -L too;
+        # it is an identity, not a dependency.
+        own_id = (_otool(["-D"], path).splitlines()[1:] or [""])[0].strip()
         lines = _otool(["-L"], path).splitlines()[1:]
         for line in lines:
             dep = line.strip().split(" (")[0]
-            if not dep:
+            if not dep or dep == own_id:
                 continue
             if dep.startswith("@rpath/"):
                 candidates = [os.path.join(r, dep[len("@rpath/"):]) for r in rpaths]
@@ -127,8 +130,6 @@ def check_macos(bundle: str) -> list[str]:
                     problems.append(f"{rel}: {dep} does not exist in the bundle")
             elif dep.startswith(("/usr/lib/", "/System/")):
                 continue
-            elif os.path.basename(dep) == os.path.basename(path):
-                continue  # the library's own install name (LC_ID_DYLIB)
             else:
                 problems.append(f"{rel}: absolute dependency outside the bundle: {dep}")
     return problems
