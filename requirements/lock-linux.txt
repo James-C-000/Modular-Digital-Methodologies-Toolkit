@@ -26,7 +26,6 @@ diskcache==5.6.3          # via -r base.in
 distro==1.9.0             # via langsmith
 docutils==0.23            # via nicegui
 docx2txt==0.9             # via -r base.in
-et-xmlfile==2.0.0         # via openpyxl
 faiss-cpu==1.15.1         # via -r base.in
 fastapi==0.162.0          # via nicegui
 faster-whisper==1.2.1     # via -r base.in
@@ -36,7 +35,6 @@ fonttools==4.67.0         # via fpdf2, matplotlib, pikepdf
 fpdf2==2.8.9              # via ocrmypdf
 frozenlist==1.8.0         # via aiohttp, aiosignal
 fsspec==2026.9.0          # via huggingface-hub, torch
-future==1.0.0             # via -r base.in
 googletrans==4.0.2        # via -r base.in
 h11==0.16.0               # via httpcore, httpcore2, nicegui, uvicorn, wsproto
 h2==4.4.1                 # via httpx
@@ -88,7 +86,6 @@ nltk==3.10.4              # via -r base.in
 numpy==2.3.2              # via contourpy, ctranslate2, faiss-cpu, langchain-community, matplotlib, onnxruntime, pandas, scikit-learn, scipy, sentence-transformers, transformers, -r base.in
 ocrmypdf==17.13.0         # via -r base.in
 onnxruntime==1.31.0       # via faster-whisper
-openpyxl==3.1.5           # via -r base.in
 opentelemetry-api==1.45.1  # via fastapi
 orjson==3.13.0            # via langgraph-sdk, langsmith, nicegui
 ormsgpack==1.13.0         # via langgraph-checkpoint
@@ -124,7 +121,7 @@ pyyaml==6.0.3             # via ctranslate2, huggingface-hub, langchain-classic,
 qtpy==2.4.3               # via -r base.in
 referencing==0.37.0       # via jsonschema, jsonschema-specifications, pikepdf
 regex==2026.9.29          # via nltk, transformers
-requests==2.32.5          # via langchain-classic, langchain-community, langsmith, requests-toolbelt, -r base.in
+requests==2.32.5          # via langchain-classic, langchain-community, langsmith, requests-toolbelt
 requests-toolbelt==1.0.0  # via langsmith
 rich==15.0.0              # via ocrmypdf, typer
 rpds-py==2026.9.1         # via jsonschema, referencing

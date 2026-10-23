@@ -293,7 +293,6 @@ Generation (RAG) to find relevant passages and generate answers.
 | docx2txt | MIT | [GitHub](https://github.com/ankushshah89/python-docx2txt) |
 | faster-whisper (includes Silero VAD model) | MIT | [GitHub](https://github.com/SYSTRAN/faster-whisper) |
 | FAISS | MIT | [GitHub](https://github.com/facebookresearch/faiss) |
-| future | MIT | [GitHub](https://github.com/PythonCharmers/python-future) |
 | googletrans | MIT | [GitHub](https://github.com/ssut/py-googletrans) |
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
 | LangChain (core, community, huggingface, text-splitters) | MIT | [GitHub](https://github.com/langchain-ai/langchain) |
@@ -304,7 +303,6 @@ Generation (RAG) to find relevant passages and generate answers.
 | NLTK | Apache-2.0 | [GitHub](https://github.com/nltk/nltk) |
 | OCRmyPDF | MPL-2.0 | [GitHub](https://github.com/ocrmypdf/OCRmyPDF) |
 | ONNX Runtime | MIT | [GitHub](https://github.com/microsoft/onnxruntime) |
-| openpyxl | MIT | [openpyxl.readthedocs.io](https://openpyxl.readthedocs.io/) |
 | pandas | BSD-3-Clause | [GitHub](https://github.com/pandas-dev/pandas) |
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
 | PyTorch | BSD-3-Clause | [GitHub](https://github.com/pytorch/pytorch) |
