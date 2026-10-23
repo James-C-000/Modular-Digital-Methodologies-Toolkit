@@ -64,7 +64,8 @@ jobs:
         run: choco install tesseract --no-progress -y
 
       - name: Report UPX availability (specs set upx=False)
-        run: command -v upx && upx --version | head -1 || echo "upx: not installed"
+        run: |
+          command -v upx && upx --version | head -1 || echo "upx is not installed"
 
       - name: Install locked Python dependencies
         run: |
