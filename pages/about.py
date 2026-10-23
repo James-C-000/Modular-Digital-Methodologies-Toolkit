@@ -1,6 +1,8 @@
 """Help / About / License page."""
 from nicegui import ui
 
+from version import __version__
+
 
 def about_page():
     ui.label("About MDMT").classes("text-h4")
@@ -8,12 +10,21 @@ def about_page():
 
     with ui.card().classes("w-full"):
         ui.label("Modular Digital Methodologies Toolkit").classes("text-h5")
-        ui.markdown("""
+        ui.markdown(f"""
+**Version:** {__version__}
+
 **Author:** James C. Caldwell
 
 MDMT is a modular application for digital humanities and research workflows,
 providing tools for text analysis, document processing, and data extraction.
         """)
+
+        def open_logs():
+            from common.logs import get_log_dir
+            from common.opener import open_external
+            open_external(get_log_dir())
+
+        ui.button("Open log folder", icon="folder_open", on_click=open_logs).props("flat dense")
 
     # --- Getting Started ---
     with ui.card().classes("w-full mt-4"):
@@ -49,13 +60,14 @@ using Tesseract OCR. Can also optionally extract the recognized text to separate
 - **Deskew** \u2014 Straightens pages that were scanned at a slight angle. Cannot be
   used together with Redo OCR.
 - **Rotate Pages** \u2014 Automatically detects and corrects page rotation (e.g. pages
-  scanned upside-down). When enabled, you can set the **Rotation Sensitivity**:
+  scanned upside-down). Uses the `osd` data file, installed by default. When enabled, you can set the **Rotation Sensitivity**:
   High catches subtle rotations, Low only corrects obvious ones.
 - **Redo OCR** \u2014 Strips any existing OCR text layer and re-runs recognition from
   scratch. Useful if a previous OCR pass produced poor results. Cannot be used
   together with Deskew.
 - **PDF/A Output** \u2014 Produces PDF/A-compliant files, an archival format suitable
-  for long-term preservation.
+  for long-term preservation. Requires [Ghostscript](https://ghostscript.com/releases/gsdnld.html),
+  which MDMT does not bundle; the option is disabled until Ghostscript is installed.
 - **Extract Text** \u2014 Saves the recognized text to a `.txt` file alongside each
   output PDF.
 
@@ -69,19 +81,28 @@ using Tesseract OCR. Can also optionally extract the recognized text to separate
     with ui.expansion("Audio Transcription", icon="mic").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Converts speech in audio files to text using OpenAI's Whisper
-speech recognition model. Outputs a `.txt` transcript for each audio file.
+speech recognition model, run offline with faster-whisper. Outputs a `.txt`
+transcript for each audio file.
 
 **How to use:**
-1. Select a directory containing audio files (supports `.mp3`, `.wav`, `.m4a`,
-   `.flac`, `.ogg`, and other common formats).
+1. Select a directory containing audio files (`.mp3`, `.wav`, `.m4a`, `.flac`,
+   `.ogg`, `.webm`, `.mp4`, `.mpeg`, `.mpga`).
 2. Choose a **Whisper Model** size.
-3. Click **Transcribe**.
+3. Leave **Skip silence** on for long recordings (see below).
+4. Click **Transcribe**.
+
+**Skip silence (voice activity filter):** On by default. It removes stretches
+without speech before transcription, which avoids Whisper's tendency to invent
+repeated phrases over silence, music or tape hiss in long archival recordings,
+and speeds things up. Turn it off if very quiet speech is being dropped.
+
+Transcription runs on the CPU (int8), on every platform.
 
 **Model sizes:**
-- **tiny** (~75 MB) \u2014 Fastest, lowest accuracy. Good for quick drafts or testing.
-- **base** (~142 MB) \u2014 Fast with improved accuracy over tiny. Suitable for clear,
+- **tiny** (~78 MB) \u2014 Fastest, lowest accuracy. Good for quick drafts or testing.
+- **base** (~148 MB) \u2014 Fast with improved accuracy over tiny. Suitable for clear,
   well-recorded audio.
-- **small** (~466 MB) \u2014 Balanced speed and accuracy. Good for most use cases.
+- **small** (~486 MB) \u2014 Balanced speed and accuracy. Good for most use cases.
 - **medium** (~1.5 GB) \u2014 Best accuracy, slowest. Recommended for difficult audio,
   background noise, accents, or non-English languages.
 
@@ -265,8 +286,11 @@ Generation (RAG) to find relevant passages and generate answers.
         ui.markdown("""
 | Library | License | Project |
 |---|---|---|
+| PyAV (bundles FFmpeg libraries, see `THIRD_PARTY_LICENSES`) | BSD-3-Clause; FFmpeg LGPL-3.0+ | [GitHub](https://github.com/PyAV-Org/PyAV) |
 | BeautifulSoup4 | MIT | [crummy.com](https://www.crummy.com/software/BeautifulSoup/) |
+| CTranslate2 | MIT | [GitHub](https://github.com/OpenNMT/CTranslate2) |
 | docx2txt | MIT | [GitHub](https://github.com/ankushshah89/python-docx2txt) |
+| faster-whisper (includes Silero VAD model) | MIT | [GitHub](https://github.com/SYSTRAN/faster-whisper) |
 | FAISS | MIT | [GitHub](https://github.com/facebookresearch/faiss) |
 | future | MIT | [GitHub](https://github.com/PythonCharmers/python-future) |
 | googletrans | MIT | [GitHub](https://github.com/ssut/py-googletrans) |
@@ -278,10 +302,11 @@ Generation (RAG) to find relevant passages and generate answers.
 | NiceGUI | MIT | [GitHub](https://github.com/zauberzeug/nicegui) |
 | NLTK | Apache-2.0 | [GitHub](https://github.com/nltk/nltk) |
 | OCRmyPDF | MPL-2.0 | [GitHub](https://github.com/ocrmypdf/OCRmyPDF) |
-| OpenAI Whisper | MIT | [GitHub](https://github.com/openai/whisper) |
+| ONNX Runtime | MIT | [GitHub](https://github.com/microsoft/onnxruntime) |
 | openpyxl | MIT | [openpyxl.readthedocs.io](https://openpyxl.readthedocs.io/) |
 | pandas | BSD-3-Clause | [GitHub](https://github.com/pandas-dev/pandas) |
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
+| PyTorch | BSD-3-Clause | [GitHub](https://github.com/pytorch/pytorch) |
 | psutil | BSD-3-Clause | [GitHub](https://github.com/giampaolo/psutil) |
 | pypdf | BSD-3-Clause | [GitHub](https://github.com/py-pdf/pypdf) |
 | PySide6 | LGPL-3.0 | [qt.io/qt-for-python](https://wiki.qt.io/Qt_for_Python) |
@@ -289,6 +314,18 @@ Generation (RAG) to find relevant passages and generate answers.
 | QtPy | MIT | [GitHub](https://github.com/spyder-ide/qtpy) |
 | Requests | Apache-2.0 | [GitHub](https://github.com/psf/requests) |
 | Sentence-Transformers | Apache-2.0 | [GitHub](https://github.com/UKPLab/sentence-transformers) |
-| Tesseract OCR | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tesseract) |
+| Tesseract OCR (and bundled tessdata `eng`, `osd`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tesseract) |
+| Tokenizers (Hugging Face) | Apache-2.0 | [GitHub](https://github.com/huggingface/tokenizers) |
 | Transformers (HuggingFace) | Apache-2.0 | [GitHub](https://github.com/huggingface/transformers) |
+""")
+        ui.markdown("""
+**Downloadable models** (never bundled; fetched on demand from the Downloads page):
+
+| Model | License | Source |
+|---|---|---|
+| Whisper tiny/base/small/medium, CTranslate2 conversions | MIT | [Systran on Hugging Face](https://huggingface.co/Systran) |
+| Tesseract language data (`tessdata`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tessdata) |
+| Qwen 3.5 GGUF (0.8B / 2B / 4B) | Apache-2.0 | [unsloth on Hugging Face](https://huggingface.co/unsloth) |
+| all-MiniLM-L6-v2 (RAG embeddings, downloaded on first use) | Apache-2.0 | [Hugging Face](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
+| bert-large-cased-finetuned-conll03-english (NER, downloaded on first use) | No license stated by the publisher | [Hugging Face](https://huggingface.co/dbmdz/bert-large-cased-finetuned-conll03-english) |
 """)

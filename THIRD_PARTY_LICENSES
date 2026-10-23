@@ -6,6 +6,31 @@ For a per-library attribution table mapping each dependency to the license
 that applies to it, see the Help/About page within the MDMT application.
 
 --------------------------------------------------------------------------------
+MIT
+
+Copyright (c) respective libraries -- see Help/About license page.
+Applies to, among others: CTranslate2, faster-whisper (including the bundled
+Silero VAD model), ONNX Runtime, the Whisper model weights (downloaded, not
+bundled), and the other MIT-licensed libraries listed on the Help/About page.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+--------------------------------------------------------------------------------
 BSD-3-Clause
 
 Copyright (c) respective libraries -- see Help/About license page.
@@ -896,3 +921,20 @@ whether future versions of the GNU Lesser General Public License shall
 apply, that proxy's public statement of acceptance of any version is
 permanent authorization for you to choose that version for the
 Library.
+--------------------------------------------------------------------------------
+FFmpeg libraries bundled by PyAV
+
+PyAV (BSD-3-Clause) is used by faster-whisper to decode audio in-process.
+Its binary wheels ship shared builds of the FFmpeg libraries (libavcodec,
+libavformat, libavutil, libswresample, ...).  Those libraries report their
+license as "LGPL version 3 or later"; the LGPL-3.0 text is above.  They are
+dynamically linked, unmodified, and can be replaced in the application folder.
+
+FFmpeg source code: https://ffmpeg.org/download.html
+PyAV FFmpeg build scripts: https://github.com/PyAV-Org/pyav-ffmpeg
+
+NOTE FOR THE MAINTAINER (under review, see the v2.1 release notes):
+the av 18.1 Linux wheel's FFmpeg configure line also contains
+--enable-libx264 and --enable-libx265, and the wheel ships libx264 and libx265,
+which are GPL-2.0-or-later.  MDMT only decodes audio and never uses these
+encoders, but their presence in the bundle needs a licensing decision.
