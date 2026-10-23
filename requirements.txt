@@ -3,7 +3,9 @@ ocrmypdf~=17.3
 pandas>=2.2,<4.0
 requests~=2.32.3
 openpyxl~=3.1.5
-openai-whisper==20250625
+faster-whisper~=1.2
+# av 19 removed the metadata_errors= argument that faster-whisper 1.2.1 passes to av.open()
+av>=16,<19
 langchain-community~=0.4
 langchain~=1.2
 langchain-core~=1.2

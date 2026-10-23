@@ -31,6 +31,8 @@ OCR/tessdata/
 *_translated.*
 *_translated_*.txt
 *_ocr.*
+# ...except the small committed test fixtures
+!tests/fixtures/*
 
 # Superpowers planning docs
 docs/superpowers/

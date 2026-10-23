@@ -4,69 +4,154 @@ from nicegui import ui, run
 from config import get_tessdata_dir, get_models_dir, get_whisper_models_dir, get_nltk_data_dir
 
 
-# Known Tesseract language files available for download
-TESSDATA_LANGUAGES = {
-    "English": "eng",
-    "French": "fra",
-    "German": "deu",
-    "Spanish": "spa",
-    "Italian": "ita",
-    "Portuguese": "por",
-    "Russian": "rus",
-    "Chinese Simplified": "chi_sim",
-    "Chinese Traditional": "chi_tra",
-    "Japanese": "jpn",
-    "Korean": "kor",
-    "Arabic": "ara",
-    "Hindi": "hin",
-    "Dutch": "nld",
-    "Swedish": "swe",
-}
-
 TESSDATA_GITHUB_URL = "https://github.com/tesseract-ocr/tessdata/raw/main"
 
-WHISPER_MODELS = {
-    "tiny": "~75 MB",
-    "base": "~142 MB",
-    "small": "~466 MB",
-    "medium": "~1.5 GB",
-}
+
+def _human_bytes(n) -> str:
+    if n is None:
+        return "?"
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
 
 
-def _is_tessdata_installed(lang_code: str) -> bool:
-    return os.path.exists(os.path.join(get_tessdata_dir(), f"{lang_code}.traineddata"))
+def _tessdata_section():
+    from OCR.ocr_logic import downloadable_tessdata
+    from OCR.tessdata import installed_languages
+    from common.downloads import download_file
+
+    tessdata_dir = get_tessdata_dir()
+    registry = downloadable_tessdata()
+    names_by_code = {code: name for name, code in registry.items()}
+
+    with ui.card().classes("w-full"):
+        ui.label("OCR Languages (Tesseract)").classes("text-h5")
+        ui.label(f"Install location: {tessdata_dir}").classes("text-caption")
+
+        @ui.refreshable
+        def installed_view():
+            installed = sorted(installed_languages(tessdata_dir))
+            ui.label(f"Installed ({len(installed)}):").classes("text-subtitle2")
+            with ui.row().classes("gap-1"):
+                for code in installed:
+                    ui.chip(f"{names_by_code.get(code, code)} ({code})", color="positive").props("outline dense")
+
+        installed_view()
+
+        def not_installed_options():
+            have = installed_languages(tessdata_dir)
+            return {code: f"{name} ({code})" for name, code in sorted(registry.items()) if code not in have}
+
+        picker = ui.select(
+            not_installed_options(), multiple=True, with_input=True,
+            label="Choose languages to download (type to filter)",
+        ).classes("w-full").props("use-chips")
+        state = {"done": 0, "total": None, "current": "", "busy": False}
+        progress = ui.linear_progress(value=0, show_value=False).classes("w-full")
+        progress.set_visibility(False)
+        status = ui.label("").classes("text-caption")
+
+        def _tick():
+            if state["busy"]:
+                frac = state["done"] / state["total"] if state["total"] else 0
+                progress.set_value(frac)
+                status.set_text(
+                    f"Downloading {state['current']}: {_human_bytes(state['done'])}"
+                    f" of {_human_bytes(state['total'])}"
+                )
+
+        ui.timer(0.25, _tick)
+
+        async def download_selected():
+            codes = list(picker.value or [])
+            if not codes or state["busy"]:
+                return
+            state["busy"] = True
+            progress.set_visibility(True)
+            failures = []
+            for code in codes:
+                state.update(done=0, total=None, current=code)
+                dest = os.path.join(tessdata_dir, f"{code}.traineddata")
+                try:
+                    await run.io_bound(
+                        download_file, f"{TESSDATA_GITHUB_URL}/{code}.traineddata", dest,
+                        lambda d, t: state.update(done=d, total=t),
+                    )
+                except Exception as e:
+                    failures.append(f"{code}: {e}")
+            state["busy"] = False
+            progress.set_visibility(False)
+            picker.set_options(not_installed_options(), value=[])
+            installed_view.refresh()
+            if failures:
+                status.set_text("Failed — " + "; ".join(failures))
+                status.classes("text-negative", remove="text-positive")
+                ui.notify("Some downloads failed: " + "; ".join(failures), type="negative", multi_line=True)
+            else:
+                status.set_text(f"Installed {', '.join(codes)}")
+                status.classes("text-positive", remove="text-negative")
+
+        ui.button("Download selected", icon="download", on_click=download_selected).props("flat")
 
 
-def _is_whisper_installed(model_name: str) -> bool:
-    model_dir = get_whisper_models_dir()
-    return os.path.exists(os.path.join(model_dir, f"{model_name}.pt"))
+def _whisper_section():
+    from Audio_Transcription.transcription_logic import (
+        WHISPER_MODELS, download_model, is_model_installed, legacy_model_files,
+    )
 
+    models_root = get_whisper_models_dir()
+    with ui.card().classes("w-full mt-4"):
+        ui.label("Whisper Models (Audio Transcription)").classes("text-h5")
+        ui.label(f"Install location: {models_root}").classes("text-caption")
+        ui.label(
+            "CTranslate2 conversions of OpenAI Whisper (MIT), run with faster-whisper."
+        ).classes("text-caption text-grey")
 
-async def _download_tessdata(lang_code: str, status_label: ui.label):
-    """Download a single Tesseract language file."""
-    import urllib.request
+        @ui.refreshable
+        def rows():
+            for name, info in WHISPER_MODELS.items():
+                installed = is_model_installed(name, models_root)
+                with ui.row().classes("items-center w-full"):
+                    ui.label(f"{name} ({info['size']})").classes("w-48")
+                    status = ui.label("Installed" if installed else "Not installed").classes(
+                        "text-positive" if installed else "text-grey"
+                    )
+                    if not installed:
+                        ui.button(
+                            "Download", on_click=lambda n=name, sl=status: download(n, sl),
+                        ).props("flat dense")
 
-    url = f"{TESSDATA_GITHUB_URL}/{lang_code}.traineddata"
-    dest = os.path.join(get_tessdata_dir(), f"{lang_code}.traineddata")
-    status_label.set_text(f"Downloading {lang_code}...")
+            legacy = legacy_model_files(models_root)
+            if legacy:
+                total = sum(os.path.getsize(p) for p in legacy)
+                with ui.row().classes("items-center w-full"):
+                    ui.label(
+                        f"{len(legacy)} old openai-whisper .pt file(s) ({_human_bytes(total)}) are no longer used."
+                    ).classes("text-caption")
+                    ui.button("Delete them", on_click=lambda: delete_legacy(legacy)).props("flat dense")
 
-    def do_download():
-        urllib.request.urlretrieve(url, dest)
+        async def download(name, status_label):
+            status_label.set_text(f"Downloading {name}...")
+            status_label.classes("text-warning", remove="text-grey")
+            try:
+                await run.io_bound(download_model, name, models_root)
+            except Exception as e:
+                status_label.set_text(f"Download failed: {e}")
+                status_label.classes("text-negative", remove="text-warning")
+                ui.notify(f"Whisper {name} download failed: {e}", type="negative")
+                return
+            rows.refresh()
 
-    await run.io_bound(do_download)
-    status_label.set_text(f"{lang_code} installed")
+        def delete_legacy(paths):
+            for p in paths:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            rows.refresh()
 
-
-async def _download_whisper_model(model_name: str, status_label: ui.label):
-    """Download a Whisper model via the whisper library."""
-    status_label.set_text(f"Downloading {model_name}...")
-
-    def do_download():
-        import whisper
-        whisper.load_model(model_name, download_root=get_whisper_models_dir())
-
-    await run.io_bound(do_download)
-    status_label.set_text(f"{model_name} installed")
+        rows()
 
 
 async def _download_qwen_model(model: dict, status_label: ui.label):
@@ -104,41 +189,8 @@ def downloads_page():
     ui.label("Manage optional assets. Downloads come from official sources.").classes("text-subtitle1")
     ui.separator()
 
-    # Tesseract Languages
-    with ui.card().classes("w-full"):
-        ui.label("OCR Languages (Tesseract)").classes("text-h5")
-        ui.label(f"Install location: {get_tessdata_dir()}").classes("text-caption")
-
-        for display_name, lang_code in TESSDATA_LANGUAGES.items():
-            installed = _is_tessdata_installed(lang_code)
-            with ui.row().classes("items-center w-full"):
-                ui.label(f"{display_name} ({lang_code})").classes("w-48")
-                status = ui.label("Installed" if installed else "Not installed").classes(
-                    "text-positive" if installed else "text-grey"
-                )
-                if not installed:
-                    ui.button(
-                        "Download",
-                        on_click=lambda lc=lang_code, sl=status: _download_tessdata(lc, sl),
-                    ).props("flat dense")
-
-    # Whisper Models
-    with ui.card().classes("w-full mt-4"):
-        ui.label("Whisper Models (Audio Transcription)").classes("text-h5")
-        ui.label(f"Install location: {get_whisper_models_dir()}").classes("text-caption")
-
-        for model_name, size in WHISPER_MODELS.items():
-            installed = _is_whisper_installed(model_name)
-            with ui.row().classes("items-center w-full"):
-                ui.label(f"{model_name} ({size})").classes("w-48")
-                status = ui.label("Installed" if installed else "Not installed").classes(
-                    "text-positive" if installed else "text-grey"
-                )
-                if not installed:
-                    ui.button(
-                        "Download",
-                        on_click=lambda mn=model_name, sl=status: _download_whisper_model(mn, sl),
-                    ).props("flat dense")
+    _tessdata_section()
+    _whisper_section()
 
     # NLTK Data
     with ui.card().classes("w-full mt-4"):
