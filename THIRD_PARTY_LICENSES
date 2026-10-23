@@ -11,7 +11,9 @@ MIT
 Copyright (c) respective libraries -- see Help/About license page.
 Applies to, among others: CTranslate2, faster-whisper (including the bundled
 Silero VAD model), ONNX Runtime, the Whisper model weights (downloaded, not
-bundled), and the other MIT-licensed libraries listed on the Help/About page.
+bundled), stopwords-iso (NLP/data/stopwords/stopwords-iso.json, Copyright (c)
+2020 Gene Diaz), and the other MIT-licensed libraries listed on the Help/About
+page.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +36,8 @@ bundled), and the other MIT-licensed libraries listed on the Help/About page.
 BSD-3-Clause
 
 Copyright (c) respective libraries -- see Help/About license page.
+Snowball stopword lists (NLP/data/stopwords/snowball): Copyright (c) 2001,
+Dr Martin Porter; Copyright (c) 2002, Richard Boulton.
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are

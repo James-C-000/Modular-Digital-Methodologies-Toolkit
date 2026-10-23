@@ -306,6 +306,8 @@ Generation (RAG) to find relevant passages and generate answers.
 | pandas | BSD-3-Clause | [GitHub](https://github.com/pandas-dev/pandas) |
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
 | PyTorch | BSD-3-Clause | [GitHub](https://github.com/pytorch/pytorch) |
+| Snowball stopword lists (bundled data) | BSD-3-Clause | [snowballstem.org](https://snowballstem.org/) |
+| stopwords-iso (bundled data) | MIT | [GitHub](https://github.com/stopwords-iso/stopwords-iso) |
 | psutil | BSD-3-Clause | [GitHub](https://github.com/giampaolo/psutil) |
 | pypdf | BSD-3-Clause | [GitHub](https://github.com/py-pdf/pypdf) |
 | PySide6 | LGPL-3.0 | [qt.io/qt-for-python](https://wiki.qt.io/Qt_for_Python) |

@@ -1,32 +1,13 @@
 #!/usr/bin/env python3
+import html
 import os
-import re
 from collections import Counter
-import nltk
-from matplotlib.figure import Figure
+
 import networkx as nx
+from matplotlib.figure import Figure
+
 from common.pdf_text import extract_text
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-
-_nltk_ready = False
-
-
-def _ensure_nltk_data():
-    """Download required NLTK data on first use."""
-    global _nltk_ready
-    if _nltk_ready:
-        return
-    from config import get_nltk_data_dir
-    nltk_dir = get_nltk_data_dir()
-    if nltk_dir not in nltk.data.path:
-        nltk.data.path.insert(0, nltk_dir)
-    for package in ('punkt_tab', 'stopwords'):
-        try:
-            nltk.data.find(f'tokenizers/{package}' if 'punkt' in package else f'corpora/{package}')
-        except LookupError:
-            nltk.download(package, download_dir=nltk_dir, quiet=True)
-    _nltk_ready = True
+from NLP.text_utils import stopwords, words
 
 def process_pdf(file_path):
     """Extract text from a PDF file."""
@@ -58,16 +39,12 @@ def process_file(file_path):
         return ""
 
 
-def preprocess_text(text):
+def preprocess_text(text, stop_set=frozenset()):
     """
-    Preprocess text: lowercase, remove punctuation, tokenize, and remove stopwords.
+    Lowercased word tokens (any script) without stopwords or one-letter words.
+    Han/kana characters are kept as single-character tokens.
     """
-    text = text.lower()
-    text = re.sub(r"[^a-z\s]", " ", text)
-    tokens = word_tokenize(text)
-    stops = set(stopwords.words("english"))
-    tokens = [word for word in tokens if word not in stops and len(word) > 1]
-    return tokens
+    return [w for w in words(text) if w not in stop_set and (len(w) > 1 or not w.isascii())]
 
 
 def cooccurrence_analysis(tokens, window_size=5):
@@ -104,6 +81,10 @@ def visualize_network(cooccurrence, output_path, top_n=30):
     fig.savefig(output_path)
 
 
+def escape(text):
+    return html.escape(text, quote=True)
+
+
 def generate_statistics_html(word_counts, cooccurrence, top_words=20, top_pairs=20):
     """
     Generate an HTML snippet with tables for top frequent words and top co-occurring word pairs.
@@ -111,13 +92,13 @@ def generate_statistics_html(word_counts, cooccurrence, top_words=20, top_pairs=
     html = "<h3>Top Frequent Words</h3><table border='1' cellspacing='0' cellpadding='5'>"
     html += "<tr><th>Word</th><th>Frequency</th></tr>"
     for word, freq in word_counts.most_common(top_words):
-        html += f"<tr><td>{word}</td><td>{freq}</td></tr>"
+        html += f"<tr><td>{escape(word)}</td><td>{freq}</td></tr>"
     html += "</table>"
 
     html += "<h3>Top Co-occurring Word Pairs</h3><table border='1' cellspacing='0' cellpadding='5'>"
     html += "<tr><th>Word Pair</th><th>Frequency</th></tr>"
     for pair, freq in cooccurrence.most_common(top_pairs):
-        html += f"<tr><td>{pair}</td><td>{freq}</td></tr>"
+        html += f"<tr><td>{escape(str(pair))}</td><td>{freq}</td></tr>"
     html += "</table>"
     return html
 
@@ -126,22 +107,28 @@ def generate_document_html(file_name, stats_html, network_img_file, output_path)
     """
     Generate an HTML file for a single document including statistics and the network graph image.
     """
-    html = f"""<html>
-<head><meta charset="utf-8"><title>Co-word Analysis - {file_name}</title></head>
+    page = f"""<html>
+<head><meta charset="utf-8"><title>Co-word Analysis - {escape(file_name)}</title></head>
 <body>
-<h1>Co-word Analysis for {file_name}</h1>
+<h1>Co-word Analysis for {escape(file_name)}</h1>
 {stats_html}
 <h2>Co-word Network Graph</h2>
-<img src="{os.path.basename(network_img_file)}" alt="Co-word Network Graph">
+<img src="{escape(os.path.basename(network_img_file))}" alt="Co-word Network Graph">
 </body>
 </html>
 """
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(page)
 
 
-def main(directory):
-    _ensure_nltk_data()
+def main(directory, stopword_language="en", extra_stopwords=()):
+    """Run co-word analysis on every PDF/TXT file under *directory*.
+
+    stopword_language: ISO 639-1 code from NLP.text_utils.STOPWORD_LANGUAGES,
+    or None for no list.  extra_stopwords: additional words to ignore.
+    """
+    stop_set = set(stopwords(stopword_language)) if stopword_language else set()
+    stop_set |= {w.lower() for w in extra_stopwords}
     overall_summary = """<html>
 <head><meta charset="utf-8"><title>Co-word Analysis Summary</title></head>
 <body>
@@ -157,7 +144,7 @@ def main(directory):
                 if not text.strip():
                     print(f"No text extracted from {file_path}")
                     continue
-                tokens = preprocess_text(text)
+                tokens = preprocess_text(text, stop_set)
                 word_counts = Counter(tokens)
                 cooccur = cooccurrence_analysis(tokens)
 
@@ -175,9 +162,9 @@ def main(directory):
                 print(f"Saved Co-word Analysis for {file} to {html_file}")
 
                 # Append a summary entry to the overall summary.
-                overall_summary += f"<h2>{file}</h2>\n"
+                overall_summary += f"<h2>{escape(file)}</h2>\n"
                 overall_summary += stats_html
-                overall_summary += f"<p><a href='{os.path.basename(html_file)}'>Detailed Analysis</a></p>\n"
+                overall_summary += f"<p><a href='{escape(os.path.basename(html_file))}'>Detailed Analysis</a></p>\n"
     overall_summary += "</body></html>"
 
     # Save the overall summary document.
