@@ -18,6 +18,10 @@ LOG_NAME = "mdmt.log"
 _MAX_BYTES = 2 * 1024 * 1024
 _BACKUPS = 3
 
+# Names of std streams that were None at startup (windowed builds); read by
+# the self-test to prove the fallback path was exercised.
+ORIGINALLY_MISSING_STREAMS: list[str] = []
+
 
 def get_log_dir() -> str:
     from config import get_app_data_dir
@@ -101,5 +105,6 @@ def setup_logging(log_dir: str | None = None, level: int = logging.INFO) -> str:
         if handler not in stream_logger.handlers:
             stream_logger.addHandler(handler)
         if getattr(sys, name) is None:
+            ORIGINALLY_MISSING_STREAMS.append(name)
             setattr(sys, name, _LogStream(stream_logger, lvl))
     return path
