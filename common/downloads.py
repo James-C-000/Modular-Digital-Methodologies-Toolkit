@@ -9,6 +9,12 @@ import shutil
 import urllib.request
 
 
+def user_agent() -> str:
+    """Identify MDMT to servers; some (e.g. the Argos model host) refuse Python's default."""
+    from version import __version__
+    return f"MDMT/{__version__} (+https://github.com/James-C-000/Modular-Digital-Methodologies-Toolkit)"
+
+
 def download_file(url: str, dest: str, on_progress=None, timeout: float = 60) -> str:
     """Download *url* to *dest* atomically and return *dest*.
 
@@ -19,7 +25,8 @@ def download_file(url: str, dest: str, on_progress=None, timeout: float = 60) ->
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
     part = dest + ".part"
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response, open(part, "wb") as out:
+        request = urllib.request.Request(url, headers={"User-Agent": user_agent()})
+        with urllib.request.urlopen(request, timeout=timeout) as response, open(part, "wb") as out:
             total = response.headers.get("Content-Length")
             total = int(total) if total and total.isdigit() else None
             done = 0

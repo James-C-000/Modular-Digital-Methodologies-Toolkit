@@ -13,7 +13,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.path == "/ok":
+        if not self.headers.get("User-Agent", "").startswith("MDMT/"):
+            self.send_response(403)
+            self.end_headers()
+        elif self.path == "/ok":
             body = b"x" * 200_000
             self.send_response(200)
             self.send_header("Content-Length", str(len(body)))
