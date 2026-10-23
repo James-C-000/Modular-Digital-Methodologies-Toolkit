@@ -5,6 +5,10 @@
 matplotlib~=3.10
 ocrmypdf~=17.3
 faster-whisper~=1.2
+# Offline translation (Argos packages on CTranslate2) and language detection
+sentencepiece~=0.2
+sacremoses~=0.2
+py3langid~=0.4
 # av 19 removed the metadata_errors= argument that faster-whisper 1.2.1 passes to av.open()
 av>=16,<19
 langchain-community~=0.4
@@ -13,8 +17,6 @@ langchain-core~=1.2
 langchain-huggingface~=1.2
 sentence-transformers~=5.2
 faiss-cpu~=1.13
-googletrans~=4.0.2
-pypdf~=6.8
 beautifulsoup4~=4.14
 docx2txt~=0.9
 nicegui~=3.8

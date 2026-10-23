@@ -34,6 +34,7 @@ def common_datas() -> list:
         (os.path.join(ROOT, "LICENSE"), "."),
         (os.path.join(ROOT, "THIRD_PARTY_LICENSES"), "."),
         (os.path.join(ROOT, "NLP", "data"), os.path.join("NLP", "data")),
+        (os.path.join(ROOT, "Translation", "argos_index.json"), "Translation"),
         # Inputs for `mdmt --self-test` (a few tens of KB).
         (os.path.join(ROOT, "tests", "fixtures", "ocr_sample.pdf"), "selftest_fixtures"),
         (os.path.join(ROOT, "tests", "fixtures", "speech_sample.mp3"), "selftest_fixtures"),
@@ -41,6 +42,8 @@ def common_datas() -> list:
     datas += collect_data_files("nicegui")
     datas += collect_data_files("ocrmypdf")
     datas += collect_data_files("faster_whisper")  # Silero VAD model (assets/*.onnx)
+    datas += collect_data_files("py3langid")      # language-ID model
+    datas += collect_data_files("sacremoses")     # Moses tokenizer data (nonbreaking prefixes)
     try:
         import certifi
         datas.append((certifi.where(), "certifi"))
@@ -84,7 +87,9 @@ def common_hiddenimports() -> list:
         "faster_whisper",
         "ctranslate2",
         "av",
-        "googletrans",
+        "sentencepiece",
+        "sacremoses",
+        "py3langid",
         "langchain",
         "langchain_community",
         "sentence_transformers",

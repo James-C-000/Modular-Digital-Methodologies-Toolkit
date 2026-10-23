@@ -30,7 +30,9 @@ models or language data first — visit the **Downloads** page to manage these.
 Some features require additional data to be downloaded:
 
 - **OCR**: Tesseract language files (~12-15 MB each)
-- **Audio Transcription**: Whisper models (75 MB - 1.5 GB)
+- **Audio Transcription**: Whisper models (78 MB - 1.5 GB)
+- **Translation**: one model per language direction (65 - 285 MB each)
+- **Named Entities / Relationships**: multilingual NER model (~182 MB)
 - **RAG Chat**: Qwen 3.5 LLM model (~533 MB to ~2.74 GB)
 
 You can download these from the **Downloads** page, or they will prompt you when needed.

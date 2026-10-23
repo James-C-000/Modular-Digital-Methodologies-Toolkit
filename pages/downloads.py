@@ -154,6 +154,88 @@ def _whisper_section():
         rows()
 
 
+def _translation_section():
+    from Translation import offline_translation as ot
+
+    names = ot.language_names()
+
+    def label(p):
+        return f"{p['from_name']} \u2192 {p['to_name']} ({_human_bytes(p['size'])})"
+
+    with ui.card().classes("w-full mt-4"):
+        ui.label("Translation Models (Argos Translate)").classes("text-h5")
+        ui.label(f"Install location: {ot.translation_root()}").classes("text-caption")
+        ui.label(
+            "One model per direction. Pairs without a direct model translate through English."
+            " Licenses vary by model: most are derived from OPUS-MT (CC-BY 4.0); see each"
+            " model's README after installing."
+        ).classes("text-caption text-grey")
+
+        @ui.refreshable
+        def installed_view():
+            pairs = sorted(ot.installed_pairs(), key=lambda p: (names.get(p[0], p[0]), names.get(p[1], p[1])))
+            ui.label(f"Installed ({len(pairs)}):").classes("text-subtitle2")
+            with ui.row().classes("gap-1"):
+                for a, b in pairs:
+                    with ui.chip(f"{names.get(a, a)} \u2192 {names.get(b, b)}", color="positive",
+                                 removable=True).props("outline dense") as chip:
+                        chip.on("remove", lambda _e, a=a, b=b: remove(a, b))
+
+        installed_view()
+
+        def options():
+            have = ot.installed_pairs()
+            return {p["code"]: label(p) for p in ot.load_index() if (p["from_code"], p["to_code"]) not in have}
+
+        picker = ui.select(options(), multiple=True, with_input=True,
+                           label="Choose models to download (type to filter)").classes("w-full").props("use-chips")
+        state = {"done": 0, "total": None, "current": "", "busy": False}
+        progress = ui.linear_progress(value=0, show_value=False).classes("w-full")
+        progress.set_visibility(False)
+        status = ui.label("").classes("text-caption")
+
+        def _tick():
+            if state["busy"]:
+                progress.set_value(state["done"] / state["total"] if state["total"] else 0)
+                status.set_text(f"Downloading {state['current']}: {_human_bytes(state['done'])}"
+                                f" of {_human_bytes(state['total'])}")
+
+        ui.timer(0.25, _tick)
+
+        async def download_selected():
+            codes = list(picker.value or [])
+            if not codes or state["busy"]:
+                return
+            by_code = {p["code"]: p for p in ot.load_index()}
+            state["busy"] = True
+            progress.set_visibility(True)
+            failures = []
+            for code in codes:
+                p = by_code[code]
+                state.update(done=0, total=p["size"], current=label(p))
+                try:
+                    await run.io_bound(ot.download_package, p["from_code"], p["to_code"], None,
+                                       lambda d, t: state.update(done=d, total=t))
+                except Exception as e:
+                    failures.append(f"{label(p)}: {e}")
+            state["busy"] = False
+            progress.set_visibility(False)
+            picker.set_options(options(), value=[])
+            installed_view.refresh()
+            if failures:
+                status.set_text("Failed \u2014 " + "; ".join(failures))
+                ui.notify("Some downloads failed: " + "; ".join(failures), type="negative", multi_line=True)
+            else:
+                status.set_text(f"Installed {len(codes)} model(s)")
+
+        def remove(a, b):
+            ot.remove_package(a, b)
+            picker.set_options(options(), value=picker.value)
+            installed_view.refresh()
+
+        ui.button("Download selected", icon="download", on_click=download_selected).props("flat")
+
+
 def _ner_section():
     from NLP.ner_onnx import NER_MODELS, download_model, is_model_installed, model_dir
 
@@ -228,6 +310,7 @@ def downloads_page():
     _tessdata_section()
     _whisper_section()
 
+    _translation_section()
     _ner_section()
 
     # LLM Models (Qwen 3.5)

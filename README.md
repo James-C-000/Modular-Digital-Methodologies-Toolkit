@@ -13,7 +13,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 ### Document Processing
 - **OCR (Optical Character Recognition)**: Convert image-based PDFs to searchable, selectable text using Tesseract OCR with support for 100+ languages (PDF/A output additionally needs [Ghostscript](https://ghostscript.com/releases/gsdnld.html), which MDMT does not bundle)
 - **Audio Transcription**: Convert speech in audio files to text offline with OpenAI's Whisper models, run by faster-whisper (CTranslate2)
-- **Language Translation**: Translate documents between multiple languages using Google Translate
+- **Language Translation**: Translate documents offline between about 50 languages and English (other pairs via English) with Argos Translate models on CTranslate2; documents never leave your computer
 
 ### Text Analysis
 - **Keyword Search**: Find and analyze keyword patterns across document collections with visualization
@@ -87,9 +87,9 @@ Launch MDMT with `python app.py`. The application opens in a native desktop wind
 6. **Relationships**: Identify entity relationships and generate network graphs
 7. **Co-Words**: Generate word co-occurrence networks
 8. **RAGBot**: Query your document collection using a local LLM
-9. **Downloads**: Manage optional assets (Tesseract languages and orientation data, Whisper models, NLTK data, LLM models)
+9. **Downloads**: Manage optional assets (Tesseract languages and orientation data, Whisper models, translation models, the NER model, LLM models)
 
-Optional assets (language models, NLTK data, Tesseract language files) are downloaded on demand via the Downloads page. Large ML models are not bundled with the application.
+Optional assets (language models, Tesseract language files) are downloaded on demand via the Downloads page. Large ML models are not bundled with the application.
 
 A dark mode toggle is available in the sidebar.
 
@@ -99,14 +99,13 @@ Major dependencies include:
 - `nicegui` + `pywebview`: Web-based UI in a native desktop window
 - `ocrmypdf`: OCR functionality
 - `faster-whisper` (CTranslate2 + PyAV): Audio transcription
-- `googletrans`: Language translation
-- `transformers`: Named entity recognition
-- `nltk` + `networkx`: NLP and graph analysis
+- `ctranslate2` + `sentencepiece`/`sacremoses`: offline translation of Argos Translate models; `py3langid`: language detection
+- `onnxruntime` + `tokenizers`: named entity recognition (multilingual BERT, ONNX)
+- `networkx`: graph analysis
 - `langchain` + `llama-cpp-python`: RAG implementation with local LLM inference
 - `sentence-transformers` + `faiss-cpu`: Document embeddings and vector search
-- `pandas`: Data manipulation
 - `matplotlib`: Data visualization
-- `pypdf`: PDF text extraction
+- `pypdfium2`: PDF text extraction
 
 See `requirements.txt` for a complete list, and the Help/About page for license details on each dependency.
 

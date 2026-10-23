@@ -12,8 +12,8 @@ Copyright (c) respective libraries -- see Help/About license page.
 Applies to, among others: CTranslate2, faster-whisper (including the bundled
 Silero VAD model), ONNX Runtime, the Whisper model weights (downloaded, not
 bundled), stopwords-iso (NLP/data/stopwords/stopwords-iso.json, Copyright (c)
-2020 Gene Diaz), and the other MIT-licensed libraries listed on the Help/About
-page.
+2020 Gene Diaz), sacremoses (Copyright (c) 2020 alvations), and the other
+MIT-licensed libraries listed on the Help/About page.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -1452,3 +1452,26 @@ necessary.  Here is a sample; alter the names:
   Ty Coon, President of Vice
 
 That's all there is to it!
+--------------------------------------------------------------------------------
+Downloadable models (not bundled)
+
+These are downloaded on demand from the Downloads page; MDMT does not
+redistribute them. Their licenses, as published:
+
+- Whisper tiny/base/small/medium, CTranslate2 conversions by Systran: MIT.
+- Tesseract language data (tessdata): Apache-2.0.
+- Qwen 3.5 GGUF models (unsloth conversions of Qwen/Qwen3.5-*): Apache-2.0.
+- NER: Davlan/bert-base-multilingual-cased-ner-hrl (int8 ONNX export by
+  Xenova): Academic Free License 3.0.
+- RAG embeddings: sentence-transformers/all-MiniLM-L6-v2: Apache-2.0.
+- Argos Translate models (argos-net.com; index pinned in
+  Translation/argos_index.json): licenses vary by package. 59 of the 100
+  packages state that they are derived from OPUS-MT models licensed CC-BY 4.0,
+  35 cite their OPUS training data without a license statement, and 6 state
+  nothing. Each installed package keeps its README.md. Attribution for the
+  OPUS-MT-derived models:
+    Jörg Tiedemann and Santhosh Thottingal. 2020. "OPUS-MT — Building open
+    translation services for the World." Proceedings of the 22nd Annual
+    Conference of the European Association for Machine Translation (EAMT),
+    Lisbon, Portugal. Licensed under CC-BY 4.0
+    (https://creativecommons.org/licenses/by/4.0/).

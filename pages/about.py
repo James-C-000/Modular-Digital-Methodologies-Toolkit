@@ -120,15 +120,20 @@ during transcription.
     # Translation
     with ui.expansion("Translation", icon="translate").classes("w-full mt-2"):
         ui.markdown("""
-**What it does:** Translates PDF documents from one language to another using
-Google Translate. Produces translated PDF copies alongside the originals.
+**What it does:** Translates text and PDF documents offline with Argos
+Translate models (CTranslate2). Your documents never leave your computer.
+Each translated document is saved next to the original as
+`name_translated.txt`.
 
 **How to use:**
-1. Select an **Input Directory** containing the PDF files to translate.
-2. Choose the source language (or leave on **Auto-detect**) and the target
-   language.
-3. Optionally change the **Output Suffix** (appended to each translated filename).
-4. Click **Translate**.
+1. Select an **Input Directory** containing `.txt` or text-searchable `.pdf` files.
+2. Choose the source language (or **Auto-detect**) and the target language.
+3. If the page says a model is needed, click **Download** (models are 65\u2013285 MB
+   each, one per direction; you can also manage them on the **Downloads** page).
+4. Optionally change the **Output Suffix**, then click **Translate**.
+
+**Languages:** about 50 languages to and from English. Other pairs (e.g.
+French \u2192 German) are translated through English, which compounds errors.
 
 **Important \u2014 PDFs must be text-searchable:**
 The translation module works by extracting text from PDFs. If your PDFs are
@@ -136,10 +141,13 @@ scanned images without an embedded text layer, they cannot be translated. Run
 the **OCR module** first to add a text layer, then translate the OCR'd output.
 
 **Tips:**
-- Auto-detect works well for single-language documents. For mixed-language
-  documents, specifying the source language may improve results.
-- Very large PDFs are split into chunks automatically to stay within translation
-  limits.
+- Offline models are smaller than online services and can be weaker for some
+  language pairs. Historical terms, place names and archaic spelling are often
+  mistranslated, so use the output as a reading aid, not a final translation.
+- Auto-detect picks among the languages you have models for. For short or
+  mixed-language documents, choose the source language yourself.
+- Files whose names already end with the output suffix are skipped, so running
+  the same folder again does not translate the translations.
         """)
 
     # Advanced Keyword Search
@@ -302,7 +310,6 @@ Generation (RAG) to find relevant passages and generate answers.
 | docx2txt | MIT | [GitHub](https://github.com/ankushshah89/python-docx2txt) |
 | faster-whisper (includes Silero VAD model) | MIT | [GitHub](https://github.com/SYSTRAN/faster-whisper) |
 | FAISS | MIT | [GitHub](https://github.com/facebookresearch/faiss) |
-| googletrans | MIT | [GitHub](https://github.com/ssut/py-googletrans) |
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
 | LangChain (core, community, huggingface, text-splitters) | MIT | [GitHub](https://github.com/langchain-ai/langchain) |
 | llama-cpp-python (fork) | MIT | [GitHub](https://github.com/JamePeng/llama-cpp-python) |
@@ -316,7 +323,10 @@ Generation (RAG) to find relevant passages and generate answers.
 | Snowball stopword lists (bundled data) | BSD-3-Clause | [snowballstem.org](https://snowballstem.org/) |
 | stopwords-iso (bundled data) | MIT | [GitHub](https://github.com/stopwords-iso/stopwords-iso) |
 | psutil | BSD-3-Clause | [GitHub](https://github.com/giampaolo/psutil) |
-| pypdf | BSD-3-Clause | [GitHub](https://github.com/py-pdf/pypdf) |
+| py3langid | BSD-3-Clause | [GitHub](https://github.com/adbar/py3langid) |
+| pypdfium2 | Apache-2.0 / BSD-3-Clause | [GitHub](https://github.com/pypdfium2-team/pypdfium2) |
+| sacremoses | MIT | [GitHub](https://github.com/hplt-project/sacremoses) |
+| SentencePiece | Apache-2.0 | [GitHub](https://github.com/google/sentencepiece) |
 | PySide6 | LGPL-3.0 | [qt.io/qt-for-python](https://wiki.qt.io/Qt_for_Python) |
 | pywebview | BSD-3-Clause | [GitHub](https://github.com/r0x0r/pywebview) |
 | QtPy | MIT | [GitHub](https://github.com/spyder-ide/qtpy) |
@@ -334,6 +344,7 @@ Generation (RAG) to find relevant passages and generate answers.
 | Whisper tiny/base/small/medium, CTranslate2 conversions | MIT | [Systran on Hugging Face](https://huggingface.co/Systran) |
 | Tesseract language data (`tessdata`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tessdata) |
 | Qwen 3.5 GGUF (0.8B / 2B / 4B) | Apache-2.0 | [unsloth on Hugging Face](https://huggingface.co/unsloth) |
+| Argos Translate models (one per language pair) | Varies by model: 59 of 100 state CC-BY 4.0 (derived from OPUS-MT); the rest cite their OPUS training data or state no license. See each model's README. | [Argos Translate](https://github.com/argosopentech/argos-translate) |
 | all-MiniLM-L6-v2 (RAG embeddings, downloaded on first use) | Apache-2.0 | [Hugging Face](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
-| bert-large-cased-finetuned-conll03-english (NER, downloaded on first use) | No license stated by the publisher | [Hugging Face](https://huggingface.co/dbmdz/bert-large-cased-finetuned-conll03-english) |
+| bert-base-multilingual-cased-ner-hrl, int8 ONNX export (NER, Relationships) | AFL-3.0 | [Hugging Face](https://huggingface.co/Davlan/bert-base-multilingual-cased-ner-hrl) |
 """)
