@@ -286,7 +286,8 @@ Generation (RAG) to find relevant passages and generate answers.
         ui.markdown("""
 | Library | License | Project |
 |---|---|---|
-| PyAV (bundles FFmpeg libraries, see `THIRD_PARTY_LICENSES`) | BSD-3-Clause; FFmpeg LGPL-3.0+ | [GitHub](https://github.com/PyAV-Org/PyAV) |
+| PyAV | BSD-3-Clause | [GitHub](https://github.com/PyAV-Org/PyAV) |
+| FFmpeg (audio decoders only, built without GPL components; see `THIRD_PARTY_LICENSES`) | LGPL-2.1-or-later | [ffmpeg.org](https://ffmpeg.org/) |
 | BeautifulSoup4 | MIT | [crummy.com](https://www.crummy.com/software/BeautifulSoup/) |
 | CTranslate2 | MIT | [GitHub](https://github.com/OpenNMT/CTranslate2) |
 | docx2txt | MIT | [GitHub](https://github.com/ankushshah89/python-docx2txt) |

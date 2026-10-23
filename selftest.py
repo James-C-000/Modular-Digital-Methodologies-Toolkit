@@ -174,7 +174,7 @@ class SelfTest:
 
         @self.check("environment")
         def _():
-            from common import logs
+            from common import launch, logs
             from version import __version__
             self.info.update(
                 version=__version__,
@@ -185,6 +185,7 @@ class SelfTest:
                 bundle=_bundle_dir(),
                 executable=sys.executable,
                 stdio_originally_missing=list(logs.ORIGINALLY_MISSING_STREAMS),
+                stdio_at_launch=launch.STDIO,
                 tessdata_prefix=os.environ.get("TESSDATA_PREFIX"),
             )
             return self.info
@@ -252,6 +253,11 @@ class SelfTest:
                 raise RuntimeError(f"expected {EXPECTED_SPEECH_WORD!r} in transcript, got {result['text']!r}")
             import av
             codec = av._core.library_meta.get("libavcodec", {})
+            gpl_flags = [f for f in codec.get("configuration", "").split()
+                         if f in ("--enable-gpl", "--enable-nonfree") or "x264" in f or "x265" in f]
+            if _bundle_dir() and (gpl_flags or not codec.get("license", "").startswith("LGPL")):
+                # Releases must ship the LGPL-only FFmpeg (packaging/build_ffmpeg_lgpl.sh).
+                raise RuntimeError(f"bundled FFmpeg is not LGPL-only: {codec.get('license')} {gpl_flags}")
             return {"text": result["text"], "downloaded_now": downloaded,
                     "ffmpeg": av.ffmpeg_version_info, "libavcodec_license": codec.get("license"),
                     "libavcodec_gpl_flags": [f for f in codec.get("configuration", "").split()

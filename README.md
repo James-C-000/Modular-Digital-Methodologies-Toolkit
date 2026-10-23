@@ -122,6 +122,8 @@ pyinstaller mdmt-macos.spec    # macOS   -> dist/MDMT.app
 pyinstaller mdmt-windows.spec  # Windows -> dist/mdmt/
 ```
 
+Release builds also replace PyPI's PyAV wheel, whose bundled FFmpeg is linked with the GPL encoders libx264/libx265, with PyAV compiled against a decoder-only FFmpeg built from source with no GPL components (`packaging/build_ffmpeg_lgpl.sh`, see `build.yml`). A plain `pip install` is fine for development.
+
 All specs use `--onedir` mode to avoid multi-GB extraction on each launch. `packaging/check_bundle_libs.py` verifies that no bundled binary depends on a library outside the bundle.
 
 Automated cross-platform builds are handled by GitHub Actions (`.github/workflows/build.yml`): each platform is built, checked and self-tested on its own runner, and a release is created when a version tag is pushed. `tests.yml` runs the test suite on all three platforms for every push.
@@ -129,6 +131,8 @@ Automated cross-platform builds are handled by GitHub Actions (`.github/workflow
 ## License
 
 MDMT is licensed under the MIT License — see [`LICENSE`](LICENSE).
+
+The distributed apps contain no GPL code: FFmpeg is built LGPL-only for releases, and Ghostscript (AGPL) is never bundled.
 
 This project uses several open-source libraries, each with their own licenses. The full text of each bundled library's license is in [`THIRD_PARTY_LICENSES`](THIRD_PARTY_LICENSES). See the Help/About page within the application for a per-library attribution table with license types and project links.
 

@@ -74,8 +74,8 @@ _TRANSCODE = {
     ".mp3": None, ".mpga": None, ".mpeg": None,  # same MPEG audio stream, new extension
     ".wav": ("pcm_s16le", 16000),
     ".flac": ("flac", 16000),
-    ".ogg": ("libopus", 48000),
-    ".webm": ("libopus", 48000),
+    ".ogg": ("opus", 48000),
+    ".webm": ("opus", 48000),
     ".m4a": ("aac", 16000),
     ".mp4": ("aac", 16000),
 }
@@ -84,8 +84,16 @@ _TRANSCODE = {
 def _transcode(src, dst, codec, rate):
     import av
     fmt = {".m4a": "mp4", ".mp4": "mp4", ".webm": "webm", ".ogg": "ogg"}.get(os.path.splitext(dst)[1])
+    options = {}
+    if codec == "opus":
+        # Release builds use an LGPL FFmpeg with only native codecs, where the
+        # Opus encoder is "experimental"; PyPI wheels also have libopus.
+        if "libopus" in av.codecs_available:
+            codec = "libopus"
+        else:
+            options = {"strict": "experimental"}
     with av.open(src) as inp, av.open(dst, "w", format=fmt) as out:
-        stream = out.add_stream(codec, rate=rate)
+        stream = out.add_stream(codec, rate=rate, options=options)
         stream.layout = "mono"
         resampler = av.AudioResampler(format=stream.codec_context.format, layout="mono", rate=rate)
         for frame in inp.decode(audio=0):
@@ -111,6 +119,16 @@ def test_every_audio_format_decodes(ext, tmp_path):
     audio = decode_audio(dst, sampling_rate=16000)
     seconds = len(audio) / 16000
     assert 8.0 < seconds < 10.0, f"{ext}: decoded {seconds:.2f}s"
+
+
+@pytest.mark.parametrize("name", ["video_sample.mp4", "video_sample.mpeg"])
+def test_audio_is_found_in_files_with_video(name):
+    """Recorded interviews are often video files.  Release builds use an FFmpeg
+    without video decoders; the demuxer must still identify the video stream
+    as video (not mislabel it as audio) and the audio must decode."""
+    from faster_whisper.audio import decode_audio
+    audio = decode_audio(os.path.join(os.path.dirname(SPEECH), name), sampling_rate=16000)
+    assert 2.5 < len(audio) / 16000 < 3.5
 
 
 @pytest.mark.skipif(not os.environ.get("MDMT_NETWORK_TESTS"), reason="downloads a model; set MDMT_NETWORK_TESTS=1")
