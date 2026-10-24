@@ -140,22 +140,36 @@ def generate_network_graph(rows, output_dir):
             fig.savefig(os.path.join(output_dir, f"{entity_type.lower()}_network.png"), dpi=300, bbox_inches='tight')
 
 
-def process_files_for_relationships(input_dir, output_dir, model_name, extract_text, generate_graph, entity_types):
-    """Process files and extract relationships (model_name is unused)."""
+def _is_extracted_text(path):
+    """A "<name>_text.txt" written by a previous run next to "<name>.pdf"."""
+    stem = path[:-len("_text.txt")] if path.lower().endswith("_text.txt") else None
+    return stem is not None and os.path.isfile(stem + ".pdf")
+
+
+def process_files_for_relationships(input_dir, output_dir, model_name, extract_text, generate_graph, entity_types,
+                                    on_progress=None, cancel=None):
+    """Process files and extract relationships (model_name is unused).
+
+    on_progress(done, total, current_file) is called before each file; a set
+    *cancel* event stops before the next one.  Text extracted by an earlier run
+    ("<name>_text.txt" beside "<name>.pdf") is not processed again.
+    """
     results = {
         'status': 'success',
         'message': '',
         'relationship_count': 0,
         'file_count': 0,
-        'processed_files': []
+        'processed_files': [],
+        'images': [],
     }
 
     try:
         files = []
         for root, _, filenames in os.walk(input_dir):
             for filename in filenames:
-                if filename.lower().endswith(('.txt', '.pdf')):
-                    files.append(os.path.join(root, filename))
+                path = os.path.join(root, filename)
+                if filename.lower().endswith(('.txt', '.pdf')) and not _is_extracted_text(path):
+                    files.append(path)
 
         if not files:
             results['status'] = 'warning'
@@ -165,7 +179,12 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         os.makedirs(output_dir, exist_ok=True)
         all_relationships = []
 
-        for file_path in sorted(files):
+        files.sort()
+        for i, file_path in enumerate(files):
+            if cancel is not None and cancel.is_set():
+                break
+            if on_progress:
+                on_progress(i, len(files), os.path.basename(file_path))
             try:
                 text = extract_text_from_file(file_path)
                 if not text:
@@ -199,6 +218,8 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
 
             if generate_graph:
                 generate_network_graph([dict(zip(CSV_COLUMNS, row)) for row in all_relationships], output_dir)
+                results['images'] = sorted(os.path.join(output_dir, f) for f in os.listdir(output_dir)
+                                           if f.endswith('_network.png'))
 
             results['relationship_count'] = len(all_relationships)
             results['message'] = f"Extraction complete. Found {len(all_relationships)} relationships."
@@ -210,6 +231,8 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         results['status'] = 'error'
         results['message'] = f"An error occurred: {str(e)}"
 
+    if on_progress and results['status'] != 'error':
+        on_progress(results['file_count'], results['file_count'], "")
     return results
 
 
