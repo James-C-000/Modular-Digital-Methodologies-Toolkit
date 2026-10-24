@@ -52,7 +52,7 @@ QWEN_MODELS = {
            "bytes": 1280835840, "size": "~1.28 GB", "desc": "Recommended without a GPU: about 1.5 GB of memory."},
     "4B": {"name": "Qwen3.5-4B-Q4_K_M", "repo_id": "unsloth/Qwen3.5-4B-GGUF",
            "revision": "e87f176479d0855a907a41277aca2f8ee7a09523", "filename": "Qwen3.5-4B-Q4_K_M.gguf",
-           "bytes": 2740937888, "size": "~2.74 GB", "desc": "Most accurate; recommended with a GPU (4 GB or more). Slow on a CPU alone."},
+           "bytes": 2740937888, "size": "~2.74 GB", "desc": "Most accurate; recommended on Apple Silicon Macs, which run it on the GPU. Slow on a CPU."},
 }
 QWEN_LICENSE = "Apache-2.0"
 

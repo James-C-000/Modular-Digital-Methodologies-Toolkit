@@ -108,8 +108,8 @@ def _setup_ui(state, on_ready):
                 ui.button("Get a Qwen model", icon="download", on_click=lambda: ui.navigate.to("/downloads")) \
                     .props("flat dense no-caps")
         else:
-            hint("2B suits any recent computer; 4B is more accurate but needs a GPU to be quick. Both are on the"
-                 " Downloads page.")
+            hint("2B suits any recent computer; 4B is more accurate but needs a GPU to be quick (Apple Silicon"
+                 " Macs). Both are on the Downloads page.")
 
     with section("Options"):
         with ui.row().classes("items-center"):

@@ -22,7 +22,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 - **Co-Word Analysis**: Generate word co-occurrence networks to reveal conceptual relationships
 
 ### AI Integration
-- **RAGBot**: Ask questions about a folder of documents and get answers that cite the passages they come from, from a local Qwen 3.5 model. Retrieval combines keyword search with multilingual embeddings and an optional reranker. MDMT detects your hardware (NVIDIA, AMD and Apple Metal GPUs) and recommends Qwen 3.5 4B when it can run on a GPU, and 2B otherwise.
+- **RAGBot**: Ask questions about a folder of documents and get answers that cite the passages they come from, from a local Qwen 3.5 model. Retrieval combines keyword search with multilingual embeddings and an optional reranker. MDMT recommends Qwen 3.5 4B on Apple Silicon Macs, where it runs on the GPU, and 2B elsewhere: the Windows and Linux builds run chat models on the CPU.
 
 <p align="center"><img src="docs/images/ragbot.gif" alt="RAGBot answering a question about Frederick Douglass's Narrative and citing its source" width="800"></p>
 
@@ -34,7 +34,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 | macOS 15 (Sequoia) or newer, Apple Silicon | `mdmt-macos-arm64.zip` | No Intel Mac build. |
 | Linux, x86-64 | `mdmt-linux-x86_64.tar.gz` | Built on Ubuntu 24.04; needs a similarly recent distribution. |
 
-Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. It runs twice: on the build, and on the release archive after unpacking it as a user would. You can run `mdmt --self-test` yourself; it also reports a download that was extracted without its symbolic links. The native window and file dialogs are not covered by CI.
+Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. It runs twice: on the build, and on the release archive after unpacking it as a user would. You can run `mdmt --self-test` yourself; it also reports a download that was extracted without its symbolic links. Note that it downloads about 460 MB of models into MDMT's data folder if they are not there yet (Whisper tiny, the NER model, French→English translation and the retrieval model), the same ones the tools would download on first use. The native window and file dialogs are not covered by CI.
 
 ## Installing the prebuilt apps
 

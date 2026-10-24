@@ -35,7 +35,8 @@ providing tools for text analysis, document processing, and data extraction.
 3. Each tool remembers its settings. Choose folders with the folder button next
    to each field, then click the tool's main button. Work continues in the
    background if you open another page; the sidebar lists what is running, and
-   a running job can be cancelled between files.
+   a running job can be cancelled between files (a file already being
+   processed, such as a long recording or a large PDF, is finished first).
         """)
 
     # --- Module Help ---
@@ -287,8 +288,9 @@ Nothing leaves your computer.
 2. Choose a **Model file**, a Qwen 3.5 `.gguf` model from the **Downloads** page.
 3. Optionally adjust **Context length**, **Thinking mode** and **Rerank passages**.
 4. Click **Start**. The first start downloads the retrieval models (about
-   135 MB, plus 588 MB for the reranker) and indexes the folder; later starts
-   only re-read files that changed.
+   135 MB, plus 588 MB for the reranker) and indexes the folder, which takes
+   time for a large collection: roughly 10–30 minutes for 10,000 pages,
+   depending on the computer. Later starts only re-read files that changed.
 5. Ask a question. The answer streams in; **Stop** ends it early.
 
 **Tips:**
@@ -309,8 +311,10 @@ Nothing leaves your computer.
   (English about a French text, say) often misses the right passages.
 - Two chat models are offered. **2B** (1.28 GB) suits any computer from the
   last few years and runs well without a GPU.
-  **4B** (2.74 GB) is somewhat more accurate but needs a GPU to be quick;
-  MDMT recommends it when it finds one.
+  **4B** (2.74 GB) is somewhat more accurate but needs a GPU to be quick.
+  MDMT recommends it on Apple Silicon Macs, where it runs on the GPU; the
+  Windows and Linux builds run chat models on the CPU, so 2B is recommended
+  there.
         """)
 
     # License
