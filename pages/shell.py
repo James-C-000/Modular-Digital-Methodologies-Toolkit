@@ -50,6 +50,7 @@ body.body--dark { --mdmt-muted: #a0a0a0; --mdmt-border: rgba(255,255,255,.14); -
 .mdmt-drawer { background-color: var(--mdmt-drawer); }
 .mdmt-section { border-color: var(--mdmt-border); }
 .mdmt-thumb { border: 1px solid var(--mdmt-border); }
+.mdmt-note { border: 1px solid var(--mdmt-border); background: var(--mdmt-active); }
 .mdmt-nav .q-item { border-radius: 6px; min-height: 36px; padding: 4px 10px; }
 .mdmt-nav .q-item.mdmt-active { background: var(--mdmt-active); color: var(--q-primary); font-weight: 500; }
 .mdmt-nav .q-item__section--avatar { min-width: 34px; }

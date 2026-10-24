@@ -78,6 +78,17 @@ class ProgressLine:
         self.text.set_text(progress_text(self.job))
 
 
+def disclaimer(text: str):
+    with ui.row().classes("w-full items-start no-wrap gap-2 q-pa-sm rounded-borders mdmt-note"):
+        ui.icon("info", size="xs").classes("q-mt-xs")
+        ui.label(text).classes("text-caption")
+
+
+def open_license(asset: Asset):
+    from common.opener import open_external
+    open_external(asset.license_path())
+
+
 def confirm_delete(asset: Asset, on_done):
     with ui.dialog() as dialog, ui.card():
         ui.label(f"Delete {asset.name}?").classes("text-subtitle1 text-weight-medium")
@@ -109,6 +120,9 @@ def _section_view(sec_id: str, recommended_llm: str):
             hint(f"{human_bytes(section_bytes(sec))} on disk")
         if sec.note:
             hint(sec.note)
+        if sec_id == "translation":
+            from Translation.offline_translation import ARGOS_DISCLAIMER
+            disclaimer(ARGOS_DISCLAIMER)
         hint(f"Location: {sec.location}")
         lines.clear()
         if sec_id in PICKER_SECTIONS:
@@ -152,6 +166,9 @@ def _section_view(sec_id: str, recommended_llm: str):
                     chip.tooltip("Ships with MDMT")
                 else:
                     chip.on("remove", lambda _e, a=a: confirm_delete(a, refresh))
+                if a.license_path():
+                    chip.props("clickable").tooltip("Click to read this model's license (its README)")
+                    chip.on_click(lambda a=a: open_license(a))
         job = JOBS.latest(f"downloads-{sec.id}")
         if job is not None and job.running:
             lines.append(ProgressLine(job))

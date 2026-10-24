@@ -26,6 +26,11 @@ class Asset:
     download_fn: object = None   # download_fn(on_progress) with on_progress(done_bytes, total_bytes)
     paths_fn: object = None      # what Delete removes and what counts as disk usage
     in_use_fn: object = None     # returns a reason it cannot be deleted now, or None
+    license_path_fn: object = None   # the installed asset's own license/README file, if it has one
+
+    def license_path(self) -> str | None:
+        path = self.license_path_fn() if self.license_path_fn else None
+        return path if path and os.path.isfile(path) else None
 
     def installed(self) -> bool:
         return bool(self.installed_fn())
@@ -128,15 +133,15 @@ def _translation_section() -> Section:
     from Translation import offline_translation as ot
     root = ot.translation_root()
     section = Section("translation", "Translation models (Argos Translate)",
-                      "One model per direction; pairs without a direct model translate through English. Licenses"
-                      " vary by model: most are derived from OPUS-MT (CC-BY 4.0); see each model's README.", root)
+                      "One model per direction; pairs without a direct model translate through English.", root)
     for p in sorted(ot.load_index(), key=lambda p: (p["from_name"], p["to_name"])):
         a, b = p["from_code"], p["to_code"]
         section.assets.append(Asset(
             f"translation:{a}_{b}", "translation", f"{p['from_name']} → {p['to_name']}", p.get("size"),
             installed_fn=lambda a=a, b=b: ot.is_installed(a, b),
             download_fn=lambda cb, a=a, b=b: ot.download_package(a, b, None, cb),
-            paths_fn=lambda a=a, b=b: [ot.package_dir(a, b)]))
+            paths_fn=lambda a=a, b=b: [ot.package_dir(a, b)],
+            license_path_fn=lambda a=a, b=b: ot.readme_path(a, b)))
     return section
 
 

@@ -13,7 +13,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 ### Document Processing
 - **OCR (Optical Character Recognition)**: Convert image-based PDFs to searchable, selectable text using Tesseract OCR with support for 100+ languages (PDF/A output additionally needs [Ghostscript](https://ghostscript.com/releases/gsdnld.html), which MDMT does not bundle)
 - **Audio Transcription**: Convert speech in audio files to text offline with OpenAI's Whisper models, run by faster-whisper (CTranslate2)
-- **Language Translation**: Translate documents offline between about 50 languages and English (other pairs via English) with Argos Translate models on CTranslate2; documents never leave your computer
+- **Language Translation**: Translate documents offline between about 50 languages and English (other pairs via English) with Argos Translate models on CTranslate2; documents never leave your computer. The models are third-party and their licenses vary (59 of 100 state CC BY 4.0, 35 name only their training data, 6 state none): check a model's README, which the Downloads page opens for you, before using its output in published or commercial work.
 
 ### Text Analysis
 - **Keyword Search**: Find and analyze keyword patterns across document collections with visualization

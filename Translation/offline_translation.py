@@ -23,6 +23,18 @@ import zipfile
 INDEX_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "argos_index.json")
 PIVOT = "en"
 DEFAULT_SUFFIX = "_translated"
+
+# Shown wherever users download or use the models.  The license counts come
+# from the packages' own READMEs (see THIRD_PARTY_LICENSES).
+ARGOS_DISCLAIMER = (
+    "Translation models come from the Argos Translate project and other third parties; they are not part of"
+    " MDMT, and MDMT does not license them to you. Their licenses vary: of the 100 models offered, 59 state they"
+    " are released under CC BY 4.0 (derived from the University of Helsinki's OPUS-MT models), 35 name only the"
+    " data they were trained on, and 6 state no license. Check the license in each model's README before using"
+    " it, or its translations, in published or commercial work. Machine translation also makes mistakes,"
+    " especially with historical language, names and specialist terms: check any translation you rely on against"
+    " the original."
+)
 MAX_TOKENS = 200        # longer sentences are split before translation
 BATCH_SIZE = 16
 
@@ -66,6 +78,11 @@ def translation_root(models_root: str | None = None) -> str:
 
 def package_dir(src: str, tgt: str, models_root: str | None = None) -> str:
     return os.path.join(translation_root(models_root), f"{src}_{tgt}")
+
+
+def readme_path(src: str, tgt: str, models_root: str | None = None) -> str:
+    """The model's own README, which states its license and sources."""
+    return os.path.join(package_dir(src, tgt, models_root), "README.md")
 
 
 def _is_package(path: str) -> bool:

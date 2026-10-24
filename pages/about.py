@@ -142,6 +142,10 @@ The translation module works by extracting text from PDFs. If your PDFs are
 scanned images without an embedded text layer, they cannot be translated. Run
 the **OCR module** first to add a text layer, then translate the OCR'd output.
 
+        """)
+        from Translation.offline_translation import ARGOS_DISCLAIMER
+        ui.markdown("**About the models:** " + ARGOS_DISCLAIMER)
+        ui.markdown("""
 **Tips:**
 - Offline models are smaller than online services and can be weaker for some
   language pairs. Historical terms, place names and archaic spelling are often

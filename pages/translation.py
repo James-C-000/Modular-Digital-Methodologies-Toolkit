@@ -5,7 +5,7 @@ from nicegui import ui
 
 from common.jobs import JOBS
 from common.paths import folder_problem
-from pages.downloads import progress_text, start_downloads
+from pages.downloads import disclaimer, progress_text, start_downloads
 from pages.components import (
     FolderField, JobPanel, file_results, hint, missing_dependency, page_header, remember, run_button, saved,
     section, start_job,
@@ -42,8 +42,8 @@ def translation_page():
                               .classes("w-40"), "defaults.translation_suffix")
         route_area = ui.column().classes("w-full gap-1")
         hint("Offline translation keeps your documents on this computer. Quality is good for modern prose but"
-             " can be weaker than online services for some language pairs, and historical terms are often"
-             " mistranslated.")
+             " can be weaker than online services for some language pairs.")
+        disclaimer(ot.ARGOS_DISCLAIMER)
 
     def _size(a, b):
         info = ot.package_info(a, b)
