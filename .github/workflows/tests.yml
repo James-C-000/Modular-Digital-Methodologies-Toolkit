@@ -70,3 +70,44 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+  # A small retrieval regression on the eval corpus (no reranker, no LLM).
+  retrieval-eval:
+    runs-on: ubuntu-latest
+    env:
+      XDG_DATA_HOME: ${{ github.workspace }}/.appdata
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/lock-linux.txt
+
+      - name: Install locked Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/lock-linux.txt
+
+      - name: Cache the eval corpus and retrieval model
+        uses: actions/cache@v4
+        with:
+          path: |
+            eval/corpus
+            .appdata/mdmt/models/rag
+          key: retrieval-eval-${{ hashFiles('eval/corpus.json', 'RAG/models.py') }}
+
+      - name: Fetch the corpus
+        run: python -m eval.fetch_corpus
+
+      - name: Retrieval regression
+        run: python -m eval.run_eval --no-rerank --check eval/baseline.json
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-eval
+          path: eval/results/
