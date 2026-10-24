@@ -9,4 +9,4 @@ pyinstaller==6.22.3       # via -r dev.in
 pyinstaller-hooks-contrib==2026.9  # via pyinstaller, -r dev.in
 pytest==9.0.3             # via -r dev.in
 ruff==0.17.2              # via -r dev.in
-setuptools==84.2.1        # via pyinstaller, -c lock-macos.txt
+setuptools==84.2.1        # via pyinstaller

@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
-from spec_common import UPX, common_binaries, common_datas, common_hiddenimports, prune  # noqa: E402
+from spec_common import UPX, common_binaries, common_datas, common_hiddenimports  # noqa: E402
 
 datas = common_datas()
 binaries = common_binaries()
@@ -63,7 +63,6 @@ a = Analysis(
     excludes=['readline'],
     noarchive=False,
 )
-prune(a)
 
 pyz = PYZ(a.pure, a.zipped_data)
 

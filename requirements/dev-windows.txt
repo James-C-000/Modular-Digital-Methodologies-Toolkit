@@ -12,4 +12,4 @@ pyinstaller-hooks-contrib==2026.9  # via pyinstaller, -r dev.in
 pytest==9.0.3             # via -r dev.in
 pywin32-ctypes==0.2.3     # via pyinstaller
 ruff==0.17.2              # via -r dev.in
-setuptools==84.2.1        # via pyinstaller, -c lock-windows.txt
+setuptools==84.2.1        # via pyinstaller

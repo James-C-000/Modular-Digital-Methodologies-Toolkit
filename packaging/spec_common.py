@@ -60,18 +60,6 @@ def common_binaries() -> list:
     return binaries
 
 
-# Test executables shipped inside the torch wheel: never run, and they link
-# against libraries the bundle checker cannot resolve.
-_PRUNE_PREFIXES = ("torch/bin/", "torch/test/", "torch\\bin\\", "torch\\test\\")
-
-
-def prune(analysis):
-    """Drop files from an Analysis that must not ship (call before PYZ)."""
-    analysis.binaries = [b for b in analysis.binaries if not b[0].startswith(_PRUNE_PREFIXES)]
-    analysis.datas = [d for d in analysis.datas if not d[0].startswith(_PRUNE_PREFIXES)]
-    return analysis
-
-
 def common_hiddenimports() -> list:
     hidden = collect_submodules("nicegui")
     hidden += [
@@ -90,10 +78,6 @@ def common_hiddenimports() -> list:
         "sentencepiece",
         "sacremoses",
         "py3langid",
-        "langchain",
-        "langchain_community",
-        "sentence_transformers",
-        "transformers",
         "networkx",
         "llama_cpp",
         "certifi",

@@ -9,22 +9,16 @@ faster-whisper~=1.2
 sentencepiece~=0.2
 sacremoses~=0.2
 py3langid~=0.4
+# NER and RAG retrieval run on ONNX Runtime with Hugging Face tokenizers (no torch)
+onnxruntime~=1.31
+tokenizers~=0.22
 # av 19 removed the metadata_errors= argument that faster-whisper 1.2.1 passes to av.open()
 av>=16,<19
-langchain-community~=0.4
-langchain~=1.2
-langchain-core~=1.2
-langchain-huggingface~=1.2
-sentence-transformers~=5.2
-faiss-cpu~=1.13
-beautifulsoup4~=4.14
-docx2txt~=0.9
 nicegui~=3.8
 # Native window on Windows/macOS only; Linux runs in the user's browser.
 pywebview~=6.1; sys_platform != 'linux'
 platformdirs~=4.3
 huggingface_hub~=1.3
-transformers~=5.3
 networkx~=3.6
 psutil~=7.0
 # Runtime dependencies of llama-cpp-python (installed with --no-deps from
