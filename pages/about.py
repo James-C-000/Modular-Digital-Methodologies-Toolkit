@@ -168,9 +168,9 @@ charts.
 5. Click **Search**.
 
 **Filters** (applied to the text before searching; the first that applies wins):
-- **Basic filter** keeps only the letters A–Z, the digits 0–9 and spaces. Note
-  that it also removes accented and non-Latin letters, so leave it off for
-  texts that are not in plain English.
+- **Basic filter** keeps only letters, digits and spaces (including line
+  breaks), removing punctuation, symbols and OCR noise. Letters of every
+  language are kept with their accents: é, ł, ß, Москва, 北京.
 - Otherwise, every **character** listed in the filter file, or typed in the
   filter box, is removed from the text: entering `#*` deletes every `#` and `*`.
   This cleans up OCR noise that splits words.

@@ -3,6 +3,7 @@ import collections
 import csv
 import logging
 import os
+import unicodedata
 
 from matplotlib.figure import Figure
 
@@ -15,6 +16,12 @@ log = logging.getLogger(__name__)
 # displays correctly, and newline="" so the csv module controls line endings
 # (otherwise Windows gets a blank line after every row).
 CSV_ENCODING = "utf-8-sig"
+
+
+def basic_filter(text: str) -> str:
+    """Keep letters of any script (with their accents, also as combining marks),
+    digits and whitespace; drop punctuation, symbols and OCR noise."""
+    return "".join(ch for ch in text if ch.isspace() or unicodedata.category(ch)[0] in "LMN")
 
 
 def _save_pie(path, counts, labels, title):
@@ -162,8 +169,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
 
             # Strip user filters from text
             if basicFilterState == 1:
-                # filter everything that isn't a letter, number, or space
-                allText = re.sub(r'[^a-zA-Z0-9 ]', '', allText)
+                allText = basic_filter(allText)
             elif filterFilePath != '':
                 # use the filter file to get filters
                 try:
