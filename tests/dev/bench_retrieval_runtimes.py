@@ -58,6 +58,9 @@ RERANKERS = {
         "gguf": ("gpustack/bge-reranker-v2-m3-GGUF", "bge-reranker-v2-m3-Q8_0.gguf"),
         "onnx": ("onnx-community/bge-reranker-v2-m3-ONNX", "onnx/model_uint8.onnx"),
     },
+    "qwen3-reranker-0.6b": {
+        "gguf": ("ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF", "qwen3-reranker-0.6b-q8_0.gguf"),
+    },
 }
 
 
@@ -241,10 +244,14 @@ def main():
     for name, cfg in RERANKERS.items():
         outs = {}
         for runtime in ("gguf", "onnx"):
+            if runtime not in cfg:
+                continue
             r, scores = bench_reranker(name, cfg, runtime, args.threads)
             results["rerankers"].append(r)
             outs[runtime] = scores
             print(json.dumps(r), flush=True)
+        if len(outs) < 2:
+            continue
         a, b = outs["gguf"], outs["onnx"]
         top5 = len(set(np.argsort(-a)[:5]) & set(np.argsort(-b)[:5])) / 5
         results["agreement"][name] = {"score_correlation": round(float(np.corrcoef(a, b)[0, 1]), 4),
