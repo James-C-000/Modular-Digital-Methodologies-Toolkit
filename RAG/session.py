@@ -161,7 +161,9 @@ class RagSession:
                 query=query, not_found=is_not_found(text), stopped=stopped, dropped_citations=dropped,
                 timings={k: round(v, 2) for k, v in timings.items()},
             )
-            if text and not stopped:
+            # Refusals stay out of the history: nothing in them can be referred
+            # to, and small models otherwise answer the old question again.
+            if text and not stopped and not result.not_found:
                 self.history.append((question, text))
             return result
         finally:

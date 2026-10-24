@@ -126,3 +126,16 @@ def test_context_is_trimmed_to_fit_the_window(docs, tmp_path):
     session = _session(docs, tmp_path, n_ctx=800)  # 768 answer tokens leave almost no room
     answer = session.ask("Where?")
     assert len(answer.context) == 1
+
+
+def test_not_found_turns_stay_out_of_the_conversation(docs, tmp_path):
+    # A refusal carries nothing a follow-up could refer to, and small models
+    # otherwise answer the earlier, unanswerable question again.
+    llm = FakeLlm(reply=NOT_FOUND)
+    session = _session(docs, tmp_path, llm=llm)
+    session.ask("Who painted the Sistine Chapel?")
+    assert session.history == []
+    llm.reply = "The brig came from Lisbon [1]."
+    session.ask("Where did the Endeavour come from?")
+    assert not llm.completions          # nothing to rewrite against: no history
+    assert "Sistine" not in llm.prompts[-1]
