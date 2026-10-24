@@ -32,13 +32,13 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 |---|---|---|
 | Windows 10/11, x64 | `mdmt-windows-x64.zip` | |
 | macOS 15 (Sequoia) or newer, Apple Silicon | `mdmt-macos-arm64.zip` | No Intel Mac build. |
-| Linux, x86-64 | `mdmt-linux-x86_64.zip` | Built on Ubuntu 24.04; needs a similarly recent distribution. |
+| Linux, x86-64 | `mdmt-linux-x86_64.tar.gz` | Built on Ubuntu 24.04; needs a similarly recent distribution. |
 
-Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. The native window and file dialogs are not covered by CI.
+Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. It runs twice: on the build, and on the release archive after unpacking it as a user would. You can run `mdmt --self-test` yourself; it also reports a download that was extracted without its symbolic links. The native window and file dialogs are not covered by CI.
 
 ## Installing the prebuilt apps
 
-Download the zip for your platform from the [releases page](https://github.com/James-C-000/Modular-Digital-Methodologies-Toolkit/releases) and extract it.
+Download the archive for your platform from the [releases page](https://github.com/James-C-000/Modular-Digital-Methodologies-Toolkit/releases) and extract it (on Linux with your archive manager or `tar -xzf mdmt-linux-x86_64.tar.gz`).
 
 The apps are **not code-signed or notarized**: MDMT is an independent open-source project without paid signing certificates. The source code and the CI logs that built each release are public. Your operating system will ask you to confirm the first launch:
 

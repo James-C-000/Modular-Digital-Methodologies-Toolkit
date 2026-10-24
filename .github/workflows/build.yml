@@ -223,6 +223,66 @@ jobs:
           if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 40 }
           exit $p.ExitCode
 
+      # ---- package ---------------------------------------------------------
+
+      # Linux ships as .tar.gz: the bundle contains library symlinks, and some
+      # archive tools extract the symlinks in a zip as small text files, which
+      # breaks llama.cpp (and others) at load time. Every tool keeps them in a
+      # tarball. macOS keeps a ditto zip, which Finder unpacks faithfully.
+      - name: Choose the archive name
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then ext=tar.gz; else ext=zip; fi
+          echo "ARCHIVE=${{ matrix.artifact }}.$ext" >> "$GITHUB_ENV"
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cp packaging/linux/install-desktop-entry.sh dist/mdmt/
+          cp MDMT_logo.png dist/mdmt/mdmt.png
+          cd dist && tar --owner=0 --group=0 -czf "../$ARCHIVE" mdmt/
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        # ditto keeps the bundle's symlinks; `zip -r` would dereference them,
+        # bloating the archive and breaking the code signature.
+        run: ditto -c -k --keepParent dist/MDMT.app "$ARCHIVE"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/mdmt -DestinationPath $env:ARCHIVE
+
+      # ---- test what users download ----------------------------------------
+
+      # Unpack the release archive the way a user would and self-test that copy
+      # (the checks above ran on dist/, which never went through an archive).
+      - name: Self-test the unpacked archive (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir unpacked && tar -xzf "$ARCHIVE" -C unpacked
+          unpacked/mdmt/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}-archive.json"
+
+      - name: Self-test the unpacked archive (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -x -k "$ARCHIVE" unpacked
+          codesign --verify --deep --strict unpacked/MDMT.app
+          unpacked/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}-archive.json"
+
+      - name: Self-test the unpacked archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path $env:ARCHIVE -DestinationPath unpacked
+          $report = Join-Path $PWD 'selftest-windows-archive.json'
+          $p = Start-Process -FilePath 'unpacked\mdmt\mdmt.exe' `
+                 -ArgumentList '--self-test', '--self-test-out', "`"$report`"" `
+                 -Wait -PassThru
+          Write-Host "mdmt.exe exited with $($p.ExitCode)"
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 25 }
+          exit $p.ExitCode
+
       - name: Upload self-test report and log
         if: always()
         uses: actions/upload-artifact@v4
@@ -233,36 +293,16 @@ jobs:
             selftest-${{ matrix.name }}*.json.log
           if-no-files-found: warn
 
-      # ---- package ---------------------------------------------------------
-
-      - name: Package (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          cp packaging/linux/install-desktop-entry.sh dist/mdmt/
-          cp MDMT_logo.png dist/mdmt/mdmt.png
-          cd dist && zip -r -y -q ../${{ matrix.artifact }}.zip mdmt/
-
-      - name: Package (macOS)
-        if: runner.os == 'macOS'
-        # ditto keeps the bundle's symlinks; `zip -r` would dereference them,
-        # bloating the archive and breaking the code signature.
-        run: ditto -c -k --keepParent dist/MDMT.app ${{ matrix.artifact }}.zip
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path dist/mdmt -DestinationPath ${{ matrix.artifact }}.zip
-
       - name: Report bundle size
         run: |
           du -sh dist/* || true
-          ls -l ${{ matrix.artifact }}.zip
+          ls -l "$ARCHIVE"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.zip
+          path: ${{ env.ARCHIVE }}
 
   release:
     needs: [build]
@@ -276,7 +316,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            mdmt-linux-x86_64/mdmt-linux-x86_64.zip
+            mdmt-linux-x86_64/mdmt-linux-x86_64.tar.gz
             mdmt-macos-arm64/mdmt-macos-arm64.zip
             mdmt-windows-x64/mdmt-windows-x64.zip
           body: |
