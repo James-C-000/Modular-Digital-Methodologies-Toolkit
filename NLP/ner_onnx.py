@@ -22,7 +22,10 @@ NER_MODELS = {
         "name": "Multilingual NER (mBERT, 10 languages)",
         "repo_id": "Xenova/bert-base-multilingual-cased-ner-hrl",
         "revision": "263e82c06569c8c2ac46238a7ae5107598934234",
-        "files": ["onnx/model_int8.onnx", "tokenizer.json", "config.json"],
+        # uint8 weights (U8U8), not model_int8.onnx (U8S8): on x86 CPUs without
+        # AVX-512 VNNI, ONNX Runtime's U8S8 kernels can saturate, and the int8
+        # variant returned no entities at all on the Windows CI runner.
+        "files": ["onnx/model_uint8.onnx", "tokenizer.json", "config.json"],
         "source": "https://huggingface.co/Davlan/bert-base-multilingual-cased-ner-hrl",
         "license": "AFL-3.0",
         "size": "~182 MB",
@@ -132,7 +135,7 @@ class NerModel:
         options = ort.SessionOptions()
         options.log_severity_level = 3
         self.session = ort.InferenceSession(
-            os.path.join(path, "onnx", "model_int8.onnx"), options, providers=["CPUExecutionProvider"])
+            os.path.join(path, "onnx", "model_uint8.onnx"), options, providers=["CPUExecutionProvider"])
         self.input_names = {i.name for i in self.session.get_inputs()}
         self._lock = threading.Lock()
 
