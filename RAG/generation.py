@@ -52,8 +52,13 @@ class LlmEngine:
         return len(self.llm.tokenize(text.encode("utf-8"), add_bos=False, special=True))
 
     def stream(self, prompt: str, enable_thinking: bool, max_tokens: int, stop_event=None):
-        """Yield generated text pieces; stops early when *stop_event* is set."""
+        """Yield generated text pieces; stops early when *stop_event* is set.
+
+        Afterwards ``last_finish_reason`` is "length" if generation ran out of
+        tokens (max_tokens or the context window), "stop" if the model finished.
+        """
         p = sampling_params(enable_thinking)
+        self.last_finish_reason = None
         with self.lock:
             for chunk in self.llm.create_completion(
                     prompt, max_tokens=max_tokens, stream=True, stop=STOP,
@@ -61,9 +66,11 @@ class LlmEngine:
                     repeat_penalty=p["repeat_penalty"], present_penalty=PRESENCE_PENALTY):
                 if stop_event is not None and stop_event.is_set():
                     break
-                piece = chunk["choices"][0]["text"]
-                if piece:
-                    yield piece
+                choice = chunk["choices"][0]
+                if choice.get("finish_reason"):
+                    self.last_finish_reason = choice["finish_reason"]
+                if choice["text"]:
+                    yield choice["text"]
 
     def complete(self, prompt: str, max_tokens: int = 128) -> str:
         """Short deterministic completion (used for query rewriting)."""

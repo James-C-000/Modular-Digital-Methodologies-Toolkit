@@ -125,6 +125,19 @@ def _setup_ui(state, on_ready):
             rerank = remember(ui.switch("Rerank passages", value=saved("defaults.rag_rerank", True)),
                               "defaults.rag_rerank") \
                 .tooltip("A cross-encoder re-orders the best 20 passages: more accurate, a few seconds slower.")
+        from RAG.session import THINKING_CONTEXT
+        room_hint = ui.label("").classes("text-caption text-warning")
+
+        def update_room_hint(_=None):
+            short = thinking.value and int(ctx_length.value or 0) < THINKING_CONTEXT
+            room_hint.set_text(f"Thinking can use many thousands of tokens: set Context length to {THINKING_CONTEXT}"
+                               " (about 0.3 GB more memory with 2B, 0.8 GB with 4B), or answers may be cut off."
+                               if short else "")
+            room_hint.set_visibility(short)
+
+        thinking.on_value_change(update_room_hint)
+        ctx_length.on_value_change(update_room_hint)
+        update_room_hint()
         needed = [m for m in (models.EMBEDDER, models.RERANKER) if not models.is_installed(m)]
         if needed:
             hint("First start downloads: " + ", ".join(f"{m['name']} ({m['size']})" for m in needed))
@@ -213,8 +226,9 @@ class PassageDialog:
         self.dialog.open()
 
 
-def _render_answer(turn, passages):
+def _render_answer(turn, passages, settings):
     from RAG.prompting import not_found_remainder
+    from RAG.session import cut_off_advice
     answer = turn.answer
     if turn.error:
         ui.label(f"Error: {turn.error}").classes("text-negative")
@@ -228,8 +242,13 @@ def _render_answer(turn, passages):
             ui.icon("search_off")
             ui.label("Probably not in your documents.").classes("text-italic")
         text = not_found_remainder(text)
-    if text or not answer.not_found:
+    if text or not (answer.not_found or answer.cut_off):
         ui.markdown(text or "(no answer)")
+    advice = cut_off_advice(answer, settings)
+    if advice:
+        with ui.row().classes("items-start gap-2 no-wrap q-pa-sm rounded-borders mdmt-note"):
+            ui.icon("warning", size="xs").classes("text-warning q-mt-xs")
+            ui.label(advice).classes("text-body2")
     if answer.stopped:
         ui.label("Stopped.").classes("text-caption mdmt-muted")
     if answer.citations:
@@ -268,7 +287,7 @@ def _chat_ui(state, refresh):
         for turn in state.turns:
             ui.chat_message(turn.question, name="You", sent=True)
             with ui.chat_message(name="Assistant"), ui.column().classes("w-full gap-1"):
-                _render_answer(turn, passages)
+                _render_answer(turn, passages, session.settings)
 
     live = {"turn": None, "thinking": None, "answer": None}
 

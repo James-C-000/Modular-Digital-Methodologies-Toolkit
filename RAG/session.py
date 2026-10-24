@@ -24,6 +24,13 @@ from RAG.prompting import (
 )
 
 
+# A plain answer is short.  With thinking on, the model may use all the room
+# left in the context: Qwen3.5-2B reasoned for 3,000-9,000 tokens on eval
+# questions, so 32768 is the recommended context length for thinking mode.
+ANSWER_TOKENS = 768
+THINKING_CONTEXT = 32768
+
+
 @dataclass
 class RagSettings:
     documents_dir: str
@@ -39,7 +46,8 @@ class RagSettings:
 
     @property
     def max_answer_tokens(self) -> int:
-        return 4096 if self.enable_thinking else 768
+        """Room kept free for the reply when deciding how many passages fit."""
+        return 4096 if self.enable_thinking else ANSWER_TOKENS
 
 
 @dataclass
@@ -58,8 +66,26 @@ class Answer:
     query: str                    # the (possibly rewritten) retrieval query
     not_found: bool = False
     stopped: bool = False
+    cut_off: bool = False                  # generation ran out of room before finishing
+    cut_off_while_thinking: bool = False   # ... and before it started the answer
     dropped_citations: list = field(default_factory=list)
     timings: dict = field(default_factory=dict)
+
+
+def cut_off_advice(answer, settings) -> str | None:
+    """What to tell the user when *answer* ran out of room, or None."""
+    if not answer.cut_off:
+        return None
+    if settings.enable_thinking:
+        what = ("RAGBot ran out of room while reasoning, before it could answer."
+                if answer.cut_off_while_thinking else "This answer was cut off: RAGBot ran out of room.")
+        longer = (f"Increase the Context length (now {settings.n_ctx}) to {THINKING_CONTEXT} with Change setup,"
+                  " and ask again." if settings.n_ctx < THINKING_CONTEXT else
+                  "Increase the Context length further with Change setup, and ask again.")
+        return (f"{what} Thinking can use many thousands of tokens. {longer} A longer context needs more memory;"
+                " if your computer does not have enough, turn off Thinking mode instead.")
+    return ("This answer was cut off at RAGBot's length limit. Try a narrower question, or start a New"
+            " conversation if this one is long.")
 
 
 class Busy(RuntimeError):
@@ -143,7 +169,9 @@ class RagSession:
             t = time.perf_counter()
             raw, shown = "", {"thinking": 0, "answer": 0}
             thinking_mode = self.settings.enable_thinking
-            for piece in self.llm.stream(prompt, thinking_mode, self.settings.max_answer_tokens, stop_event):
+            room = max(16, self.settings.n_ctx - self.llm.count_tokens(prompt) - 8)
+            max_tokens = room if thinking_mode else min(ANSWER_TOKENS, room)
+            for piece in self.llm.stream(prompt, thinking_mode, max_tokens, stop_event):
                 raw += piece
                 if on_token:
                     thinking, answer = split_thinking(raw, started_in_thinking=thinking_mode)
@@ -153,6 +181,7 @@ class RagSession:
                             shown[kind] = len(text)
             timings["generation_s"] = time.perf_counter() - t
             stopped = bool(stop_event is not None and stop_event.is_set())
+            cut_off = not stopped and getattr(self.llm, "last_finish_reason", None) == "length"
 
             thinking, answer = split_thinking(raw, started_in_thinking=thinking_mode)
             text, cited, dropped = parse_citations(strip_echoed_instructions(answer), len(context))
@@ -160,11 +189,12 @@ class RagSession:
             result = Answer(
                 text=text, thinking=thinking, citations=[by_number[n] for n in cited], context=context,
                 query=query, not_found=is_not_found(text), stopped=stopped, dropped_citations=dropped,
+                cut_off=cut_off, cut_off_while_thinking=cut_off and thinking_mode and "</think>" not in raw,
                 timings={k: round(v, 2) for k, v in timings.items()},
             )
             # Refusals stay out of the history: nothing in them can be referred
             # to, and small models otherwise answer the old question again.
-            if text and not stopped and not result.not_found:
+            if text and not stopped and not cut_off and not result.not_found:
                 self.history.append((question, text))
             return result
         finally:

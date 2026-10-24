@@ -301,7 +301,10 @@ Nothing leaves your computer.
 - **Re-index** picks up files added or edited while the chat is open.
 - **Rerank passages** improves accuracy but is slower on older computers.
 - **Thinking mode** lets the model reason first: slower, sometimes better on
-  complex questions.
+  complex questions. Its reasoning can run to many thousands of words, so set
+  **Context length** to 32768 (about 0.3 GB more memory with 2B, 0.8 GB with
+  4B). If an answer is cut off and your computer cannot spare the memory, turn
+  Thinking mode off.
 - Ask in the language of your documents. A question in another language
   (English about a French text, say) often misses the right passages.
 - Two chat models are offered. **2B** (1.28 GB) suits any computer from the

@@ -21,12 +21,18 @@ class FakeLlm:
     def count_tokens(self, text):
         return len(text.split())
 
+    finish = "stop"       # what llama.cpp reports at the end: "stop" or "length"
+
     def stream(self, prompt, enable_thinking, max_tokens, stop_event=None):
         self.prompts.append(prompt)
+        self.max_tokens = max_tokens
+        self.last_finish_reason = None
         for i in range(0, len(self.reply), 5):
             if stop_event is not None and stop_event.is_set():
                 break
             yield self.reply[i:i + 5]
+        else:
+            self.last_finish_reason = self.finish
 
     def complete(self, prompt, max_tokens=128):
         self.completions.append(prompt)
@@ -146,3 +152,34 @@ def test_echoed_instructions_do_not_reach_the_user(docs, tmp_path):
     session = _session(docs, tmp_path, llm=FakeLlm(reply="Lisbon [1].\n\n" + CITE_REMINDER))
     answer = session.ask("Where did the Endeavour come from?")
     assert answer.text == "Lisbon [1]." and not answer.not_found
+
+
+def test_running_out_of_room_while_thinking_is_reported(docs, tmp_path):
+    llm = FakeLlm(reply="The question asks where the brig came from. Document 1 says")   # no </think>
+    llm.finish = "length"
+    session = _session(docs, tmp_path, llm=llm, enable_thinking=True)
+    answer = session.ask("Where did the Endeavour come from?")
+    assert answer.text == "" and answer.cut_off and answer.cut_off_while_thinking
+    assert session.history == []
+
+
+def test_an_answer_cut_off_mid_sentence_is_reported(docs, tmp_path):
+    llm = FakeLlm(reply="The brig came from Lisbon [1] and then sailed")
+    llm.finish = "length"
+    answer = _session(docs, tmp_path, llm=llm).ask("Where?")
+    assert answer.cut_off and not answer.cut_off_while_thinking and answer.text
+
+
+def test_a_normal_answer_is_not_cut_off(docs, tmp_path):
+    answer = _session(docs, tmp_path).ask("Where?")
+    assert not answer.cut_off
+
+
+def test_thinking_may_use_all_the_room_left_in_the_context(docs, tmp_path):
+    llm = FakeLlm(reply="Hmm.</think>Lisbon [1].")
+    session = _session(docs, tmp_path, llm=llm, enable_thinking=True, n_ctx=32768)
+    session.ask("Where?")
+    assert llm.max_tokens > 30000                  # not capped at 4096
+    llm = FakeLlm()
+    _session(docs, tmp_path, llm=llm, n_ctx=32768).ask("Where?")
+    assert llm.max_tokens == 768                   # plain answers stay short

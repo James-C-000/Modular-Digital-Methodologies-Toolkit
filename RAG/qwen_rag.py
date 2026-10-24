@@ -26,6 +26,8 @@ def _answer_record(question, answer) -> dict:
         "query": answer.query,
         "answer": answer.text,
         "not_found": answer.not_found,
+        "cut_off": answer.cut_off,
+        "cut_off_while_thinking": answer.cut_off_while_thinking,
         "citations": [{"n": c.number, "file": c.chunk.file, "page": c.chunk.page,
                        "start": c.chunk.start, "end": c.chunk.end} for c in answer.citations],
         "context": [{"n": c.number, "file": c.chunk.file, "page": c.chunk.page, "score": c.score}
@@ -37,6 +39,11 @@ def _answer_record(question, answer) -> dict:
 
 def _print_answer(answer):
     print(f"\nAssistant: {answer.text}")
+    if answer.cut_off:
+        from RAG.session import THINKING_CONTEXT
+        where = "while reasoning, before answering" if answer.cut_off_while_thinking else "before finishing"
+        print(f"  (Ran out of room {where}. Try --context-window {THINKING_CONTEXT}, or leave out"
+              " --enable-thinking if there is not enough memory.)")
     for c in answer.citations:
         page = f", page {c.chunk.page}" if c.chunk.page else ""
         print(f"  [{c.number}] {c.chunk.file}{page}")
