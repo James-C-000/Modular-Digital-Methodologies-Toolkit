@@ -267,7 +267,7 @@ def _chat_ui(state, refresh):
             ui.label("Could not read: " + ", ".join(f for f, _e in report.failed)).classes("text-caption text-warning")
         for turn in state.turns:
             ui.chat_message(turn.question, name="You", sent=True)
-            with ui.chat_message(name="Assistant"):
+            with ui.chat_message(name="Assistant"), ui.column().classes("w-full gap-1"):
                 _render_answer(turn, passages)
 
     live = {"turn": None, "thinking": None, "answer": None}
@@ -275,8 +275,10 @@ def _chat_ui(state, refresh):
     def show_pending(turn):
         with messages:
             ui.chat_message(turn.question, name="You", sent=True)
-            with ui.chat_message(name="Assistant"):
+            # One column per message: Quasar draws a separate bubble for every child.
+            with ui.chat_message(name="Assistant"), ui.column().classes("gap-1"):
                 live["thinking"] = ui.label("").classes("whitespace-pre-wrap text-caption mdmt-muted")
+                live["thinking"].set_visibility(False)   # an empty label would draw an empty bubble
                 live["answer"] = ui.label("Searching the documents...").classes("whitespace-pre-wrap")
         live["turn"] = turn
         scroller.scroll_to(percent=1.0)
@@ -295,6 +297,7 @@ def _chat_ui(state, refresh):
             show_pending(pending)
         if pending is not None:
             if state.stream["thinking"]:
+                live["thinking"].set_visibility(True)
                 live["thinking"].set_text(state.stream["thinking"][-600:])
             if state.stream["answer"]:
                 live["answer"].set_text(state.stream["answer"])
