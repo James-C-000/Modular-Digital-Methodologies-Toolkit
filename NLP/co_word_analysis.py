@@ -121,8 +121,12 @@ def generate_document_html(file_name, stats_html, network_img_file, output_path)
         f.write(page)
 
 
-def main(directory, stopword_language="en", extra_stopwords=()):
+def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None, cancel=None):
     """Run co-word analysis on every PDF/TXT file under *directory*.
+
+    on_progress(done, total, current_file) is called before each file; a set
+    *cancel* event stops before the next one.  Returns {"files": files read,
+    "total": files found, "summary": summary HTML path, "images": network graphs}.
 
     stopword_language: ISO 639-1 code from NLP.text_utils.STOPWORD_LANGUAGES,
     or None for no list.  extra_stopwords: additional words to ignore.
@@ -135,36 +139,43 @@ def main(directory, stopword_language="en", extra_stopwords=()):
 <h1>Co-word Analysis Summary</h1>
 """
     # Process each PDF or TXT file in the directory.
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.lower().endswith((".pdf", ".txt")):
-                file_path = os.path.join(root, file)
-                print(f"Processing {file_path}...")
-                text = process_file(file_path)
-                if not text.strip():
-                    print(f"No text extracted from {file_path}")
-                    continue
-                tokens = preprocess_text(text, stop_set)
-                word_counts = Counter(tokens)
-                cooccur = cooccurrence_analysis(tokens)
+    paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
+                   for file in files if file.lower().endswith((".pdf", ".txt")))
+    read, images = 0, []
+    for i, file_path in enumerate(paths):
+        if cancel is not None and cancel.is_set():
+            break
+        root, file = os.path.split(file_path)
+        if on_progress:
+            on_progress(i, len(paths), file)
+        read += 1
+        print(f"Processing {file_path}...")
+        text = process_file(file_path)
+        if not text.strip():
+            print(f"No text extracted from {file_path}")
+            continue
+        tokens = preprocess_text(text, stop_set)
+        word_counts = Counter(tokens)
+        cooccur = cooccurrence_analysis(tokens)
 
-                # Visualize co-word network.
-                base_name = os.path.splitext(file)[0]
-                network_img_file = os.path.join(root, f"{base_name}_co_word_network.png")
-                visualize_network(cooccur, network_img_file)
+        # Visualize co-word network.
+        base_name = os.path.splitext(file)[0]
+        network_img_file = os.path.join(root, f"{base_name}_co_word_network.png")
+        visualize_network(cooccur, network_img_file)
+        images.append(network_img_file)
 
-                # Generate statistics HTML snippet.
-                stats_html = generate_statistics_html(word_counts, cooccur)
+        # Generate statistics HTML snippet.
+        stats_html = generate_statistics_html(word_counts, cooccur)
 
-                # Generate individual HTML report for the document.
-                html_file = os.path.join(root, f"{base_name}_co_word_analysis.html")
-                generate_document_html(file, stats_html, network_img_file, html_file)
-                print(f"Saved Co-word Analysis for {file} to {html_file}")
+        # Generate individual HTML report for the document.
+        html_file = os.path.join(root, f"{base_name}_co_word_analysis.html")
+        generate_document_html(file, stats_html, network_img_file, html_file)
+        print(f"Saved Co-word Analysis for {file} to {html_file}")
 
-                # Append a summary entry to the overall summary.
-                overall_summary += f"<h2>{escape(file)}</h2>\n"
-                overall_summary += stats_html
-                overall_summary += f"<p><a href='{escape(os.path.basename(html_file))}'>Detailed Analysis</a></p>\n"
+        # Append a summary entry to the overall summary.
+        overall_summary += f"<h2>{escape(file)}</h2>\n"
+        overall_summary += stats_html
+        overall_summary += f"<p><a href='{escape(os.path.basename(html_file))}'>Detailed Analysis</a></p>\n"
     overall_summary += "</body></html>"
 
     # Save the overall summary document.
@@ -172,6 +183,9 @@ def main(directory, stopword_language="en", extra_stopwords=()):
     with open(summary_file, "w", encoding="utf-8") as f:
         f.write(overall_summary)
     print(f"Overall Co-word Analysis Summary saved to {summary_file}")
+    if on_progress:
+        on_progress(read, len(paths), "")
+    return {"files": read, "total": len(paths), "summary": summary_file, "images": images}
 
 
 if __name__ == "__main__":

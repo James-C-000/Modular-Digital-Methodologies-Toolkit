@@ -316,12 +316,13 @@ def translate_text(text: str, src: str, tgt: str, models_root: str | None = None
 # ------------------------------------------------------------- folders ----
 
 def translate_directory(directory: str, src: str | None, tgt: str, suffix: str = DEFAULT_SUFFIX,
-                        models_root: str | None = None, on_progress=None) -> list[dict]:
+                        models_root: str | None = None, on_progress=None, cancel=None) -> list[dict]:
     """Translate every .txt and .pdf file under *directory*.
 
     src=None detects each file's language among those with an installed route.
     Output: ``name<suffix>.txt`` next to the input (``.txt`` for PDFs too).
     Files that already end with the suffix are skipped (they are outputs).
+    A set *cancel* event stops the run before the next file.
     """
     from common.pdf_text import extract_text
 
@@ -338,6 +339,8 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
     candidates = {s for s in sources if route(s, tgt, models_root, installed) is not None}
     results = []
     for i, path in enumerate(files):
+        if cancel is not None and cancel.is_set():
+            break
         if on_progress:
             on_progress(i, len(files), os.path.basename(path))
         result = {"input": path}
@@ -368,5 +371,5 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
             result.update(status="error", message=str(e))
         results.append(result)
     if on_progress:
-        on_progress(len(files), len(files), "Done")
+        on_progress(len(results), len(files), "")
     return results

@@ -115,15 +115,18 @@ def generate_highlight_html(file_name, text, entities):
     return out
 
 
-def main(directory):
+def main(directory, on_progress=None, cancel=None):
     """
     Process PDF and TXT files in the directory, run NER on each,
     generate both a summary HTML file with statistics and individual
     HTML files with highlighted entities for each document.
+
+    on_progress(done, total, current_file) is called before each file; a set
+    *cancel* event stops before the next one.  Returns {"files": files read,
+    "total": files found, "summary": path of the summary HTML}.
     """
     if not os.path.isdir(directory):
-        print(f"{directory} is not a valid directory.")
-        return
+        raise NotADirectoryError(f"{directory} is not a valid directory.")
 
     summary_html_content = (
         "<html><head><meta charset='utf-8'><title>NER Summary Statistics</title></head><body>\n"
@@ -132,36 +135,42 @@ def main(directory):
 
     overall_summary = {}
 
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.lower().endswith((".pdf", ".txt")):
-                file_path = os.path.join(root, file)
-                print(f"Processing file: {file_path}")
-                text = process_file(file_path)
-                if text:
-                    # Run NER on the entire text by chunking.
-                    entities = run_ner_on_text(text)
-                    summary = summarize_entities(entities)
+    paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
+                   for file in files if file.lower().endswith((".pdf", ".txt")))
+    read = 0
+    for i, file_path in enumerate(paths):
+        if cancel is not None and cancel.is_set():
+            break
+        file = os.path.basename(file_path)
+        if on_progress:
+            on_progress(i, len(paths), file)
+        read += 1
+        print(f"Processing file: {file_path}")
+        text = process_file(file_path)
+        if text:
+            # Run NER on the entire text by chunking.
+            entities = run_ner_on_text(text)
+            summary = summarize_entities(entities)
 
-                    # Update overall summary
-                    for label, counter in summary.items():
-                        if label not in overall_summary:
-                            overall_summary[label] = Counter()
-                        overall_summary[label] += counter
+            # Update overall summary
+            for label, counter in summary.items():
+                if label not in overall_summary:
+                    overall_summary[label] = Counter()
+                overall_summary[label] += counter
 
-                    # Append file summary to overall summary HTML.
-                    summary_html_content += generate_summary_html(file, summary)
+            # Append file summary to overall summary HTML.
+            summary_html_content += generate_summary_html(file, summary)
 
-                    # Generate highlighted HTML for the individual document.
-                    highlight_html = generate_highlight_html(file, text, entities)
-                    # Build output file name: replace extension with _highlight.html
-                    base_name = os.path.splitext(file)[0]
-                    highlight_file = os.path.join(directory, f"{base_name}_Named_Entity_Recognition_Highlight.html")
-                    with open(highlight_file, "w", encoding="utf-8") as f:
-                        f.write(highlight_html)
-                    print(f"Saved highlighted HTML to {highlight_file}")
-                else:
-                    print(f"No text extracted from {file_path}\n")
+            # Generate highlighted HTML for the individual document.
+            highlight_html = generate_highlight_html(file, text, entities)
+            # Build output file name: replace extension with _highlight.html
+            base_name = os.path.splitext(file)[0]
+            highlight_file = os.path.join(directory, f"{base_name}_Named_Entity_Recognition_Highlight.html")
+            with open(highlight_file, "w", encoding="utf-8") as f:
+                f.write(highlight_html)
+            print(f"Saved highlighted HTML to {highlight_file}")
+        else:
+            print(f"No text extracted from {file_path}\n")
 
     # Append overall summary statistics.
     if overall_summary:
@@ -176,6 +185,9 @@ def main(directory):
         f.write(summary_html_content)
 
     print(f"NER summary statistics saved to {output_summary_file}")
+    if on_progress:
+        on_progress(read, len(paths), "")
+    return {"files": read, "total": len(paths), "summary": output_summary_file}
 
 
 if __name__ == "__main__":

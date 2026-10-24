@@ -51,14 +51,21 @@ def make_autopct(values):
 
 def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath,
                manualKeywords, filterFilePath, manualFilters,
-               on_error=None, on_message=None):
+               on_error=None, on_message=None, on_progress=None, cancel=None):
+    """Count keywords in every PDF of PDFDirectory; write CSVs and charts to outputDirectory.
+
+    on_progress(done, total, current_file) is called before each PDF; a set
+    *cancel* event stops before the next one (totals cover the PDFs read).
+    Returns {"files": PDFs read, "total": PDFs found, "charts": [total chart paths]},
+    or None after reporting an error through on_error.
+    """
     logic_error = on_error or print
     logic_message = on_message or print
     log.debug("keyword search: context=%s basic_filter=%s pdfs=%s out=%s keyword_file=%s filter_file=%s",
               contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath, filterFilePath)
     # Get a list of files in the pdf directory
     try:
-        pdfsInDirectory = [f for f in os.listdir(PDFDirectory) if f.endswith('.pdf')]
+        pdfsInDirectory = sorted(f for f in os.listdir(PDFDirectory) if f.endswith('.pdf'))
     except Exception as e:
         error = "ERROR: " + str(e) + ".\nCheck PDFs and retry."
         logic_error(error)
@@ -129,7 +136,13 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
         return
 
     # Open each pdf in a for loop
-    for i in pdfsInDirectory:
+    filesRead = 0
+    for index, i in enumerate(pdfsInDirectory):
+        if cancel is not None and cancel.is_set():
+            break
+        if on_progress:
+            on_progress(index, len(pdfsInDirectory), str(i))
+        filesRead += 1
         try:
             pageTexts = extract_pages(os.path.join(PDFDirectory, str(i)))
             numOfPages = len(pageTexts)  # Get number of pages in open pdf
@@ -300,5 +313,11 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
         error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
         logic_error(error)
         return
+
+    if on_progress:
+        on_progress(filesRead, len(pdfsInDirectory), "")
+    return {"files": filesRead, "total": len(pdfsInDirectory),
+            "charts": [os.path.join(outputDirectory, 'totalBar.png'),
+                       os.path.join(outputDirectory, 'totalPie.png')]}
 
     logic_message("Processing Complete")

@@ -88,6 +88,7 @@ def transcribe_file(model, audio_path: str, output_path: str = None, vad_filter:
         audio_path: Path to the audio file.
         output_path: Optional output .txt path. If None, uses audio_path + '.txt'.
         vad_filter: Skip non-speech with the voice-activity filter.
+        cancel: Optional threading.Event; when set, stops before the next file.
 
     Returns:
         Dict with 'status', 'input', 'output', and optionally 'text' or 'message'.
@@ -121,6 +122,7 @@ def transcribe_directory(
     download_root: str = None,
     on_progress=None,
     vad_filter: bool = DEFAULT_VAD,
+    cancel=None,
 ) -> list[dict]:
     """Transcribe all audio files in a directory.
 
@@ -146,6 +148,8 @@ def transcribe_directory(
     results = []
 
     for i, audio_path in enumerate(audio_files):
+        if cancel is not None and cancel.is_set():
+            break
         if on_progress:
             on_progress(i, len(audio_files), os.path.basename(audio_path))
 
@@ -153,6 +157,6 @@ def transcribe_directory(
         results.append(result)
 
     if on_progress:
-        on_progress(len(audio_files), len(audio_files), "Done")
+        on_progress(len(results), len(audio_files), "")
 
     return results

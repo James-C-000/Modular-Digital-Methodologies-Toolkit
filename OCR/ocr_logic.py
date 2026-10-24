@@ -242,8 +242,14 @@ def run_ocr_batch(
     redo_ocr: bool = False,
     output_type: str = "pdf",
     extract_text: bool = False,
+    on_progress=None,
+    cancel=None,
 ) -> list[dict]:
-    """Run OCR on all PDFs in input_dir, writing results to output_dir."""
+    """Run OCR on all PDFs in input_dir, writing results to output_dir.
+
+    on_progress(done, total, current_file) is called before each file; a set
+    *cancel* event stops the batch before the next file.
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     language_codes = [TESSERACT_LANGUAGES[name] for name in language_names if name in TESSERACT_LANGUAGES]
@@ -253,7 +259,11 @@ def run_ocr_batch(
     pdfs = find_pdfs_in_directory(input_dir)
     results = []
 
-    for pdf_path in pdfs:
+    for i, pdf_path in enumerate(pdfs):
+        if cancel is not None and cancel.is_set():
+            break
+        if on_progress:
+            on_progress(i, len(pdfs), os.path.basename(pdf_path))
         rel_path = os.path.relpath(pdf_path, input_dir)
         out_path = os.path.join(output_dir, rel_path)
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -274,4 +284,6 @@ def run_ocr_batch(
             sidecar_path=sidecar_path,
         ))
 
+    if on_progress:
+        on_progress(len(results), len(pdfs), "")
     return results
