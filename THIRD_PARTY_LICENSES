@@ -1291,9 +1291,11 @@ redistribute them. Their licenses, as published:
 - Whisper tiny/base/small/medium, CTranslate2 conversions by Systran: MIT.
 - Tesseract language data (tessdata): Apache-2.0.
 - Qwen 3.5 GGUF models (unsloth conversions of Qwen/Qwen3.5-*): Apache-2.0.
-- NER: Davlan/bert-base-multilingual-cased-ner-hrl (int8 ONNX export by
+- NER: Davlan/bert-base-multilingual-cased-ner-hrl (uint8 ONNX export by
   Xenova): Academic Free License 3.0.
-- RAG embeddings: sentence-transformers/all-MiniLM-L6-v2: Apache-2.0.
+- RAG retrieval: intfloat/multilingual-e5-small (ONNX export by Xenova): MIT.
+- RAG reranking (optional): BAAI/bge-reranker-v2-m3 (ONNX export by
+  onnx-community): Apache-2.0.
 - Argos Translate models (argos-net.com; index pinned in
   Translation/argos_index.json): licenses vary by package. 59 of the 100
   packages state that they are derived from OPUS-MT models licensed CC-BY 4.0,

@@ -102,10 +102,9 @@ Major dependencies include:
 - `ocrmypdf`: OCR functionality
 - `faster-whisper` (CTranslate2 + PyAV): Audio transcription
 - `ctranslate2` + `sentencepiece`/`sacremoses`: offline translation of Argos Translate models; `py3langid`: language detection
-- `onnxruntime` + `tokenizers`: named entity recognition (multilingual BERT, ONNX)
+- `onnxruntime` + `tokenizers`: named entity recognition (multilingual BERT) and RAG retrieval (multilingual-e5-small embeddings, BM25, optional bge-reranker-v2-m3), all on ONNX; MDMT does not use PyTorch
 - `networkx`: graph analysis
-- `langchain` + `llama-cpp-python`: RAG implementation with local LLM inference
-- `sentence-transformers` + `faiss-cpu`: Document embeddings and vector search
+- `llama-cpp-python`: local LLM inference for RAG chat (Qwen 3.5 GGUF models)
 - `matplotlib`: Data visualization
 - `pypdfium2`: PDF text extraction
 

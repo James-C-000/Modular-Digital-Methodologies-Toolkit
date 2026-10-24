@@ -272,27 +272,32 @@ For other languages MDMT uses the broader stopwords-iso lists, marked
     # RAG Chat
     with ui.expansion("RAG Chat", icon="smart_toy").classes("w-full mt-2"):
         ui.markdown("""
-**What it does:** Lets you ask questions about your documents using a local
-Qwen AI model. The system indexes your documents and uses Retrieval-Augmented
-Generation (RAG) to find relevant passages and generate answers.
+**What it does:** Lets you ask questions about a folder of documents using a
+local Qwen model. MDMT indexes the documents, finds the passages most relevant
+to each question (keyword search and multilingual embeddings, optionally
+reranked), and asks the model to answer from those passages only, citing them.
+Nothing leaves your computer.
 
 **How to use:**
-1. Select a **Documents Directory** containing the files to index.
-2. Select a **Model File** — a Qwen 3.5 `.gguf` model. If you don't have one,
-   download it from the **Downloads** page.
-3. Optionally adjust **Context Length** and **Thinking Mode** settings.
-4. Click **Initialize RAG** to load the model and index your documents.
-5. Once initialized, type questions in the chat box and press Enter or click
-   Send.
+1. Select a **Documents Directory** (TXT, PDF, Markdown, HTML, CSV, JSON, DOCX).
+2. Select a **Model File**, a Qwen 3.5 `.gguf` model from the **Downloads** page.
+3. Optionally adjust **Context Length**, **Thinking mode** and **Rerank passages**.
+4. Click **Start**. The first start downloads the retrieval models (about
+   135 MB, plus 588 MB for the reranker) and indexes the folder; later starts
+   only re-read files that changed.
+5. Ask a question. The answer streams in; **Stop** ends it early.
 
 **Tips:**
-- MDMT auto-detects your hardware and recommends the best model size.
-- Initialization can take a minute or more depending on the number of documents
-  and model size.
-- The AI will cite which documents (and pages) it used to answer your question.
-- Enable **Thinking Mode** for more thorough reasoning on complex questions.
-- For best results, use focused document collections rather than very large
-  mixed archives.
+- Numbers such as [1] in an answer are citations. Click a source chip to read
+  the passage and open its file.
+- Follow-up questions can refer to earlier ones ("What did it carry?");
+  **New conversation** starts afresh.
+- If the documents do not contain the answer, the model says so rather than
+  guessing. Answers can still be wrong: check the cited passages.
+- **Re-index** picks up files added or edited while the chat is open.
+- **Rerank passages** improves accuracy but is slower on older computers.
+- **Thinking mode** lets the model reason first: slower, sometimes better on
+  complex questions.
         """)
 
     # License
@@ -305,13 +310,10 @@ Generation (RAG) to find relevant passages and generate answers.
 |---|---|---|
 | PyAV | BSD-3-Clause | [GitHub](https://github.com/PyAV-Org/PyAV) |
 | FFmpeg (audio decoders only, built without GPL components; see `THIRD_PARTY_LICENSES`) | LGPL-2.1-or-later | [ffmpeg.org](https://ffmpeg.org/) |
-| BeautifulSoup4 | MIT | [crummy.com](https://www.crummy.com/software/BeautifulSoup/) |
 | CTranslate2 | MIT | [GitHub](https://github.com/OpenNMT/CTranslate2) |
-| docx2txt | MIT | [GitHub](https://github.com/ankushshah89/python-docx2txt) |
 | faster-whisper (includes Silero VAD model) | MIT | [GitHub](https://github.com/SYSTRAN/faster-whisper) |
-| FAISS | MIT | [GitHub](https://github.com/facebookresearch/faiss) |
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
-| LangChain (core, community, huggingface, text-splitters) | MIT | [GitHub](https://github.com/langchain-ai/langchain) |
+| Jinja2 | BSD-3-Clause | [GitHub](https://github.com/pallets/jinja) |
 | llama-cpp-python (fork) | MIT | [GitHub](https://github.com/JamePeng/llama-cpp-python) |
 | Matplotlib | PSF-2.0 | [GitHub](https://github.com/matplotlib/matplotlib) |
 | NetworkX | BSD-3-Clause | [GitHub](https://github.com/networkx/networkx) |
@@ -319,7 +321,6 @@ Generation (RAG) to find relevant passages and generate answers.
 | OCRmyPDF | MPL-2.0 | [GitHub](https://github.com/ocrmypdf/OCRmyPDF) |
 | ONNX Runtime | MIT | [GitHub](https://github.com/microsoft/onnxruntime) |
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
-| PyTorch | BSD-3-Clause | [GitHub](https://github.com/pytorch/pytorch) |
 | Snowball stopword lists (bundled data) | BSD-3-Clause | [snowballstem.org](https://snowballstem.org/) |
 | stopwords-iso (bundled data) | MIT | [GitHub](https://github.com/stopwords-iso/stopwords-iso) |
 | psutil | BSD-3-Clause | [GitHub](https://github.com/giampaolo/psutil) |
@@ -328,11 +329,8 @@ Generation (RAG) to find relevant passages and generate answers.
 | sacremoses | MIT | [GitHub](https://github.com/hplt-project/sacremoses) |
 | SentencePiece | Apache-2.0 | [GitHub](https://github.com/google/sentencepiece) |
 | pywebview (Windows and macOS) | BSD-3-Clause | [GitHub](https://github.com/r0x0r/pywebview) |
-| Requests | Apache-2.0 | [GitHub](https://github.com/psf/requests) |
-| Sentence-Transformers | Apache-2.0 | [GitHub](https://github.com/UKPLab/sentence-transformers) |
 | Tesseract OCR (and bundled tessdata `eng`, `osd`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tesseract) |
 | Tokenizers (Hugging Face) | Apache-2.0 | [GitHub](https://github.com/huggingface/tokenizers) |
-| Transformers (HuggingFace) | Apache-2.0 | [GitHub](https://github.com/huggingface/transformers) |
 """)
         ui.markdown("""
 **Downloadable models** (never bundled; fetched on demand from the Downloads page):
@@ -343,6 +341,7 @@ Generation (RAG) to find relevant passages and generate answers.
 | Tesseract language data (`tessdata`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tessdata) |
 | Qwen 3.5 GGUF (0.8B / 2B / 4B) | Apache-2.0 | [unsloth on Hugging Face](https://huggingface.co/unsloth) |
 | Argos Translate models (one per language pair) | Varies by model: 59 of 100 state CC-BY 4.0 (derived from OPUS-MT); the rest cite their OPUS training data or state no license. See each model's README. | [Argos Translate](https://github.com/argosopentech/argos-translate) |
-| all-MiniLM-L6-v2 (RAG embeddings, downloaded on first use) | Apache-2.0 | [Hugging Face](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
-| bert-base-multilingual-cased-ner-hrl, int8 ONNX export (NER, Relationships) | AFL-3.0 | [Hugging Face](https://huggingface.co/Davlan/bert-base-multilingual-cased-ner-hrl) |
+| multilingual-e5-small, ONNX export (RAG retrieval) | MIT | [Hugging Face](https://huggingface.co/intfloat/multilingual-e5-small) |
+| bge-reranker-v2-m3, ONNX export (RAG reranking, optional) | Apache-2.0 | [Hugging Face](https://huggingface.co/BAAI/bge-reranker-v2-m3) |
+| bert-base-multilingual-cased-ner-hrl, uint8 ONNX export (NER, Relationships) | AFL-3.0 | [Hugging Face](https://huggingface.co/Davlan/bert-base-multilingual-cased-ner-hrl) |
 """)
