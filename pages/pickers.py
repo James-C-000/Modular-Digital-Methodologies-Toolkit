@@ -131,11 +131,11 @@ class LocalFilePicker(ui.dialog):
         if not self.show_hidden:
             entries = [p for p in entries if not p.name.startswith(".")]
         folders = sorted((p for p in entries if _is_dir(p)), key=lambda p: p.name.lower())
-        files = []
-        if self.mode == "file":
-            files = sorted((p for p in entries if not _is_dir(p)
-                            and (not self.extensions or p.suffix.lower() in self.extensions)),
-                           key=lambda p: p.name.lower())
+        # Folder mode lists files too (dimmed, not selectable) so users can see
+        # what a folder contains before choosing it.
+        files = sorted((p for p in entries if not _is_dir(p)
+                        and (not self.extensions or p.suffix.lower() in self.extensions)),
+                       key=lambda p: p.name.lower())
         return folders, files
 
     def _render(self):
@@ -146,8 +146,8 @@ class LocalFilePicker(ui.dialog):
             for i, part in enumerate(parts):
                 name = part.name or str(part)
                 ui.button(name, on_click=lambda p=part: self._go(str(p))).props("flat dense no-caps")
-                if i < len(parts) - 1:
-                    ui.label("/").classes("text-grey")
+                if 0 < i < len(parts) - 1 or (i == 0 and part.name and len(parts) > 1):
+                    ui.label(os.sep).classes("text-grey")
         self.listing.clear()
         folders, files = self._entries()
         with self.listing:
@@ -157,6 +157,12 @@ class LocalFilePicker(ui.dialog):
                         ui.icon("folder", color="amber")
                     ui.item_section(p.name)
             for p in files:
+                if self.mode == "folder":
+                    with ui.item().classes("text-grey"):
+                        with ui.item_section().props("avatar"):
+                            ui.icon("description", color="grey")
+                        ui.item_section(p.name)
+                    continue
                 item = ui.item(on_click=lambda p=p: self._select(p))
                 item.on("dblclick", lambda p=p: self.submit(str(p)))
                 if p == self.selected:
