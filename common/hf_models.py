@@ -2,8 +2,12 @@
 import os
 import shutil
 import threading
+import time
 
 POLL_SECONDS = 0.5
+# Hugging Face limits anonymous requests per IP address; shared addresses
+# (university networks, CI runners) hit it.  Wait as told, a few times.
+RATE_LIMIT_RETRIES = 4
 
 
 def is_snapshot_complete(dest: str, files) -> bool:
@@ -34,6 +38,28 @@ def _use_plain_http():
         constants.HF_HUB_DISABLE_XET = True
     except ImportError:
         pass
+
+
+def _retry_after(error) -> float | None:
+    """Seconds to wait if *error* is an HTTP 429 (rate limit), else None."""
+    response = getattr(error, "response", None)
+    if getattr(response, "status_code", None) != 429:
+        return None
+    try:
+        return max(1.0, min(60.0, float(response.headers.get("Retry-After", 10))))
+    except (TypeError, ValueError):
+        return 10.0
+
+
+def _snapshot_with_retries(snapshot_download, **kwargs):
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            return snapshot_download(**kwargs)
+        except Exception as e:
+            wait = _retry_after(e)
+            if wait is None or attempt == RATE_LIMIT_RETRIES:
+                raise
+            time.sleep(wait)
 
 
 def _bytes_under(folder: str) -> int:
@@ -75,7 +101,8 @@ def download_snapshot(repo_id: str, revision: str, files, dest: str, on_progress
 
         threading.Thread(target=poll, name="hf-progress", daemon=True).start()
     try:
-        snapshot_download(repo_id=repo_id, revision=revision, allow_patterns=list(files), local_dir=part)
+        _snapshot_with_retries(snapshot_download, repo_id=repo_id, revision=revision,
+                               allow_patterns=list(files), local_dir=part)
         shutil.rmtree(os.path.join(part, ".cache"), ignore_errors=True)
         if not is_snapshot_complete(part, files):
             missing = [f for f in files if not os.path.isfile(os.path.join(part, f))]

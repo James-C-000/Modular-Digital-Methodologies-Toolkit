@@ -75,3 +75,38 @@ def test_downloads_avoid_the_xet_cache(tmp_path, monkeypatch, fake_hub):
     monkeypatch.setitem(sys.modules, "huggingface_hub.constants", constants)
     hf_models.download_snapshot("org/m", "abc123", ["a.bin"], str(tmp_path / "m"))
     assert constants.HF_HUB_DISABLE_XET is True
+
+
+class FakeRateLimit(Exception):
+    """Shaped like huggingface_hub's HfHubHTTPError for a 429."""
+
+    def __init__(self, retry_after="2"):
+        super().__init__("429 Too Many Requests")
+        self.response = types.SimpleNamespace(status_code=429, headers={"Retry-After": retry_after})
+
+
+def test_rate_limits_are_waited_out(tmp_path, monkeypatch, fake_hub):
+    real = sys.modules["huggingface_hub"].snapshot_download
+    failures = [FakeRateLimit("3"), FakeRateLimit()]
+
+    def flaky(**kwargs):
+        if failures:
+            raise failures.pop(0)
+        return real(**kwargs)
+
+    sys.modules["huggingface_hub"].snapshot_download = flaky
+    waits = []
+    monkeypatch.setattr(hf_models.time, "sleep", waits.append)
+    hf_models.download_snapshot("org/m", "abc123", ["a.bin"], str(tmp_path / "m"))
+    assert (tmp_path / "m" / "a.bin").exists() and waits[:2] == [3, 2]   # then the fake hub's own pauses
+
+
+def test_rate_limits_give_up_eventually(tmp_path, monkeypatch, fake_hub):
+    def always(**kwargs):
+        raise FakeRateLimit()
+
+    sys.modules["huggingface_hub"].snapshot_download = always
+    monkeypatch.setattr(hf_models.time, "sleep", lambda s: None)
+    with pytest.raises(FakeRateLimit):
+        hf_models.download_snapshot("org/m", "abc123", ["a.bin"], str(tmp_path / "m"))
+    assert not (tmp_path / "m").exists() and not (tmp_path / "m.part").exists()
