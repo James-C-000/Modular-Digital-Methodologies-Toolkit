@@ -158,27 +158,24 @@ and produces a detailed report with context snippets, frequency counts, and
 charts.
 
 **How to use:**
-1. Select a **PDF Input Directory** and a separate **Output Directory** for results.
-2. Set the **Context Length** \u2014 the number of words shown before and after each
-   keyword match (default: 5).
-3. Enter your **Keywords**, one per line. These are the terms to search for.
-4. Optionally configure filters (see below).
-5. Click **Analyze**.
+1. Choose a **PDF folder** and a separate **Output folder** for the results.
+2. Enter your **Keywords**, one per line.
+3. Set the **Context length**: the total number of words saved around each
+   match, half before it and half after (default: 5).
+4. Optionally set filters (see below).
+5. Click **Search**.
 
-**Filters:**
-- **Basic Filter (letters & numbers only)** \u2014 When enabled, strips all characters
-  except letters and numbers from the extracted PDF text before searching. This
-  is useful for cleaning up OCR artifacts, stray punctuation, or special
-  characters that might prevent keyword matches.
-- **Filter words** (textarea below) \u2014 Words to exclude from results. If a keyword
-  match's surrounding context contains any of these filter words, that match is
-  removed from the output. Enter one filter word per line. Useful for eliminating
-  false positives (e.g. filtering out "table of contents" matches).
+**Filters** (applied to the text before searching; the first that applies wins):
+- **Basic filter** keeps only the letters A–Z, the digits 0–9 and spaces. Note
+  that it also removes accented and non-Latin letters, so leave it off for
+  texts that are not in plain English.
+- Otherwise, every **character** listed in the filter file, or typed in the
+  filter box, is removed from the text: entering `#*` deletes every `#` and `*`.
+  This cleans up OCR noise that splits words.
 
 **Loading from files:**
-Instead of typing keywords and filters manually, you can load them from text
-files using the expandable "Or load from files..." section. The files should
-contain one keyword or filter word per line.
+Instead of typing them, keywords (one per line) and filter characters can be
+loaded from text files in the "Or load keywords and filters from files" section.
 
 **Tips:**
 - Use short, specific keywords for more relevant results.
