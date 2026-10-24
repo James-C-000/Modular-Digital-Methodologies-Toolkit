@@ -68,6 +68,8 @@ def test_paraphrased_refusals_are_detected():
         "Aucune information à ce sujet dans les documents.",
         "Die Dokumente enthalten keine Informationen darüber.",
         "Das wird in den Dokumenten nicht erwähnt.",
+        # rambles about a cited passage, then gives the stock reply
+        "Document [1] discusses Rousseau but not the chapel.\n\nTherefore, I could not find this in the documents.",
     ]:
         assert is_not_found(answer), answer
 

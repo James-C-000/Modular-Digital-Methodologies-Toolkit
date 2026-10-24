@@ -102,7 +102,7 @@ _STOCK_REPLY = re.compile(re.escape(NOT_FOUND.rstrip(".")) + r"\.?", re.IGNORECA
 def is_not_found(answer: str) -> bool:
     """True if *answer* is the NOT_FOUND reply or opens by declining to answer."""
     text = answer.strip().replace("’", "'")
-    if _STOCK_REPLY.match(text):
+    if _STOCK_REPLY.match(text) or NOT_FOUND.lower() in text.lower():
         return True
     first = _FIRST_SENTENCE.match(text).group(0)
     return bool(_REFUSAL.search(first)) and not _CITATION.search(first)
