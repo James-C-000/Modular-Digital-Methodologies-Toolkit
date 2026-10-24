@@ -4,7 +4,8 @@
 - The model must cite chunks as [n]; citations are validated afterwards and
   out-of-range numbers removed.
 - If the documents do not contain the answer the model must reply with
-  NOT_FOUND, which the UI shows as a clean "not found" message.
+  NOT_FOUND; that reply, or one that opens by declining in other words, is
+  flagged so the UI can say the answer is probably not in the documents.
 - Follow-up questions are rewritten into standalone search queries using the
   recent conversation, before retrieval.
 """
@@ -71,8 +72,47 @@ def parse_citations(answer: str, n_sources: int):
     return text, cited, dropped
 
 
+# Small models often decline in their own words instead of replying NOT_FOUND.
+# Only the first sentence is checked, and only when it cites nothing, so an
+# answer like "The documents do not give his age, but he was born in X [1]." is
+# not taken for a refusal.  The UI shows a note and keeps the text either way.
+_REFUSAL = re.compile("|".join([
+    # English
+    r"\bno (specific |relevant |further )?(information|mention|details?)\b",
+    r"\b(do|does|did) not (mention|contain|include|specify|say|provide|state)\b",
+    r"\bnot (mentioned|found|stated|specified|provided|included)\b",
+    r"\b(could|can)( ?not|n't) find\b",
+    r"\bnone of (them|the (provided )?documents)\b",
+    # French
+    r"\bne (mentionne|mentionnent|contient|contiennent|précise|précisent|parle|parlent) pas\b",
+    r"\bn'ai pas trouvé\b",
+    r"\baucune (information|mention|indication)\b",
+    r"\bn'(est|sont) pas (mentionnée?s?|indiquée?s?|précisée?s?)\b",
+    # German
+    r"\bkeine (Informationen?|Angaben?|Erwähnung|Hinweise?)\b",
+    r"\bnicht (erwähnt|enthalten|gefunden|angegeben|genannt)\b",
+    r"\b(erwähnen|enthalten|nennen) (die (vorliegenden )?(Dokumente|Texte) )?(dies |das )?nicht\b",
+]), re.IGNORECASE)
+_FIRST_SENTENCE = re.compile(r"^.*?(?:[.!?](?=\s)|$)", re.DOTALL)
+
+
+_STOCK_REPLY = re.compile(re.escape(NOT_FOUND.rstrip(".")) + r"\.?", re.IGNORECASE)
+
+
 def is_not_found(answer: str) -> bool:
-    return answer.strip().lower().startswith(NOT_FOUND.lower().rstrip("."))
+    """True if *answer* is the NOT_FOUND reply or opens by declining to answer."""
+    text = answer.strip().replace("’", "'")
+    if _STOCK_REPLY.match(text):
+        return True
+    first = _FIRST_SENTENCE.match(text).group(0)
+    return bool(_REFUSAL.search(first)) and not _CITATION.search(first)
+
+
+def not_found_remainder(answer: str) -> str:
+    """What a not-found answer says beyond the stock NOT_FOUND reply (shown under the note)."""
+    text = answer.strip()
+    m = _STOCK_REPLY.match(text)
+    return text[m.end():].strip() if m else text
 
 
 def _strip_citations(text: str) -> str:

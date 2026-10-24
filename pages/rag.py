@@ -200,6 +200,7 @@ class PassageDialog:
 
 
 def _render_answer(turn, passages):
+    from RAG.prompting import not_found_remainder
     answer = turn.answer
     if turn.error:
         ui.label(f"Error: {turn.error}").classes("text-negative")
@@ -207,12 +208,14 @@ def _render_answer(turn, passages):
     if answer.thinking:
         with ui.expansion("Reasoning", icon="psychology").classes("w-full text-caption"):
             ui.label(answer.thinking).classes("whitespace-pre-wrap text-grey")
+    text = answer.text
     if answer.not_found:
         with ui.row().classes("items-center gap-1"):
             ui.icon("search_off").classes("text-grey")
-            ui.label("Not found in the documents.").classes("text-grey")
-    else:
-        ui.markdown(answer.text or "(no answer)")
+            ui.label("Probably not in your documents.").classes("text-grey")
+        text = not_found_remainder(text)
+    if text or not answer.not_found:
+        ui.markdown(text or "(no answer)")
     if answer.stopped:
         ui.label("Stopped.").classes("text-caption text-grey")
     if answer.citations:

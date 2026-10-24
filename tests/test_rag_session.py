@@ -91,6 +91,11 @@ def test_not_found_answers_are_flagged(docs, tmp_path):
     assert answer.not_found and answer.citations == []
 
 
+def test_paraphrased_not_found_answers_are_flagged(docs, tmp_path):
+    session = _session(docs, tmp_path, llm=FakeLlm(reply="None of the documents mention the king of France."))
+    assert session.ask("Who was the king of France?").not_found
+
+
 def test_thinking_is_separated_from_the_answer(docs, tmp_path):
     llm = FakeLlm(reply="Ship records say Lisbon.</think>\n\nLisbon [1].")
     session = _session(docs, tmp_path, llm=llm, enable_thinking=True)

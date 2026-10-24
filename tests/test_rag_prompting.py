@@ -6,6 +6,7 @@ from RAG.prompting import (
     format_context,
     history_window,
     is_not_found,
+    not_found_remainder,
     parse_citations,
     rewrite_messages,
     split_thinking,
@@ -53,6 +54,40 @@ def test_not_found_detection():
     assert is_not_found(NOT_FOUND)
     assert is_not_found("  " + NOT_FOUND.lower())
     assert not is_not_found("Lisbon [1].")
+
+
+def test_paraphrased_refusals_are_detected():
+    # Seen from Qwen3.5-0.8B in eval/ runs.
+    for answer in [
+        "Based on the provided documents, none of them mention who painted the ceiling of the Sistine Chapel.",
+        "Based on the provided documents, there is no mention of the invention of an electric telegraph.",
+        "Based on the provided documents, no specific information is given regarding who painted it.\n\n[1] discusses Rousseau.",
+        "The documents do not contain this information.",
+        "Les documents ne mentionnent pas qui a peint ce plafond.",
+        "Je n'ai pas trouvé cette information dans les documents.",
+        "Aucune information à ce sujet dans les documents.",
+        "Die Dokumente enthalten keine Informationen darüber.",
+        "Das wird in den Dokumenten nicht erwähnt.",
+    ]:
+        assert is_not_found(answer), answer
+
+
+def test_answers_with_content_are_not_refusals():
+    for answer in [
+        "Lisbon [1].",
+        "The documents do not mention his age, but he was born in Tuckahoe [1].",   # cited: real content
+        "He was born in Tuckahoe [1]. The documents do not mention the year.",       # refusal not first
+        "Gregor's father did not throw anything at him; an apple grazed his back [3].",
+        "Not found anywhere else, the Junto met on Friday evenings [2].",
+    ]:
+        assert not is_not_found(answer), answer
+
+
+def test_not_found_remainder_keeps_anything_beyond_the_stock_reply():
+    assert not_found_remainder(NOT_FOUND) == ""
+    assert not_found_remainder(NOT_FOUND + " The mill is mentioned in [2].") == "The mill is mentioned in [2]."
+    para = "The documents do not contain this information."
+    assert not_found_remainder(para) == para
 
 
 def test_answer_prompt_carries_question_context_rules_and_history():
