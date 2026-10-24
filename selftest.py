@@ -444,10 +444,35 @@ class SelfTest:
             gs = find_ghostscript()
             return {"ghostscript": gs, "pdfa_available": bool(gs)}
 
-        @self.check("torch presence (informational)")
+        @self.check("torch-free build")
         def _():
             import importlib.util
-            return {"torch_importable": importlib.util.find_spec("torch") is not None}
+            present = [m for m in ("torch", "transformers", "sentence_transformers", "langchain", "faiss")
+                       if importlib.util.find_spec(m) is not None]
+            if present and _bundle_dir():
+                raise RuntimeError(f"frozen build contains {present}")
+            return {"importable": present}
+
+        @self.check("RAG retrieval (e5-small + BM25)")
+        def _():
+            from RAG.index import CorpusIndex
+            from RAG.models import get_embedder, is_installed, EMBEDDER
+            downloaded = not is_installed(EMBEDDER)
+            corpus = os.path.join(work, "rag-corpus")
+            os.makedirs(corpus)
+            docs = {"ledger.txt": "The brig Endeavour arrived from Lisbon carrying cork, salt and port wine. "
+                                  "The harbour master Josiah Penrose recorded a duty of fourteen pounds.",
+                    "mill.txt": "The mill flooded in the winter of 1751 and the bridge was carried away.",
+                    "letters.txt": "Ada Lovelace corresponded with Charles Babbage about the Analytical Engine."}
+            for name, text in docs.items():
+                with open(os.path.join(corpus, name), "w", encoding="utf-8") as f:
+                    f.write(text)
+            index = CorpusIndex(corpus, get_embedder(), index_root=os.path.join(work, "rag-index"))
+            report = index.update()
+            hits = index.search("Which ship came from Portugal?", k=3)
+            if not hits or hits[0].chunk.file != "ledger.txt":
+                raise RuntimeError(f"expected ledger.txt first, got {[h.chunk.file for h in hits]}")
+            return {"chunks": report.chunks, "top": [h.chunk.file for h in hits], "downloaded_now": downloaded}
 
         @self.check("browser mode: local server security")
         def _():

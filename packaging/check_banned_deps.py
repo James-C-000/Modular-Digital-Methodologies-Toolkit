@@ -13,7 +13,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REQ = os.path.join(ROOT, "requirements")
 
 # Not allowed anywhere in a lock file.
-BANNED = {"nltk", "pandas", "googletrans", "pypdf", "openai-whisper", "openpyxl", "future"}
+BANNED = {"nltk", "pandas", "googletrans", "pypdf", "openai-whisper", "openpyxl", "future",
+          # Phase 3: the RAG stack runs on ONNX Runtime and numpy; MDMT is torch-free.
+          "torch", "transformers", "sentence-transformers", "faiss-cpu", "beautifulsoup4", "docx2txt"}
+BANNED_PREFIXES = ("langchain",)
 # Not allowed in the Linux lock (Linux runs in the browser, without Qt).
 BANNED_LINUX = {"pyside6", "pyside6-essentials", "pyside6-addons", "shiboken6", "qtpy", "pywebview"}
 # Not allowed as direct requirements (may still arrive transitively).
@@ -35,6 +38,7 @@ def main() -> int:
             found = set(_names(os.path.join(REQ, name)))
             banned = BANNED | (BANNED_LINUX if name == "lock-linux.txt" else set())
             problems += [f"{name}: {pkg}" for pkg in sorted(found & banned)]
+            problems += [f"{name}: {pkg}" for pkg in sorted(found) if pkg.startswith(BANNED_PREFIXES)]
     direct = set(_names(os.path.join(REQ, "base.in")))
     problems += [f"base.in (direct): {pkg}" for pkg in sorted(direct & BANNED_DIRECT)]
     for p in problems:
