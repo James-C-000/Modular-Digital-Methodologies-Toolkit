@@ -18,7 +18,7 @@ def test_fallback_template_switches_thinking_like_qwen():
 def test_every_argument_mdmt_passes_exists_in_the_installed_llama_cpp():
     # The JamePeng fork renamed presence_penalty to present_penalty; a mismatch
     # only shows up when a real model generates, so check the signature here.
-    # Runs in the build workflow, which installs llama-cpp-python.
+    # Runs in tests.yml's llama-cpp job and in build.yml, which install it.
     import inspect
 
     import pytest

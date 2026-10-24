@@ -54,8 +54,8 @@ jobs:
           choco install tesseract --no-progress -y
           echo "C:\\Program Files\\Tesseract-OCR" >> "$GITHUB_PATH"
 
-      # llama-cpp-python is not needed by the tests (it is only loaded when a
-      # model is), so the slow source build is skipped here.
+      # llama-cpp-python is not needed by most tests (it is only loaded when a
+      # model is), so the slow source build is left to the llama-cpp job.
       - name: Install locked Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -70,6 +70,51 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+  # The tests that need llama-cpp-python (such as the check that every argument
+  # MDMT passes exists in it), against the release build of the pinned version.
+  llama-cpp:
+    runs-on: ubuntu-latest
+    env:
+      # Same flags and cache key as build.yml's Linux job, so they share the wheel.
+      CMAKE_ARGS: -DGGML_NATIVE=OFF
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/*-linux.txt
+
+      - name: Install locked Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/lock-linux.txt
+          pip install -r requirements/dev-linux.txt
+
+      - name: Cache llama-cpp-python wheel
+        id: llama-cache
+        uses: actions/cache@v4
+        with:
+          path: wheels
+          key: llama-cpp-python-linux-py312-${{ hashFiles('requirements/llama.txt') }}-${{ env.CMAKE_ARGS }}
+
+      - name: Build llama-cpp-python wheel
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        # --no-cache-dir: pip's wheel cache ignores CMAKE_ARGS (see build.yml).
+        run: pip wheel --no-deps --no-cache-dir -r requirements/llama.txt -w wheels
+
+      # Import it here so a broken install fails the job instead of letting
+      # the tests skip themselves.
+      - name: Install llama-cpp-python
+        run: |
+          pip install --no-deps wheels/llama_cpp_python-*.whl
+          python -c "import llama_cpp; print(llama_cpp.__version__)"
+
+      - name: Run the llama-cpp-python tests
+        run: pytest -v -rs tests/test_rag_generation.py
 
   # A small retrieval regression on the eval corpus (no reranker, no LLM).
   retrieval-eval:
