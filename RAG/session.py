@@ -20,6 +20,7 @@ from RAG.prompting import (
     parse_citations,
     rewrite_messages,
     split_thinking,
+    strip_echoed_instructions,
 )
 
 
@@ -154,7 +155,7 @@ class RagSession:
             stopped = bool(stop_event is not None and stop_event.is_set())
 
             thinking, answer = split_thinking(raw, started_in_thinking=thinking_mode)
-            text, cited, dropped = parse_citations(answer, len(context))
+            text, cited, dropped = parse_citations(strip_echoed_instructions(answer), len(context))
             by_number = {c.number: c for c in context}
             result = Answer(
                 text=text, thinking=thinking, citations=[by_number[n] for n in cited], context=context,

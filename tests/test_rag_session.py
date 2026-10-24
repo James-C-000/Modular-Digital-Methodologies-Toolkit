@@ -139,3 +139,10 @@ def test_not_found_turns_stay_out_of_the_conversation(docs, tmp_path):
     session.ask("Where did the Endeavour come from?")
     assert not llm.completions          # nothing to rewrite against: no history
     assert "Sistine" not in llm.prompts[-1]
+
+
+def test_echoed_instructions_do_not_reach_the_user(docs, tmp_path):
+    from RAG.prompting import CITE_REMINDER
+    session = _session(docs, tmp_path, llm=FakeLlm(reply="Lisbon [1].\n\n" + CITE_REMINDER))
+    answer = session.ask("Where did the Endeavour come from?")
+    assert answer.text == "Lisbon [1]." and not answer.not_found

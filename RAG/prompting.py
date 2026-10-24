@@ -99,6 +99,15 @@ _FIRST_SENTENCE = re.compile(r"^.*?(?:[.!?](?=\s)|$)", re.DOTALL)
 _STOCK_REPLY = re.compile(re.escape(NOT_FOUND.rstrip(".")) + r"\.?", re.IGNORECASE)
 
 
+def strip_echoed_instructions(answer: str) -> str:
+    """Remove CITE_REMINDER if the model repeated it back (Qwen3.5-2B sometimes does).
+
+    Left in, it shows in the chat and its NOT_FOUND wording flags a real answer.
+    """
+    words = [re.escape(w) for w in CITE_REMINDER.split()]
+    return re.sub(r"\s*" + r"\s+".join(words) + r"\s*", "\n", answer).strip()
+
+
 def is_not_found(answer: str) -> bool:
     """True if *answer* is the NOT_FOUND reply or opens by declining to answer."""
     text = answer.strip().replace("’", "'")

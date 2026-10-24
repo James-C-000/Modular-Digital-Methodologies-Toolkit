@@ -135,3 +135,14 @@ def test_split_thinking_handles_streamed_fragments():
     assert split_thinking("Reasoning here.</think>Answer.", started_in_thinking=True) == ("Reasoning here.", "Answer.")
     assert split_thinking("Still reasoning", started_in_thinking=True) == ("Still reasoning", "")
     assert split_thinking("Plain answer.") == ("", "Plain answer.")
+
+
+def test_an_echoed_instruction_is_removed_from_the_answer():
+    # Qwen3.5-2B sometimes repeats the reminder that follows the question.
+    from RAG.prompting import strip_echoed_instructions
+    answer = ("According to Paine, government is a necessary evil [1].\n\n"
+              + CITE_REMINDER.replace(" put", "  put"))
+    cleaned = strip_echoed_instructions(answer)
+    assert cleaned == "According to Paine, government is a necessary evil [1]."
+    assert not is_not_found(cleaned)
+    assert strip_echoed_instructions(NOT_FOUND) == NOT_FOUND
