@@ -183,3 +183,33 @@ def test_thinking_may_use_all_the_room_left_in_the_context(docs, tmp_path):
     llm = FakeLlm()
     _session(docs, tmp_path, llm=llm, n_ctx=32768).ask("Where?")
     assert llm.max_tokens == 768                   # plain answers stay short
+
+
+def test_a_model_that_does_not_fit_on_the_gpu_runs_on_the_cpu(docs, tmp_path, monkeypatch):
+    import RAG.generation as generation
+    loads = []
+
+    class SmallGpu(FakeLlm):
+        def __init__(self, path, n_ctx, n_threads=None, n_gpu_layers=0):
+            loads.append(n_gpu_layers)
+            if n_gpu_layers:
+                raise ValueError("Failed to create llama_context")   # what llama.cpp raises on GPU OOM
+            super().__init__()
+
+    monkeypatch.setattr(generation, "LlmEngine", SmallGpu)
+    settings = RagSettings(str(docs), "model.gguf", n_gpu_layers=-1)
+    session = RagSession(settings, embedder=FakeEmbedder(), index_root=str(tmp_path / "index"))
+    assert loads == [-1, 0] and settings.n_gpu_layers == 0
+    assert "CPU" in session.notice
+
+
+def test_a_cpu_failure_is_not_retried(docs, tmp_path, monkeypatch):
+    import RAG.generation as generation
+
+    class Broken(FakeLlm):
+        def __init__(self, *a, **k):
+            raise ValueError("not a GGUF file")
+
+    monkeypatch.setattr(generation, "LlmEngine", Broken)
+    with pytest.raises(ValueError):
+        RagSession(RagSettings(str(docs), "model.gguf"), embedder=FakeEmbedder(), index_root=str(tmp_path / "i"))

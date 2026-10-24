@@ -299,6 +299,8 @@ def _chat_ui(state, refresh):
                         name="Assistant", stamp="System")
         if report and report.failed:
             ui.label("Could not read: " + ", ".join(f for f, _e in report.failed)).classes("text-caption text-warning")
+        if session.notice:
+            ui.label(session.notice).classes("text-caption text-warning")
         for turn in state.turns:
             ui.chat_message(turn.question, name="You", sent=True)
             with ui.chat_message(name="Assistant"), ui.column().classes("w-full gap-1"):

@@ -9,6 +9,7 @@ Fusion, then the top candidates are reranked with a cross-encoder
 (bge-reranker-v2-m3, optional) and the best `top_k` go to the LLM as numbered
 context.  Follow-up questions are first rewritten into standalone queries.
 """
+import logging
 import threading
 import time
 from dataclasses import dataclass, field
@@ -23,6 +24,8 @@ from RAG.prompting import (
     strip_echoed_instructions,
 )
 
+
+log = logging.getLogger("mdmt.rag")
 
 # A plain answer is short.  With thinking on, the model may use all the room
 # left in the context: Qwen3.5-2B reasoned for 3,000-9,000 tokens on eval
@@ -100,13 +103,26 @@ class RagSession:
         self.embedder = embedder or models.get_embedder()
         self._reranker = reranker
         self.index = CorpusIndex(settings.documents_dir, self.embedder, index_root=index_root)
-        if llm is None:
-            from RAG.generation import LlmEngine
-            llm = LlmEngine(settings.llm_path, n_ctx=settings.n_ctx, n_threads=settings.threads,
-                            n_gpu_layers=settings.n_gpu_layers)
-        self.llm = llm
+        self.notice = None   # something the user should know about this session
+        self.llm = llm if llm is not None else self._load_llm(settings)
         self.history: list[tuple[str, str]] = []
         self._busy = threading.Lock()
+
+    def _load_llm(self, settings):
+        """Load the chat model; if it does not fit on the GPU, run it on the CPU."""
+        from RAG import generation
+        try:
+            return generation.LlmEngine(settings.llm_path, n_ctx=settings.n_ctx, n_threads=settings.threads,
+                                        n_gpu_layers=settings.n_gpu_layers)
+        except Exception as e:
+            if not settings.n_gpu_layers:
+                raise
+            log.warning("loading the model on the GPU failed (%s); using the CPU", e)
+            settings.n_gpu_layers = 0
+            self.notice = ("The model did not fit in the GPU's memory, so it runs on the CPU, which is slower."
+                           " A shorter Context length, or the 2B model, may fit on the GPU.")
+            return generation.LlmEngine(settings.llm_path, n_ctx=settings.n_ctx, n_threads=settings.threads,
+                                        n_gpu_layers=0)
 
     # ------------------------------------------------------------ indexing ----
 

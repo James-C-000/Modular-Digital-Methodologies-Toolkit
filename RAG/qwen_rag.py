@@ -77,6 +77,8 @@ def main(argv=None):
                            top_k=args.top_k, rerank=not args.no_rerank, enable_thinking=args.enable_thinking,
                            n_gpu_layers=args.gpu_layers, threads=args.threads)
     session = RagSession(settings)
+    if session.notice:
+        print(session.notice, file=sys.stderr)
     log = sys.stderr if args.json else sys.stdout
     report = session.build_index(lambda done, total, name: print(
         f"\rIndexing {done}/{total} {name[:60]:<60}", end="", file=log, flush=True))
