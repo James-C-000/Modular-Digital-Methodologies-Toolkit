@@ -15,7 +15,7 @@ this computer:
 
 - **Document processing**: OCR, audio transcription, translation
 - **Text analysis**: keyword search, named entities, relationships, co-words
-- **AI**: RAG Chat, which answers questions about your documents and cites its sources
+- **AI**: RAGBot, which answers questions about your documents and cites its sources
 
 Choose a tool in the sidebar. Jobs keep running while you look at other pages;
 the sidebar shows what is running.
@@ -32,7 +32,7 @@ on the **Downloads** page:
 - **Audio transcription**: Whisper models, 78 MB to 1.5 GB
 - **Translation**: one model per language direction, 65–285 MB each
 - **Named entities and relationships**: the multilingual NER model, 182 MB
-- **RAG Chat**: retrieval models (135 MB, plus 588 MB for the optional reranker)
+- **RAGBot**: retrieval models (135 MB, plus 588 MB for the optional reranker)
   and a Qwen 3.5 chat model (533 MB to 2.74 GB)
         """)
         ui.button("Open Downloads", icon="download", on_click=lambda: ui.navigate.to("/downloads")).props("outline")

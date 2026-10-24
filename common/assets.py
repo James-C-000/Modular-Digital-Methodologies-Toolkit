@@ -162,14 +162,14 @@ def _rag_in_use(path_of_model) -> str | None:
         return None
     used = {getattr(session.settings, "llm_path", None)}
     if path_of_model in used or STATE.setup.running:
-        return "RAG Chat is using this model: choose Change setup on the RAG Chat page first."
+        return "RAGBot is using this model: choose Change setup on the RAGBot page first."
     return None
 
 
 def _retrieval_section() -> Section:
     from RAG import models
-    section = Section("retrieval", "Retrieval models (RAG Chat)",
-                      "RAG Chat also downloads these on first start if they are missing.", models.models_root())
+    section = Section("retrieval", "Retrieval models (RAGBot)",
+                      "RAGBot also downloads these on first start if they are missing.", models.models_root())
     roles = {models.EMBEDDER["key"]: "Required: finds the passages relevant to a question.",
              models.RERANKER["key"]: "Optional (\"Rerank passages\"): reorders them for accuracy."}
     for info in models.RAG_MODELS.values():
@@ -179,7 +179,7 @@ def _retrieval_section() -> Section:
             installed_fn=lambda i=info: models.is_installed(i),
             download_fn=lambda cb, i=info: models.download(i, None, cb),
             paths_fn=lambda i=info: [models.model_dir(i)],
-            in_use_fn=lambda: "RAG Chat is using the retrieval models: choose Change setup on the RAG Chat page"
+            in_use_fn=lambda: "RAGBot is using the retrieval models: choose Change setup on the RAGBot page"
                               " first." if _rag_session_open() else None))
     return section
 
@@ -192,7 +192,7 @@ def _rag_session_open() -> bool:
 def _llm_section() -> Section:
     from config import get_models_dir
     from RAG import models
-    section = Section("llm", "Chat models (RAG Chat)", f"Qwen 3.5, quantised GGUF. License: {models.QWEN_LICENSE}.",
+    section = Section("llm", "Chat models (RAGBot)", f"Qwen 3.5, quantised GGUF. License: {models.QWEN_LICENSE}.",
                       get_models_dir())
     for key, info in models.QWEN_MODELS.items():
         section.assets.append(Asset(

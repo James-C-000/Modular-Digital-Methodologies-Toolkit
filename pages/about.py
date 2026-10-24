@@ -1,15 +1,15 @@
 """Help / About / License page."""
 from nicegui import ui
 
+from pages.components import page_header, section
+
 from version import __version__
 
 
 def about_page():
-    ui.label("About MDMT").classes("text-h4")
-    ui.separator()
+    page_header("Help / About", "Modular Digital Methodologies Toolkit")
 
-    with ui.card().classes("w-full"):
-        ui.label("Modular Digital Methodologies Toolkit").classes("text-h5")
+    with section("About MDMT"):
         ui.markdown(f"""
 **Version:** {__version__}
 
@@ -27,30 +27,32 @@ providing tools for text analysis, document processing, and data extraction.
         ui.button("Open log folder", icon="folder_open", on_click=open_logs).props("flat dense")
 
     # --- Getting Started ---
-    with ui.card().classes("w-full mt-4"):
-        ui.label("Getting Started").classes("text-h5")
+    with section("Getting started"):
         ui.markdown("""
-1. Use the **sidebar** to navigate between modules.
-2. Some modules require downloading models or language data first \u2014 visit the
+1. Use the **sidebar** to move between tools.
+2. Some tools require downloading models or language data first \u2014 visit the
    **Downloads** page to manage these.
-3. Each module has its own input/output configuration. Browse for directories
-   using the folder buttons, adjust settings, then click the action button to run.
+3. Each tool remembers its settings. Choose folders with the folder button next
+   to each field, then click the tool's main button. Work continues in the
+   background if you open another page; the sidebar lists what is running, and
+   a running job can be cancelled between files.
         """)
 
     # --- Module Help ---
-    ui.label("Module Reference").classes("text-h5 q-mt-lg")
-    ui.label("Click a module name to expand its usage guide.").classes("text-caption text-grey")
+    ui.label("Tool reference").classes("text-subtitle1 text-weight-medium q-mt-md")
+    ui.label("Click a tool to expand its guide.").classes("text-caption text-grey")
 
     # OCR
-    with ui.expansion("OCR Processing", icon="document_scanner").classes("w-full mt-2"):
+    with ui.expansion("OCR", icon="document_scanner").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Converts scanned or image-based PDFs into text-searchable PDFs
 using Tesseract OCR. Can also optionally extract the recognized text to separate
 `.txt` files.
 
 **How to use:**
-1. Select an **Input Directory** containing PDF files.
-2. Select a different **Output Directory** for the processed files.
+1. Choose an **Input folder** containing PDF files (sub-folders are included).
+2. Choose a different **Output folder**, not inside the input folder (the next
+   run would process the outputs again).
 3. Choose the **Languages** present in your documents. Selecting the correct
    languages significantly improves recognition accuracy. If you need a language
    that isn't listed, download it from the **Downloads** page.
@@ -59,16 +61,16 @@ using Tesseract OCR. Can also optionally extract the recognized text to separate
 **Options:**
 - **Deskew** \u2014 Straightens pages that were scanned at a slight angle. Cannot be
   used together with Redo OCR.
-- **Rotate Pages** \u2014 Automatically detects and corrects page rotation (e.g. pages
-  scanned upside-down). Uses the `osd` data file, installed by default. When enabled, you can set the **Rotation Sensitivity**:
+- **Rotate pages** \u2014 Automatically detects and corrects page rotation (e.g. pages
+  scanned upside-down). Uses the `osd` data file, installed by default. When enabled, you can set the **Rotation sensitivity**:
   High catches subtle rotations, Low only corrects obvious ones.
 - **Redo OCR** \u2014 Strips any existing OCR text layer and re-runs recognition from
   scratch. Useful if a previous OCR pass produced poor results. Cannot be used
   together with Deskew.
-- **PDF/A Output** \u2014 Produces PDF/A-compliant files, an archival format suitable
+- **PDF/A output** \u2014 Produces PDF/A-compliant files, an archival format suitable
   for long-term preservation. Requires [Ghostscript](https://ghostscript.com/releases/gsdnld.html),
   which MDMT does not bundle; the option is disabled until Ghostscript is installed.
-- **Extract Text** \u2014 Saves the recognized text to a `.txt` file alongside each
+- **Extract text (.txt)** \u2014 Saves the recognized text to a `.txt` file alongside each
   output PDF.
 
 **Tips:**
@@ -87,7 +89,7 @@ transcript for each audio file.
 **How to use:**
 1. Select a directory containing audio files (`.mp3`, `.wav`, `.m4a`, `.flac`,
    `.ogg`, `.webm`, `.mp4`, `.mpeg`, `.mpga`).
-2. Choose a **Whisper Model** size.
+2. Choose a **Whisper model** size.
 3. Leave **Skip silence** on for long recordings (see below).
 4. Click **Transcribe**.
 
@@ -126,11 +128,11 @@ Each translated document is saved next to the original as
 `name_translated.txt`.
 
 **How to use:**
-1. Select an **Input Directory** containing `.txt` or text-searchable `.pdf` files.
+1. Choose an **Input folder** containing `.txt` or text-searchable `.pdf` files.
 2. Choose the source language (or **Auto-detect**) and the target language.
 3. If the page says a model is needed, click **Download** (models are 65\u2013285 MB
    each, one per direction; you can also manage them on the **Downloads** page).
-4. Optionally change the **Output Suffix**, then click **Translate**.
+4. Optionally change the **Output suffix**, then click **Translate**.
 
 **Languages:** about 50 languages to and from English. Other pairs (e.g.
 French \u2192 German) are translated through English, which compounds errors.
@@ -151,7 +153,7 @@ the **OCR module** first to add a text layer, then translate the OCR'd output.
         """)
 
     # Advanced Keyword Search
-    with ui.expansion("Advanced Keyword Search", icon="search").classes("w-full mt-2"):
+    with ui.expansion("Keyword Search", icon="search").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Searches a collection of PDF documents for specified keywords
 and produces a detailed report with context snippets, frequency counts, and
@@ -184,7 +186,7 @@ loaded from text files in the "Or load keywords and filters from files" section.
         """)
 
     # Named Entity Recognition
-    with ui.expansion("Named Entity Recognition", icon="person_search").classes("w-full mt-2"):
+    with ui.expansion("Named Entities", icon="person_search").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Identifies people (PER), organizations (ORG), places (LOC)
 and dates (DATE) in your documents with a multilingual BERT model that runs
@@ -193,8 +195,8 @@ English, French, German, Italian, Latvian, Portuguese and Spanish; other
 languages may work less well.
 
 **How to use:**
-1. Select an **Input Directory** containing text or PDF files.
-2. Click **Run NER**.
+1. Choose an **Input folder** containing text or PDF files.
+2. Click **Find entities**.
 3. Results are saved in the input directory: a summary table and, for each
    document, a copy with the entities highlighted.
 
@@ -209,18 +211,19 @@ languages may work less well.
         """)
 
     # Relationship Extraction
-    with ui.expansion("Relationship Extraction", icon="hub").classes("w-full mt-2"):
+    with ui.expansion("Relationships", icon="hub").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Finds pairs of named entities that appear in the same
 sentence, records the words connecting them, and can draw a network graph of
 these connections.
 
 **How to use:**
-1. Select an **Input Directory** containing your documents.
-2. Choose which **Entity Types** to include.
+1. Choose an **Input folder** containing your documents.
+2. Choose which **Entity types** to include.
 3. Configure options:
-   - **Extract text from PDFs** \u2014 Also saves the text extracted from each PDF.
-   - **Generate network graph** \u2014 Saves network images (PNG) of all entities
+   - **Save text extracted from PDFs** \u2014 Also saves the text of each PDF as
+     `<name>_text.txt`; later runs do not process these files again.
+   - **Draw network graphs** \u2014 Saves network images (PNG) of all entities
      and of each entity type.
 4. Click **Extract Relationships**. Results go to `relationships.csv`
    (Excel-friendly) in the input directory.
@@ -242,17 +245,17 @@ when they are adjacent. Versions before 2.1 used NLTK's entity types
         """)
 
     # Co-Word Analysis
-    with ui.expansion("Co-Word Analysis", icon="share").classes("w-full mt-2"):
+    with ui.expansion("Co-Words", icon="grain").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Analyzes how frequently words appear together in your documents
 to reveal conceptual relationships. Produces a co-occurrence network and a
 summary report.
 
 **How to use:**
-1. Select an **Input Directory** containing text or PDF files.
+1. Choose an **Input folder** containing text or PDF files.
 2. Choose the **Stopword list** for the documents' language, and optionally add
    your own words to ignore.
-3. Click **Run Analysis**.
+3. Click **Run analysis**.
 4. Results, including an HTML summary report, are saved in the input directory.
 
 **Stopword lists:** Snowball lists (17 languages) contain only function words.
@@ -266,8 +269,8 @@ For other languages MDMT uses the broader stopwords-iso lists, marked
   are meaningful.
         """)
 
-    # RAG Chat
-    with ui.expansion("RAG Chat", icon="smart_toy").classes("w-full mt-2"):
+    # RAGBot
+    with ui.expansion("RAGBot", icon="smart_toy").classes("w-full mt-2"):
         ui.markdown("""
 **What it does:** Lets you ask questions about a folder of documents using a
 local Qwen model. MDMT indexes the documents, finds the passages most relevant
@@ -276,9 +279,9 @@ reranked), and asks the model to answer from those passages only, citing them.
 Nothing leaves your computer.
 
 **How to use:**
-1. Select a **Documents Directory** (TXT, PDF, Markdown, HTML, CSV, JSON, DOCX).
-2. Select a **Model File**, a Qwen 3.5 `.gguf` model from the **Downloads** page.
-3. Optionally adjust **Context Length**, **Thinking mode** and **Rerank passages**.
+1. Choose a **Documents folder** (TXT, PDF, Markdown, HTML, CSV, JSON, DOCX).
+2. Choose a **Model file**, a Qwen 3.5 `.gguf` model from the **Downloads** page.
+3. Optionally adjust **Context length**, **Thinking mode** and **Rerank passages**.
 4. Click **Start**. The first start downloads the retrieval models (about
    135 MB, plus 588 MB for the reranker) and indexes the folder; later starts
    only re-read files that changed.
@@ -303,7 +306,7 @@ Nothing leaves your computer.
         """)
 
     # License
-    with ui.expansion("License", icon="gavel").classes("w-full mt-2"):
+    with ui.expansion("Licenses", icon="gavel").classes("w-full mt-2"):
         ui.markdown("MDMT is MIT-licensed -- see the project's `LICENSE` file. "
                     "License texts for bundled third-party libraries are in "
                     "`THIRD_PARTY_LICENSES`.")

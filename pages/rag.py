@@ -18,7 +18,7 @@ def rag_page():
 
     with ui.row().classes("w-full items-center no-wrap"):
         with ui.column().classes("gap-0"):
-            ui.label("RAG Chat").classes("text-h5 text-weight-medium")
+            ui.label("RAGBot").classes("text-h5 text-weight-medium")
             ui.label("Ask questions about your documents; answers cite the passages they rely on.") \
                 .classes("text-body2 mdmt-muted")
         ui.space()

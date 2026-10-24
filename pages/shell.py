@@ -34,6 +34,9 @@ SECTIONS = [
         ("/about", "Help / About", "info", "pages.about:about_page"),
     ]),
 ]
+# A restrained desktop look: sentence-case buttons rather than Quasar's capitals.
+ui.button.default_props("no-caps")
+
 WELCOME = ("/welcome", "Welcome", "home", "pages.welcome:welcome_page")
 ROUTES = [WELCOME] + [entry for _title, entries in SECTIONS for entry in entries]
 FULL_HEIGHT = {"/rag"}  # pages that manage their own height (chat)
