@@ -95,6 +95,9 @@ def _setup_ui(config, state, on_ready):
         ui.button("Browse...", on_click=browse_model, icon="folder_open").props("flat")
         if not ggufs:
             ui.label("No models found. Visit the Downloads page to get a Qwen model.").classes("text-warning")
+        else:
+            ui.label("Larger models (2B, 4B) answer more accurately than 0.8B but are slower and need more "
+                     "memory; get them from the Downloads page.").classes("text-caption text-grey")
 
         with ui.row().classes("items-center"):
             ctx_length = ui.number("Context Length", value=config.get("defaults.rag_context_window", 8192),
@@ -242,7 +245,8 @@ def _chat_ui(state):
         report = state.setup.report
         n_files = len((session.index.manifest or {}).get("files", {}))
         ui.chat_message(f"I've indexed {n_files} document(s) ({len(session.index.chunks)} passages). "
-                        "Ask me anything about them.", name="Assistant", stamp="System")
+                        "Ask me anything about them, ideally in the language they are written in.",
+                        name="Assistant", stamp="System")
         if report and report.failed:
             ui.label("Could not read: " + ", ".join(f for f, _e in report.failed)).classes("text-caption text-warning")
         for turn in state.turns:

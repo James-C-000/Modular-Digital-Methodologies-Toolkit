@@ -298,6 +298,11 @@ Nothing leaves your computer.
 - **Rerank passages** improves accuracy but is slower on older computers.
 - **Thinking mode** lets the model reason first: slower, sometimes better on
   complex questions.
+- Ask in the language of your documents. A question in another language
+  (English about a French text, say) often misses the right passages.
+- The 0.8B model is fast but often gets details wrong. If your computer can
+  run them, the 2B and 4B models from the **Downloads** page answer more
+  accurately.
         """)
 
     # License
