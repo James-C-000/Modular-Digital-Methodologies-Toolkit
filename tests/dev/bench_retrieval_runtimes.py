@@ -58,6 +58,9 @@ RERANKERS = {
         "gguf": ("gpustack/bge-reranker-v2-m3-GGUF", "bge-reranker-v2-m3-Q8_0.gguf"),
         "onnx": ("onnx-community/bge-reranker-v2-m3-ONNX", "onnx/model_uint8.onnx"),
     },
+    "gte-multilingual-reranker-base": {
+        "onnx": ("onnx-community/gte-multilingual-reranker-base", "onnx/model_uint8.onnx"),
+    },
     "qwen3-reranker-0.6b": {
         "gguf": ("ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF", "qwen3-reranker-0.6b-q8_0.gguf"),
     },
