@@ -183,6 +183,11 @@ def _run_native_window():
     port = _free_port()
     app.add_middleware(LocalAccessMiddleware, port=port, token=None)  # Host check only
     app.native.window_args["text_select"] = True
+    # Ask before closing while a job runs (common/close_guard.py), in MDMT's words.
+    from common import close_guard
+    from common.jobs import JOBS
+    app.native.start_args["localization"] = {"global.quitConfirmation": close_guard.QUESTION}
+    close_guard.install(JOBS, close_guard.send_to_native_window)
     from pages.shell import root
     ui.run(root, native=True, port=port, title=TITLE, window_size=(1200, 800), reload=False)
 
