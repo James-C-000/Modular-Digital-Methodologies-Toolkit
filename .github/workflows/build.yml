@@ -139,20 +139,22 @@ jobs:
           pip install --no-deps --force-reinstall av-wheel/av-*.whl
           python -c "import av; m = av._core.library_meta['libavcodec']; print(av.__version__, av.ffmpeg_version_info, m['license']); assert 'x264' not in m['configuration'] and m['license'].startswith('LGPL')"
 
-      - name: Read pinned llama-cpp-python commit
+      - name: Read pinned llama-cpp-python version
         id: llama
-        run: echo "sha=$(grep -oE '@[0-9a-f]{40}' requirements/llama.txt | tr -d @)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(grep -oE '^llama-cpp-python==[^ ]+' requirements/llama.txt | cut -d= -f3)" >> "$GITHUB_OUTPUT"
 
       - name: Cache llama-cpp-python wheel
         id: llama-cache
         uses: actions/cache@v4
         with:
           path: wheels
-          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.sha }}-${{ env.CMAKE_ARGS }}
+          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.version }}-${{ env.CMAKE_ARGS }}
 
       - name: Build llama-cpp-python wheel
         if: steps.llama-cache.outputs.cache-hit != 'true'
-        run: pip wheel --no-deps -r requirements/llama.txt -w wheels
+        # --no-cache-dir: pip's wheel cache ignores CMAKE_ARGS, so it could hand
+        # back a build made with other flags.
+        run: pip wheel --no-deps --no-cache-dir -r requirements/llama.txt -w wheels
 
       - name: Install llama-cpp-python
         run: pip install --no-deps wheels/llama_cpp_python-*.whl

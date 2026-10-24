@@ -1,4 +1,9 @@
-# JamePeng's llama-cpp-python fork (MIT), pinned to a commit.
-# fe38cbf = "Bump version to 0.3.37" (2026-05-02), the version v2.0.7 shipped with.
+# llama-cpp-python (MIT), always compiled from its PyPI source with MDMT's
+# CMAKE_ARGS (see .github/workflows/build.yml): -DGGML_NATIVE=OFF everywhere,
+# -DGGML_OPENMP=OFF on Windows. Never a prebuilt binary, which may use other
+# CPU features or need OpenMP's vcomp140.dll on Windows.
+# MDMT 2.0.x-2.1.0 used JamePeng's fork, the only build with Qwen 3.5 support
+# in March 2026; mainline 0.3.36 (2026-10-01) gives identical results.
 # Its runtime dependencies are locked via requirements/base.in.
-llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git@fe38cbfac424973ccd9cfaa199a64a02502af4d1
+--no-binary llama-cpp-python
+llama-cpp-python==0.3.36

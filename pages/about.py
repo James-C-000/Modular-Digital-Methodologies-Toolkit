@@ -337,7 +337,7 @@ Nothing leaves your computer.
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
 | img2pdf (shipped as replaceable source files) | LGPL-3.0 | [GitLab](https://gitlab.mister-muffin.de/josch/img2pdf) |
 | Jinja2 | BSD-3-Clause | [GitHub](https://github.com/pallets/jinja) |
-| llama-cpp-python (fork) | MIT | [GitHub](https://github.com/JamePeng/llama-cpp-python) |
+| llama-cpp-python | MIT | [GitHub](https://github.com/abetlen/llama-cpp-python) |
 | Matplotlib | PSF-2.0 | [GitHub](https://github.com/matplotlib/matplotlib) |
 | NetworkX | BSD-3-Clause | [GitHub](https://github.com/networkx/networkx) |
 | NiceGUI | MIT | [GitHub](https://github.com/zauberzeug/nicegui) |

@@ -22,6 +22,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CMAKE_ARGS: -DGGML_NATIVE=OFF ${{ matrix.cmake_extra }}
+      # The benchmark uses the JamePeng fork's LlamaEmbedding (not in mainline),
+      # so it keeps the fork commit it was written for.
+      BENCH_LLAMA_SHA: fe38cbfac424973ccd9cfaa199a64a02502af4d1
       HF_HUB_DISABLE_PROGRESS_BARS: '1'
     defaults:
       run:
@@ -37,17 +40,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements/lock-${{ matrix.name }}.txt
-      - id: llama
-        run: echo "sha=$(grep -oE '@[0-9a-f]{40}' requirements/llama.txt | tr -d @)" >> "$GITHUB_OUTPUT"
-      - name: Restore llama-cpp-python wheel (built by build.yml)
+      - name: Restore the fork's llama-cpp-python wheel
         id: llama-cache
         uses: actions/cache@v4
         with:
           path: wheels
-          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.sha }}-${{ env.CMAKE_ARGS }}
-      - name: Build llama-cpp-python wheel
+          key: llama-cpp-python-${{ matrix.name }}-py312-${{ env.BENCH_LLAMA_SHA }}-${{ env.CMAKE_ARGS }}
+      - name: Build the fork's llama-cpp-python wheel
         if: steps.llama-cache.outputs.cache-hit != 'true'
-        run: pip wheel --no-deps -r requirements/llama.txt -w wheels
+        run: pip wheel --no-deps -w wheels "llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git@${BENCH_LLAMA_SHA}"
       - run: pip install --no-deps wheels/llama_cpp_python-*.whl
       - name: CPU info
         run: python -c "import os, platform; print(platform.platform(), platform.processor(), os.cpu_count())"
