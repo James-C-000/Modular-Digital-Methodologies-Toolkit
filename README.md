@@ -22,7 +22,9 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 - **Co-Word Analysis**: Generate word co-occurrence networks to reveal conceptual relationships
 
 ### AI Integration
-- **RAGBot**: Chat with your documents using an AI assistant powered by local Qwen 3.5 models. MDMT auto-detects your hardware (NVIDIA, AMD, and Apple Metal GPUs) and recommends the best model size for your system.
+- **RAGBot**: Ask questions about a folder of documents and get answers that cite the passages they come from, from a local Qwen 3.5 model. Retrieval combines keyword search with multilingual embeddings and an optional reranker. MDMT auto-detects your hardware (NVIDIA, AMD, and Apple Metal GPUs) and recommends the best model size for your system.
+
+<p align="center"><img src="docs/images/ragbot.gif" alt="RAGBot answering a question about Frederick Douglass's Narrative and citing its source" width="800"></p>
 
 ## Platform support
 
@@ -77,7 +79,7 @@ python app.py --self-test --self-test-out report.json
 
 ## Usage
 
-Launch MDMT with `python app.py`. The application opens in a native desktop window on Windows and macOS, and in your web browser on Linux, with a sidebar for navigation between modules:
+Launch MDMT with `python app.py`. The application opens in a native desktop window on Windows and macOS, and in your web browser on Linux, with a sidebar for navigation between tools. Every tool remembers its settings, and work keeps running in the background while you look at other pages: the sidebar lists running jobs, and a job shows its progress, can be cancelled between files, and ends with a summary, the generated charts or graphs, and a button that opens the output folder.
 
 <p align="center"><img src="MDMT_Welcome.png" alt="MDMT Welcome Screen"></p>
 
@@ -89,9 +91,9 @@ Launch MDMT with `python app.py`. The application opens in a native desktop wind
 6. **Relationships**: Identify entity relationships and generate network graphs
 7. **Co-Words**: Generate word co-occurrence networks
 8. **RAGBot**: Query your document collection using a local LLM
-9. **Downloads**: Manage optional assets (Tesseract languages and orientation data, Whisper models, translation models, the NER model, LLM models)
+9. **Downloads**: Download or delete optional assets (Tesseract languages, Whisper models, translation models, the NER model, the retrieval models, Qwen chat models), with progress and the disk space each section uses
 
-Optional assets (language models, Tesseract language files) are downloaded on demand via the Downloads page. Large ML models are not bundled with the application.
+Models and language files are never bundled; they are downloaded on demand from the Downloads page, or all at once with the **Recommended setup** on the Welcome page.
 
 A dark mode toggle is available in the sidebar.
 
