@@ -16,6 +16,12 @@ sys.path.insert(0, ROOT)
 from selftest import SELF_TEST_MODULES  # noqa: E402
 
 
+# LGPL-3.0 packages (dependencies of OCRmyPDF) are shipped as plain .py files
+# in the application folder, not inside the compressed module archive, so that
+# users can replace them with their own versions as the LGPL requires.
+LGPL_SOURCE_MODULES = {"fpdf": "py", "img2pdf": "py"}
+
+
 def read_version() -> str:
     with open(os.path.join(ROOT, "version.py"), encoding="utf-8") as f:
         return re.search(r'__version__\s*=\s*"([^"]+)"', f.read()).group(1)

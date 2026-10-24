@@ -456,6 +456,17 @@ class SelfTest:
                                    f"{flattened[:3]}")
             return {"checked": bundle}
 
+        @self.check("LGPL libraries replaceable (shipped as .py files)")
+        def _():
+            import fpdf
+            import img2pdf
+            files = {m.__name__: m.__file__ for m in (fpdf, img2pdf)}
+            if _bundle_dir():
+                packed = [n for n, f in files.items() if not (f and f.endswith(".py") and os.path.isfile(f))]
+                if packed:
+                    raise RuntimeError(f"{packed} are inside the module archive, not replaceable files")
+            return files
+
         @self.check("torch-free build")
         def _():
             import importlib.util

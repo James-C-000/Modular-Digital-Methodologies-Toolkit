@@ -7,7 +7,7 @@ import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
-from spec_common import UPX, VERSION, common_binaries, common_datas, common_hiddenimports  # noqa: E402
+from spec_common import LGPL_SOURCE_MODULES, UPX, VERSION, common_binaries, common_datas, common_hiddenimports  # noqa: E402
 
 datas = common_datas()
 binaries = common_binaries()
@@ -60,6 +60,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
+    module_collection_mode=LGPL_SOURCE_MODULES,
 )
 
 pyz = PYZ(a.pure, a.zipped_data)
