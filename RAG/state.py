@@ -32,13 +32,19 @@ class RagState:
     turns: list = field(default_factory=list)
     setup: SetupProgress = field(default_factory=SetupProgress)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    pending: Turn | None = None  # the question being answered, if any
+    stream: dict = field(default_factory=lambda: {"thinking": "", "answer": ""})
+    stop_event: threading.Event = field(default_factory=threading.Event)
 
 
 STATE = RagState()
 
 
-def start_session(settings, n_gpu_layers: int = 0):
-    """Download models if needed, load the LLM and index the folder (blocking)."""
+def start_session(settings, n_gpu_layers: int = 0, job=None):
+    """Download models if needed, load the LLM and index the folder (blocking).
+
+    *job* (common.jobs.Job), if given, mirrors the progress for the sidebar.
+    """
     from RAG import models
     from RAG.session import RagSession
 
@@ -48,8 +54,12 @@ def start_session(settings, n_gpu_layers: int = 0):
         for info in (models.EMBEDDER, models.RERANKER) if settings.rerank else (models.EMBEDDER,):
             if not models.is_installed(info):
                 progress.stage = f"Downloading {info['name']} ({info['size']})..."
+                if job:
+                    job.progress(0, 0, progress.stage)
                 models.download(info)
         progress.stage = "Loading the language model..."
+        if job:
+            job.progress(0, 0, progress.stage)
         settings.n_gpu_layers = n_gpu_layers
         old, STATE.session = STATE.session, None
         if old is not None:
@@ -59,6 +69,8 @@ def start_session(settings, n_gpu_layers: int = 0):
 
         def on_progress(done, total, name):
             progress.done, progress.total, progress.current = done, total, name
+            if job:
+                job.progress(done, total, name)
 
         progress.report = session.build_index(on_progress)
         STATE.session, STATE.turns = session, []
@@ -69,6 +81,32 @@ def start_session(settings, n_gpu_layers: int = 0):
         raise
     finally:
         progress.running = False
+
+
+def answer(question: str, job=None):
+    """Answer *question* in the current session, streaming into STATE.stream (blocking).
+
+    The turn is STATE.pending while it runs and joins STATE.turns when done, so a
+    page shown again mid-answer can pick up the stream.
+    """
+    turn = Turn(question)
+    STATE.stream = {"thinking": "", "answer": ""}
+    STATE.stop_event.clear()
+    STATE.pending = turn
+
+    def on_token(kind, text):
+        STATE.stream[kind] += text
+
+    try:
+        if job:
+            job.progress(0, 0, "Answering...")
+        turn.answer = STATE.session.ask(question, on_token, STATE.stop_event)
+    except Exception as e:
+        turn.error = str(e)
+    finally:
+        STATE.turns.append(turn)
+        STATE.pending = None
+    return turn
 
 
 def close_session():

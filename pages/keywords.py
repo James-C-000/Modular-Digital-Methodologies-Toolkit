@@ -1,108 +1,73 @@
 """Advanced keyword search page."""
-from nicegui import ui, run
-from pages.pickers import browse_dir, browse_file
-from config import AppConfig
+from nicegui import ui
+
+from common.paths import folder_problem, output_folder_problem
+from pages.components import (
+    FileField, FolderField, JobPanel, hint, missing_dependency, page_header, remember, run_button, saved,
+    section, start_job,
+)
 
 
 def keywords_page():
-    config = AppConfig()
-
-    ui.label("Advanced Keyword Search").classes("text-h4")
-    ui.label("Batch keyword analysis across PDF collections").classes("text-subtitle1")
-    ui.separator()
-
+    page_header("Keyword Search", "Count keywords and collect their context across a folder of PDFs")
     try:
         from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
     except ImportError as e:
-        ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
-        ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
+        missing_dependency(e)
         return
 
-    with ui.card().classes("w-full"):
-        pdf_dir = ui.input("PDF Input Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: browse_dir(pdf_dir), icon="folder_open").props("flat")
+    with section("Folders"):
+        src = FolderField("PDF folder", "defaults.keywords_input_dir")
+        dst = FolderField("Output folder", "defaults.keywords_output_dir")
+        hint("Writes one CSV per keyword with its context, an overview CSV, and charts per PDF and in total.")
 
-        output_dir = ui.input("Output Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: browse_dir(output_dir), icon="folder_open").props("flat")
+    with section("Keywords"):
+        keywords_text = remember(ui.textarea("Keywords, one per line", value=saved("defaults.keywords_keywords", ""))
+                                 .classes("w-full").props("rows=5"), "defaults.keywords_keywords")
+        context = remember(ui.number("Context length (words)", value=saved("defaults.keywords_context", 5),
+                                     min=1, max=50, precision=0).classes("w-48"), "defaults.keywords_context")
 
-        context_length = ui.number("Context Length (words)", value=5, min=1, max=50).classes("w-48")
+    with section("Filters"):
+        basic = remember(ui.checkbox("Basic filter (letters and numbers only)",
+                                     value=saved("defaults.keywords_basic_filter", False)),
+                         "defaults.keywords_basic_filter")
+        hint("Strips every character except letters, numbers and spaces before searching; useful for OCR noise.")
+        filters_text = remember(ui.textarea("Characters to remove, one group per line",
+                                            value=saved("defaults.keywords_filters", ""))
+                                .classes("w-full").props("rows=3"), "defaults.keywords_filters")
+        hint("Every character listed here is removed from the text before searching.")
 
-    with ui.card().classes("w-full"):
-        ui.label("Keywords (one per line)").classes("text-subtitle2")
-        keywords_text = ui.textarea(placeholder="Enter keywords, one per line...").classes("w-full").props("rows=5")
+    with ui.expansion("Or load keywords and filters from files").classes("w-full"):
+        keyword_file = FileField("Keyword file (.txt)", "defaults.keywords_keyword_file", [".txt"], "Text files")
+        filter_file = FileField("Filter file (.txt)", "defaults.keywords_filter_file", [".txt"], "Text files")
 
-    with ui.card().classes("w-full"):
-        with ui.row().classes("items-center"):
-            basic_filter = ui.checkbox("Basic Filter (letters & numbers only)", value=False)
-        ui.label(
-            "When enabled, strips all characters except letters and numbers from extracted"
-            " text before searching. Useful for cleaning up OCR artifacts or special characters."
-        ).classes("text-caption text-grey")
-        ui.label("Filter Words (one per line)").classes("text-subtitle2 q-mt-md")
-        filters_text = ui.textarea(placeholder="Enter filter words, one per line...").classes("w-full").props("rows=5")
-        ui.label(
-            "Filter words to exclude from results. Any keyword match containing a filter"
-            " word in its surrounding context will be removed."
-        ).classes("text-caption text-grey")
+    def describe(job):
+        summary = job.result or {}
+        if summary:
+            ui.label(f"{summary['files']} of {summary['total']} PDF(s) searched.").classes("text-body2")
 
-    with ui.expansion("Or load from files...").classes("w-full"):
-        keyword_file = ui.input("Keyword File Path").classes("w-full")
-        ui.button("Browse...", on_click=lambda: browse_file(keyword_file, [".txt"], "Text files"), icon="folder_open").props("flat")
-        filter_file = ui.input("Filter File Path").classes("w-full")
-        ui.button("Browse...", on_click=lambda: browse_file(filter_file, [".txt"], "Text files"), icon="folder_open").props("flat")
+    def start():
+        problem = folder_problem(src.value)
+        if problem:
+            return src.error(problem)
+        problem = output_folder_problem(src.value, dst.value, reprocesses_outputs=False) or folder_problem(dst.value)
+        if problem:
+            return dst.error(problem)
+        if not (keywords_text.value or "").strip() and not keyword_file.value:
+            return ui.notify("Enter keywords or choose a keyword file.", type="warning")
+        args = (str(int(context.value or 5)), 1 if basic.value else 0, src.value, dst.value, keyword_file.value,
+                keywords_text.value or "", filter_file.value, filters_text.value or "")
 
-    ui.separator()
+        def work(job):
+            errors = []
+            summary = core_logic(*args, on_error=errors.append, on_progress=job.progress, cancel=job.cancel_event)
+            if errors:
+                raise RuntimeError(errors[0].replace("ERROR: ", "").replace("\n", " "))
+            for chart in summary["charts"]:
+                job.add_image(chart)
+            return summary
 
-    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
-    progress.set_visibility(False)
-    status_label = ui.label("Ready")
+        start_job("keywords", "Keyword search", work, output_dir=dst.value)
 
-    async def run_analysis():
-        in_dir = pdf_dir.value
-        out_dir = output_dir.value
-
-        if not in_dir or not out_dir:
-            ui.notify("Please select both input and output directories.", type="warning")
-            return
-        if in_dir == out_dir:
-            ui.notify("Input and output directories cannot be the same.", type="warning")
-            return
-
-        manual_kw = keywords_text.value or ""
-        manual_fl = filters_text.value or ""
-        kw_file = keyword_file.value or ""
-        fl_file = filter_file.value or ""
-
-        if not manual_kw and not kw_file:
-            ui.notify("Please enter keywords or select a keyword file.", type="warning")
-            return
-
-        progress.set_visibility(True)
-        status_label.set_text("Analyzing...")
-
-        def do_analysis():
-            core_logic(
-                str(int(context_length.value)),
-                1 if basic_filter.value else 0,
-                in_dir,
-                out_dir,
-                kw_file,
-                manual_kw,
-                fl_file,
-                manual_fl,
-            )
-
-        try:
-            await run.io_bound(do_analysis)
-            status_label.set_text("Analysis complete!")
-            ui.notify("Keyword analysis complete! Check the output directory.", type="positive")
-        except Exception as e:
-            status_label.set_text(f"Error: {e}")
-            ui.notify(f"Analysis error: {e}", type="negative")
-        finally:
-            progress.set_visibility(False)
-
-        config.set("last_page", "/keywords")
-        config.save()
-
-    ui.button("Analyze", on_click=run_analysis, icon="play_arrow").props("color=primary")
+    run_button("Search", start, "keywords")
+    JobPanel("keywords", describe=describe)

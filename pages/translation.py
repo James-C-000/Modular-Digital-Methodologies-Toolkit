@@ -1,193 +1,150 @@
 """Translation page (offline, Argos Translate models)."""
 import os
 
-from nicegui import ui, run
-from pages.pickers import browse_dir
-from config import AppConfig
+from nicegui import ui
+
+from common.jobs import JOBS
+from common.paths import folder_problem
+from pages.components import (
+    FolderField, JobPanel, file_results, hint, missing_dependency, page_header, remember, run_button, saved,
+    section, start_job,
+)
 
 AUTO = "auto"
 
 
 def translation_page():
-    config = AppConfig()
-
-    ui.label("Translation").classes("text-h4")
-    ui.label("Translate documents offline with Argos Translate models").classes("text-subtitle1")
-    ui.label(
-        "Input PDFs must contain selectable text (be OCR'd). Scanned image-only PDFs"
-        " cannot be translated — use the OCR module first to add a text layer."
-    ).classes("text-caption text-grey")
-    ui.separator()
-
+    page_header("Translation", "Translate documents offline with Argos Translate models")
     try:
         from Translation import offline_translation as ot
     except ImportError as e:
-        ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
-        ui.label("Install the required package via pip, then restart MDMT.")
+        missing_dependency(e)
         return
-
     names = ot.language_names()
 
-    with ui.card().classes("w-full"):
-        input_dir = ui.input("Input Directory", value=config.get("defaults.translation_input_dir", "")).classes("w-full")
-        ui.button("Browse...", on_click=lambda: browse_dir(input_dir), icon="folder_open").props("flat")
+    with section("Folder"):
+        src = FolderField("Input folder (.txt and .pdf, searched recursively)", "defaults.translation_input_dir")
+        hint("PDFs must contain selectable text: run scanned PDFs through OCR first. Each translation is"
+             " saved next to its original with the output suffix.")
 
-    with ui.card().classes("w-full"):
-        with ui.row().classes("items-center"):
-            source_lang = ui.select(
-                {AUTO: "Auto-detect", **names}, label="Translate from", with_input=True,
-                value=config.get("defaults.translation_source", AUTO) if
-                config.get("defaults.translation_source", AUTO) in {AUTO, *names} else AUTO,
-            ).classes("w-64")
-            target_lang = ui.select(
-                names, label="Translate to", with_input=True,
-                value=config.get("defaults.translation_target", "en") if
-                config.get("defaults.translation_target", "en") in names else "en",
-            ).classes("w-64")
-        suffix = ui.input("Output Suffix", value=config.get("defaults.translation_suffix", ot.DEFAULT_SUFFIX)).classes("w-64")
-        route_area = ui.column().classes("w-full")
-        ui.label(
-            "Offline translation keeps your documents on this computer. Quality is good for"
-            " modern prose but can be weaker than online services for some language pairs,"
-            " and historical terms are often mistranslated."
-        ).classes("text-caption text-grey")
+    with section("Languages"):
+        with ui.row().classes("items-center w-full"):
+            saved_src = saved("defaults.translation_source", AUTO)
+            source = remember(ui.select({AUTO: "Auto-detect", **names}, label="Translate from", with_input=True,
+                                        value=saved_src if saved_src in {AUTO, *names} else AUTO).classes("w-64"),
+                              "defaults.translation_source")
+            saved_tgt = saved("defaults.translation_target", "en")
+            target = remember(ui.select(names, label="Translate to", with_input=True,
+                                        value=saved_tgt if saved_tgt in names else "en").classes("w-64"),
+                              "defaults.translation_target")
+            suffix = remember(ui.input("Output suffix", value=saved("defaults.translation_suffix", ot.DEFAULT_SUFFIX))
+                              .classes("w-40"), "defaults.translation_suffix")
+        route_area = ui.column().classes("w-full gap-1")
+        hint("Offline translation keeps your documents on this computer. Quality is good for modern prose but"
+             " can be weaker than online services for some language pairs, and historical terms are often"
+             " mistranslated.")
 
-    progress_state = {"done": 0, "total": 0, "current": "", "busy": False}
-    progress = ui.linear_progress(value=0, show_value=False).classes("w-full")
-    progress.set_visibility(False)
-    status_label = ui.label("Ready")
-    results_area = ui.column().classes("w-full")
-
-    def _size(src, tgt):
-        info = ot.package_info(src, tgt)
+    def _size(a, b):
+        info = ot.package_info(a, b)
         return f"{info['size'] / 1e6:.0f} MB" if info else "?"
 
     def needed_packages():
-        """Packages required for the current choice that are not installed (or None if impossible)."""
-        tgt = target_lang.value
+        """Packages the current choice needs that are not installed (None if no route exists)."""
+        tgt = target.value
         installed = ot.installed_pairs()
-        if source_lang.value == AUTO:
+        if source.value == AUTO:
             return [] if any(ot.route(s, tgt, available=installed) for s, _t in installed) else None
-        src = source_lang.value
-        best = ot.route(src, tgt, available=ot.index_pairs())
-        if best is None:
-            return None
-        return [p for p in best if p not in installed]
+        best = ot.route(source.value, tgt, available=ot.index_pairs())
+        return None if best is None else [p for p in best if p not in installed]
 
     @ui.refreshable
     def show_route():
-        tgt = target_lang.value
+        tgt = target.value
         if not tgt:
             return
         installed = ot.installed_pairs()
-        if source_lang.value == AUTO:
+        if source.value == AUTO:
             usable = sorted(s for s in {a for a, _b in installed} | {b for _a, b in installed}
                             if s != tgt and ot.route(s, tgt, available=installed))
             if usable:
-                ui.label("Auto-detect will choose among: " + ", ".join(names.get(s, s) for s in usable)
-                         ).classes("text-caption")
+                hint("Auto-detect will choose among: " + ", ".join(names.get(s, s) for s in usable))
             else:
-                ui.label(f"No installed model translates into {names[tgt]}. Choose the source"
-                         " language to download the right model.").classes("text-caption text-warning")
+                ui.label(f"No installed model translates into {names[tgt]}. Choose the source language to"
+                         " download the right model.").classes("text-caption text-warning")
             return
-        src = source_lang.value
-        if src == tgt:
+        src_lang = source.value
+        if src_lang == tgt:
             ui.label("Source and target are the same.").classes("text-caption text-warning")
             return
-        steps = ot.route(src, tgt, available=ot.index_pairs())
+        steps = ot.route(src_lang, tgt, available=ot.index_pairs())
         if steps is None:
-            ui.label(f"No Argos model is available for {names[src]} → {names[tgt]}"
+            ui.label(f"No Argos model is available for {names[src_lang]} → {names[tgt]}"
                      " (not even through English).").classes("text-caption text-negative")
             return
         if len(steps) > 1:
-            ui.label(f"No direct {names[src]} → {names[tgt]} model: MDMT translates through"
-                     " English, which compounds errors.").classes("text-caption text-warning")
+            ui.label(f"No direct {names[src_lang]} → {names[tgt]} model: MDMT translates through English,"
+                     " which compounds errors.").classes("text-caption text-warning")
         missing = [p for p in steps if p not in installed]
         if not missing:
             ui.label("Model(s) installed.").classes("text-caption text-positive")
             return
+        downloading = JOBS.latest("translation-models")
         with ui.row().classes("items-center"):
-            ui.label("Needs: " + ", ".join(f"{names[a]} → {names[b]} ({_size(a, b)})" for a, b in missing)
-                     ).classes("text-caption")
-            ui.button("Download", icon="download", on_click=lambda: download_missing(missing)).props("flat dense")
+            hint("Needs: " + ", ".join(f"{names[a]} → {names[b]} ({_size(a, b)})" for a, b in missing))
+            if downloading and downloading.running:
+                ui.spinner(size="xs")
+                hint(downloading.current)
+            else:
+                ui.button("Download", icon="download", on_click=lambda: download(missing)).props("flat dense")
 
-    async def download_missing(pairs):
-        for a, b in pairs:
-            status_label.set_text(f"Downloading {names[a]} → {names[b]} ({_size(a, b)})...")
-            try:
-                await run.io_bound(ot.download_package, a, b)
-            except Exception as e:
-                status_label.set_text(f"Download failed: {e}")
-                ui.notify(f"Download failed: {e}", type="negative")
-                return
-        status_label.set_text("Ready")
-        show_route.refresh()
+    def download(pairs):
+        def work(job):
+            for i, (a, b) in enumerate(pairs):
+                job.progress(i, len(pairs), f"Downloading {names[a]} → {names[b]} ({_size(a, b)})...")
+                ot.download_package(a, b)
+            job.progress(len(pairs), len(pairs), "")
+        if start_job("translation-models", "Translation models", work):
+            show_route.refresh()
+
+    # Refresh the route note when a model download (possibly started earlier) finishes.
+    seen = {"status": None}
+
+    def watch_downloads():
+        job = JOBS.latest("translation-models")
+        status = job and (job.id, job.status)
+        if status != seen["status"]:
+            seen["status"] = status
+            if job and job.status == "failed":
+                ui.notify(f"Download failed: {job.error}", type="negative")
+            show_route.refresh()
 
     with route_area:
         show_route()
-    source_lang.on_value_change(lambda _e: show_route.refresh())
-    target_lang.on_value_change(lambda _e: show_route.refresh())
+    ui.timer(1.0, watch_downloads)
+    source.on_value_change(lambda _e: show_route.refresh())
+    target.on_value_change(lambda _e: show_route.refresh())
 
-    def _tick():
-        if progress_state["busy"] and progress_state["total"]:
-            progress.set_value(progress_state["done"] / progress_state["total"])
-            status_label.set_text(
-                f"Translating {progress_state['current']} ({progress_state['done']}/{progress_state['total']})...")
+    def describe(job):
+        file_results(job, "translated")
+        for r in job.result or []:
+            if r.get("status") == "success" and r.get("language"):
+                via = ", via English" if r.get("pivot") else ""
+                hint(f"{os.path.basename(r['input'])}: {names.get(r['language'], r['language'])}{via}")
 
-    ui.timer(0.3, _tick)
+    def start():
+        problem = folder_problem(src.value)
+        if problem:
+            return src.error(problem)
+        needed = needed_packages()
+        if needed is None:
+            return ui.notify("No model is available for this language pair.", type="warning")
+        if needed:
+            return ui.notify("Download the required model first (see above).", type="warning")
+        folder, lang = src.value, None if source.value == AUTO else source.value
+        tgt, sfx = target.value, suffix.value or ot.DEFAULT_SUFFIX
+        start_job("translation", "Translation",
+                  lambda job: ot.translate_directory(folder, lang, tgt, sfx, None, job.progress, job.cancel_event),
+                  output_dir=folder)
 
-    async def run_translation():
-        in_dir = input_dir.value
-        if not in_dir or not os.path.isdir(in_dir):
-            ui.notify("Please select a valid input directory.", type="warning")
-            return
-        if needed_packages():
-            ui.notify("Download the required model first (see above).", type="warning")
-            return
-        if needed_packages() is None:
-            ui.notify("No model is available for this language pair.", type="warning")
-            return
-
-        src = None if source_lang.value == AUTO else source_lang.value
-        tgt = target_lang.value
-        sfx = suffix.value or ot.DEFAULT_SUFFIX
-        results_area.clear()
-        progress.set_visibility(True)
-        progress_state.update(done=0, total=0, current="", busy=True)
-
-        def on_progress(done, total, name):
-            progress_state.update(done=done, total=total, current=name)
-
-        try:
-            results = await run.io_bound(ot.translate_directory, in_dir, src, tgt, sfx, None, on_progress)
-        except Exception as e:
-            status_label.set_text(f"Error: {e}")
-            ui.notify(f"Translation error: {e}", type="negative")
-            return
-        finally:
-            progress_state["busy"] = False
-            progress.set_visibility(False)
-
-        ok = sum(1 for r in results if r["status"] == "success")
-        status_label.set_text(f"Complete: {ok}/{len(results)} files translated" if results
-                              else "No .txt or .pdf files found.")
-        with results_area:
-            for r in results:
-                good = r["status"] == "success"
-                with ui.row().classes("items-center"):
-                    ui.icon("check_circle" if good else "error").classes("text-positive" if good else "text-negative")
-                    detail = os.path.basename(r["input"])
-                    if r.get("language"):
-                        detail += f" ({names.get(r['language'], r['language'])}" + (", via English)" if r.get("pivot") else ")")
-                    if not good:
-                        detail += f" — {r.get('message', r['status'])}"
-                    ui.label(detail)
-
-        config.set("defaults.translation_input_dir", in_dir)
-        config.set("defaults.translation_source", source_lang.value)
-        config.set("defaults.translation_target", tgt)
-        config.set("defaults.translation_suffix", sfx)
-        config.set("last_page", "/translation")
-        config.save()
-
-    ui.button("Translate", on_click=run_translation, icon="play_arrow").props("color=primary")
+    run_button("Translate", start, "translation")
+    JobPanel("translation", describe=describe)

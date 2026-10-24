@@ -51,6 +51,7 @@ SELF_TEST_MODULES = [
     "Translation.offline_translation",
     "pages.about",
     "pages.audio",
+    "pages.components",
     "pages.cowords",
     "pages.downloads",
     "pages.keywords",
@@ -59,6 +60,7 @@ SELF_TEST_MODULES = [
     "pages.pickers",
     "pages.rag",
     "pages.relationships",
+    "pages.shell",
     "pages.translation",
     "pages.welcome",
 ]

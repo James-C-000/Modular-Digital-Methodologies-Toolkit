@@ -88,7 +88,6 @@ def transcribe_file(model, audio_path: str, output_path: str = None, vad_filter:
         audio_path: Path to the audio file.
         output_path: Optional output .txt path. If None, uses audio_path + '.txt'.
         vad_filter: Skip non-speech with the voice-activity filter.
-        cancel: Optional threading.Event; when set, stops before the next file.
 
     Returns:
         Dict with 'status', 'input', 'output', and optionally 'text' or 'message'.
@@ -132,6 +131,7 @@ def transcribe_directory(
         download_root: Directory holding downloaded Whisper models.
         on_progress: Optional callback(current, total, filename).
         vad_filter: Skip non-speech with the voice-activity filter.
+        cancel: Optional threading.Event; when set, stops before the next file.
 
     Returns:
         List of result dicts.

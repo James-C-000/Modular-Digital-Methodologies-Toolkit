@@ -1,45 +1,53 @@
-"""RAG chat page: grounded, cited answers about a folder of documents."""
+"""RAG chat page: grounded, cited answers about a folder of documents.
+
+The session, the conversation and any answer being generated live in
+RAG.state; setup and answers run as jobs (common.jobs).  Leaving the page and
+coming back picks up where things are, including an answer still streaming.
+"""
 import os
-import threading
 
 from nicegui import run, ui
 
-from config import AppConfig, get_models_dir
-from pages.pickers import browse_dir
+from common.jobs import JOBS
+from config import get_models_dir
+from pages.components import FolderField, hint, remember, saved, section, start_job
 
 
 def rag_page():
     from RAG.state import STATE
 
-    config = AppConfig()
-    ui.query(".q-page").style("overflow: hidden")
-    with ui.row().classes("w-full items-center"):
-        ui.label("RAG Chat").classes("text-h4")
+    with ui.row().classes("w-full items-center no-wrap"):
+        with ui.column().classes("gap-0"):
+            ui.label("RAG Chat").classes("text-h5 text-weight-medium")
+            ui.label("Ask questions about your documents; answers cite the passages they rely on.") \
+                .classes("text-body2 mdmt-muted")
         ui.space()
         actions = ui.row().classes("items-center gap-1")
-    ui.label("Ask questions about your documents; answers cite the passages they rely on.").classes("text-subtitle1")
-    ui.separator()
+    ui.separator().classes("q-my-sm")
 
     @ui.refreshable
     def content():
         actions.clear()
         if STATE.session is not None and not STATE.setup.running:
             with actions:
-                ui.button("New conversation", icon="add_comment", on_click=new_conversation).props("flat dense")
-                ui.button("Re-index", icon="sync", on_click=reindex).props("flat dense")
-                ui.button("Change setup", icon="settings", on_click=change_setup).props("flat dense")
-            _chat_ui(STATE)
+                ui.button("New conversation", icon="add_comment", on_click=new_conversation).props("flat dense no-caps")
+                ui.button("Re-index", icon="sync", on_click=reindex).props("flat dense no-caps")
+                ui.button("Change setup", icon="settings", on_click=change_setup).props("flat dense no-caps")
+            _chat_ui(STATE, content.refresh)
         else:
-            _setup_ui(config, STATE, on_ready=content.refresh)
+            _setup_ui(STATE, on_ready=content.refresh)
+
+    def idle():
+        return STATE.session is not None and not STATE.session.busy and STATE.pending is None
 
     def new_conversation():
-        if STATE.session is not None and not STATE.session.busy:
+        if idle():
             STATE.session.reset_conversation()
             STATE.turns = []
             content.refresh()
 
     async def reindex():
-        if STATE.session is None or STATE.session.busy:
+        if not idle():
             return
         n = ui.notification("Updating the index...", spinner=True, timeout=None)
         report = await run.io_bound(STATE.session.build_index)
@@ -48,121 +56,127 @@ def rag_page():
                   f"{len(report.removed)} removed files ({report.chunks} chunks).", type="positive")
 
     def change_setup():
-        if STATE.session is not None and STATE.session.busy:
-            return
-        from RAG.state import close_session
-        close_session()
-        content.refresh()
+        if idle():
+            from RAG.state import close_session
+            close_session()
+            content.refresh()
 
     content()
 
 
 # ------------------------------------------------------------------- setup ----
 
-def _setup_ui(config, state, on_ready):
+def _setup_ui(state, on_ready):
     from RAG import models
     from RAG.hardware import detect_hardware
     from RAG.session import RagSettings
 
     hw = detect_hardware()
-    with ui.card().classes("w-full"):
-        doc_dir = ui.input("Documents Directory", value=config.get("defaults.rag_documents_dir", "")).classes("w-full")
-        ui.button("Browse...", on_click=lambda: browse_dir(doc_dir), icon="folder_open").props("flat")
-        ui.label("Supported formats: TXT, PDF, Markdown, HTML, CSV, JSON, DOCX").classes("text-caption text-grey")
+    with section("Documents"):
+        docs = FolderField("Documents folder", "defaults.rag_documents_dir")
+        hint("Supported formats: TXT, PDF, Markdown, HTML, CSV, JSON, DOCX. Later starts only re-read files"
+             " that changed.")
+
+    with section("Model"):
         hw_text = (f"{hw.gpu_type.upper()} GPU — {hw.vram_mb} MB VRAM" if hw.gpu_available
                    else f"No GPU — {hw.ram_mb} MB RAM")
-        ui.label(f"Detected hardware: {hw_text}").classes("text-caption")
-
+        hint(f"Detected hardware: {hw_text}")
         models_dir = get_models_dir()
         ggufs = sorted(f for f in os.listdir(models_dir) if f.endswith(".gguf")) if os.path.isdir(models_dir) else []
         options = {os.path.join(models_dir, f): f for f in ggufs}
-        saved = config.get("defaults.rag_model_path", "")
-        default = saved if saved and os.path.exists(saved) else None
+        last = saved("defaults.rag_model_path", "")
+        default = last if last and os.path.exists(last) else None
         if default is None and ggufs:
             default = next((os.path.join(models_dir, f) for f in ggufs
                             if f"-{hw.recommended_model}-" in f or f"-{hw.recommended_model}." in f),
                            os.path.join(models_dir, ggufs[0]))
         if default and default not in options:
             options[default] = os.path.basename(default)
-        model_select = ui.select(options, value=default, label="Model File (.gguf)").classes("w-full")
+        with ui.row().classes("w-full items-start no-wrap gap-1"):
+            model_select = remember(ui.select(options, value=default, label="Model file (.gguf)")
+                                    .classes("flex-grow"), "defaults.rag_model_path")
 
-        async def browse_model():
-            from pages.pickers import pick_file
-            path = await pick_file(model_select.value or models_dir, [".gguf"], "GGUF models")
-            if path:
-                model_select.set_options({**model_select.options, path: os.path.basename(path)}, value=path)
+            async def browse_model():
+                from pages.pickers import pick_file
+                path = await pick_file(model_select.value or models_dir, [".gguf"], "GGUF models")
+                if path:
+                    model_select.set_options({**model_select.options, path: os.path.basename(path)}, value=path)
 
-        ui.button("Browse...", on_click=browse_model, icon="folder_open").props("flat")
+            ui.button(icon="description", on_click=browse_model).props("flat round").classes("q-mt-sm") \
+                .tooltip("Browse...")
         if not ggufs:
-            ui.label("No models found. Visit the Downloads page to get a Qwen model.").classes("text-warning")
+            with ui.row().classes("items-center gap-1"):
+                ui.label("No models found.").classes("text-warning")
+                ui.button("Get a Qwen model", icon="download", on_click=lambda: ui.navigate.to("/downloads")) \
+                    .props("flat dense no-caps")
         else:
-            ui.label("Larger models (2B, 4B) answer more accurately than 0.8B but are slower and need more "
-                     "memory; get them from the Downloads page.").classes("text-caption text-grey")
+            hint("Larger models (2B, 4B) answer more accurately than 0.8B but are slower and need more memory;"
+                 " get them from the Downloads page.")
 
+    with section("Options"):
         with ui.row().classes("items-center"):
-            ctx_length = ui.number("Context Length", value=config.get("defaults.rag_context_window", 8192),
-                                   min=2048, max=65536, step=1024).classes("w-48") \
+            ctx_length = remember(ui.number("Context length", value=saved("defaults.rag_context_window", 8192),
+                                            min=2048, max=65536, step=1024).classes("w-48"),
+                                  "defaults.rag_context_window") \
                 .tooltip("Longer contexts use more memory. 8192 is enough for six passages and a conversation.")
-            thinking = ui.switch("Thinking mode", value=config.get("defaults.rag_thinking_mode", False)) \
+            thinking = remember(ui.switch("Thinking mode", value=saved("defaults.rag_thinking_mode", False)),
+                                "defaults.rag_thinking_mode") \
                 .tooltip("The model reasons before answering: slower, sometimes better on hard questions.")
-            rerank = ui.switch("Rerank passages", value=config.get("defaults.rag_rerank", True)) \
+            rerank = remember(ui.switch("Rerank passages", value=saved("defaults.rag_rerank", True)),
+                              "defaults.rag_rerank") \
                 .tooltip("A cross-encoder re-orders the best 20 passages: more accurate, a few seconds slower.")
-
         needed = [m for m in (models.EMBEDDER, models.RERANKER) if not models.is_installed(m)]
         if needed:
-            ui.label("First start downloads: " + ", ".join(f"{m['name']} ({m['size']})" for m in needed)
-                     ).classes("text-caption text-grey")
+            hint("First start downloads: " + ", ".join(f"{m['name']} ({m['size']})" for m in needed))
 
-        status = ui.label(state.setup.stage if state.setup.running else "").classes("text-caption")
-        progress = ui.linear_progress(value=0, show_value=False).classes("w-full")
-        progress.set_visibility(state.setup.running)
+    with ui.row().classes("w-full items-center no-wrap"):
+        start_btn = ui.button("Start", icon="play_arrow").props("color=primary unelevated")
+        status = ui.label("").classes("text-body2 q-ml-sm")
+    progress = ui.linear_progress(value=0, show_value=False).classes("w-full")
+    progress.set_visibility(False)
+    shown_error = {"id": None}
 
-        def tick():
-            s = state.setup
-            if s.running:
-                progress.set_visibility(True)
-                progress.set_value(s.done / s.total if s.total else 0)
-                detail = f" {s.done}/{s.total} {s.current}" if s.stage.startswith("Indexing") and s.total else ""
-                status.set_text(s.stage + detail)
-            elif state.session is not None:
-                on_ready()
-
-        ui.timer(0.3, tick)
-
-        async def start():
-            if state.setup.running:
-                return
-            if not doc_dir.value or not os.path.isdir(doc_dir.value):
-                ui.notify("Please select a documents directory.", type="warning")
-                return
-            if not model_select.value or not os.path.exists(model_select.value):
-                ui.notify("Please select a valid model file.", type="warning")
-                return
-            settings = RagSettings(documents_dir=doc_dir.value, llm_path=model_select.value,
-                                   n_ctx=int(ctx_length.value or 8192), enable_thinking=thinking.value,
-                                   rerank=rerank.value)
-            config.set("defaults.rag_documents_dir", doc_dir.value)
-            config.set("defaults.rag_model_path", model_select.value)
-            config.set("defaults.rag_context_window", settings.n_ctx)
-            config.set("defaults.rag_thinking_mode", thinking.value)
-            config.set("defaults.rag_rerank", rerank.value)
-            config.set("last_page", "/rag")
-            config.save()
-            from RAG.state import start_session
-            try:
-                await run.io_bound(start_session, settings, hw.n_gpu_layers)
-            except Exception as e:
-                status.set_text(f"Error: {e}")
-                progress.set_visibility(False)
-                ui.notify(f"Failed to start RAG: {e}", type="negative", multi_line=True)
-                return
-            report = state.setup.report
-            if report and report.failed:
-                ui.notify(f"{len(report.failed)} file(s) could not be read: "
-                          + ", ".join(f for f, _e in report.failed[:5]), type="warning", multi_line=True)
+    def tick():
+        s, job = state.setup, JOBS.latest("rag-setup")
+        if s.running:
+            start_btn.disable()
+            progress.set_visibility(True)
+            if s.stage.startswith("Indexing") and s.total:
+                progress.props(remove="indeterminate")
+                progress.set_value(s.done / s.total)
+                status.set_text(f"{s.stage} {s.done}/{s.total} {s.current}")
+            else:
+                progress.props("indeterminate")
+                status.set_text(s.stage)
+        elif state.session is not None:
             on_ready()
+        else:
+            start_btn.enable()
+            progress.set_visibility(False)
+            if job and job.status == "failed" and shown_error["id"] != job.id:
+                shown_error["id"] = job.id
+                status.set_text(f"Failed: {job.error}")
+                status.classes("text-negative")
 
-        ui.button("Start", on_click=start, icon="play_arrow").props("color=primary")
+    ui.timer(0.3, tick)
+
+    def start():
+        if state.setup.running:
+            return
+        if not docs.value or not os.path.isdir(docs.value):
+            return docs.error("Choose the folder of documents to ask about.")
+        if not model_select.value or not os.path.exists(model_select.value):
+            return ui.notify("Choose a model file.", type="warning")
+        settings = RagSettings(documents_dir=docs.value, llm_path=model_select.value,
+                               n_ctx=int(ctx_length.value or 8192), enable_thinking=thinking.value,
+                               rerank=rerank.value)
+        from RAG.state import start_session
+        status.classes(remove="text-negative")
+        state.setup.running, state.setup.stage = True, "Starting..."   # shown at once; start_session takes over
+        if start_job("rag-setup", "RAG setup", lambda job: start_session(settings, hw.n_gpu_layers, job)) is None:
+            state.setup.running = False
+
+    start_btn.on_click(start)
 
 
 # -------------------------------------------------------------------- chat ----
@@ -182,7 +196,7 @@ class PassageDialog:
         # the close animation ends, stealing keystrokes typed into the question box.
         with ui.dialog().props("no-refocus") as self.dialog, ui.card().classes("w-[44rem] max-w-full"):
             self.title = ui.label("").classes("text-h6")
-            self.score = ui.label("").classes("text-caption text-grey")
+            self.score = ui.label("").classes("text-caption mdmt-muted")
             with ui.scroll_area().classes("w-full h-64 border rounded q-pa-sm"):
                 self.text = ui.label("").classes("whitespace-pre-wrap")
             with ui.row().classes("w-full justify-end"):
@@ -207,17 +221,17 @@ def _render_answer(turn, passages):
         return
     if answer.thinking:
         with ui.expansion("Reasoning", icon="psychology").classes("w-full text-caption"):
-            ui.label(answer.thinking).classes("whitespace-pre-wrap text-grey")
+            ui.label(answer.thinking).classes("whitespace-pre-wrap mdmt-muted")
     text = answer.text
     if answer.not_found:
-        with ui.row().classes("items-center gap-1"):
-            ui.icon("search_off").classes("text-grey")
-            ui.label("Probably not in your documents.").classes("text-grey")
+        with ui.row().classes("items-center gap-1 no-wrap"):
+            ui.icon("search_off")
+            ui.label("Probably not in your documents.").classes("text-italic")
         text = not_found_remainder(text)
     if text or not answer.not_found:
         ui.markdown(text or "(no answer)")
     if answer.stopped:
-        ui.label("Stopped.").classes("text-caption text-grey")
+        ui.label("Stopped.").classes("text-caption mdmt-muted")
     if answer.citations:
         with ui.row().classes("gap-1 items-center"):
             ui.label("Sources:").classes("text-caption")
@@ -232,17 +246,16 @@ def _render_answer(turn, passages):
                         on_click=lambda c=c: passages.show(c)).props("outline dense clickable")
 
 
-def _chat_ui(state):
+def _chat_ui(state, refresh):
     session = state.session
     passages = PassageDialog(session.settings.documents_dir)
-    with ui.column().classes("w-full").style("height: calc(100vh - 170px); overflow: hidden"):
+    with ui.column().classes("w-full mdmt-chat").style("height: calc(100vh - 150px); overflow: hidden"):
         with ui.scroll_area().classes("w-full").style("flex: 1; min-height: 0") as scroller:
             messages = ui.column().classes("w-full q-pa-sm")
         with ui.row().classes("w-full items-center no-wrap").style("flex-shrink: 0"):
             message_input = ui.input(placeholder="Ask a question about your documents...").classes("flex-grow")
-            send_btn = ui.button("Send", icon="send").props("color=primary")
+            send_btn = ui.button("Send", icon="send").props("color=primary unelevated")
             stop_btn = ui.button("Stop", icon="stop").props("color=negative outline")
-            stop_btn.set_visibility(False)
 
     with messages:
         report = state.setup.report
@@ -257,57 +270,49 @@ def _chat_ui(state):
             with ui.chat_message(name="Assistant"):
                 _render_answer(turn, passages)
 
-    generating = {"on": False}
-    stop_event = threading.Event()
+    live = {"turn": None, "thinking": None, "answer": None}
+
+    def show_pending(turn):
+        with messages:
+            ui.chat_message(turn.question, name="You", sent=True)
+            with ui.chat_message(name="Assistant"):
+                live["thinking"] = ui.label("").classes("whitespace-pre-wrap text-caption mdmt-muted")
+                live["answer"] = ui.label("Searching the documents...").classes("whitespace-pre-wrap")
+        live["turn"] = turn
+        scroller.scroll_to(percent=1.0)
 
     def set_generating(on: bool):
-        generating["on"] = on
         message_input.set_enabled(not on)
         send_btn.set_enabled(not on)
         stop_btn.set_visibility(on)
 
-    async def send(_=None):
-        question = (message_input.value or "").strip()
-        if not question or generating["on"] or session.busy:
+    def tick():
+        pending = state.pending
+        if live["turn"] is not None and pending is not live["turn"]:
+            refresh()            # the answer finished: draw it with its sources
             return
-        from RAG.state import Turn
-        message_input.set_value("")
-        set_generating(True)
-        stop_event.clear()
-        turn = Turn(question)
-        buffer = {"thinking": "", "answer": ""}
-        with messages:
-            ui.chat_message(question, name="You", sent=True)
-            reply = ui.chat_message(name="Assistant")
-            with reply:
-                thinking_label = ui.label("").classes("whitespace-pre-wrap text-caption text-grey")
-                answer_label = ui.label("Searching the documents...").classes("whitespace-pre-wrap")
-        scroller.scroll_to(percent=1.0)
-
-        def on_token(kind, text):
-            buffer[kind] += text
-
-        def flush():
-            if buffer["thinking"]:
-                thinking_label.set_text(buffer["thinking"][-600:])
-            if buffer["answer"]:
-                answer_label.set_text(buffer["answer"])
+        if pending is not None and live["turn"] is None:
+            show_pending(pending)
+        if pending is not None:
+            if state.stream["thinking"]:
+                live["thinking"].set_text(state.stream["thinking"][-600:])
+            if state.stream["answer"]:
+                live["answer"].set_text(state.stream["answer"])
                 scroller.scroll_to(percent=1.0)
+        set_generating(pending is not None)
 
-        timer = ui.timer(0.1, flush)
-        try:
-            turn.answer = await run.io_bound(session.ask, question, on_token, stop_event)
-        except Exception as e:
-            turn.error = str(e)
-        finally:
-            timer.cancel()
-            set_generating(False)
-        state.turns.append(turn)
-        reply.clear()
-        with reply:
-            _render_answer(turn, passages)
-        scroller.scroll_to(percent=1.0)
+    def send(_=None):
+        question = (message_input.value or "").strip()
+        if not question or state.pending is not None or session.busy:
+            return
+        from RAG.state import answer
+        message_input.set_value("")
+        if start_job("rag", "RAGBot", lambda job: answer(question, job)):
+            set_generating(True)
 
+    tick()
+    ui.timer(0.15, tick)
+    scroller.scroll_to(percent=1.0)
     send_btn.on_click(send)
     message_input.on("keydown.enter", send)
-    stop_btn.on_click(lambda: stop_event.set())
+    stop_btn.on_click(lambda: state.stop_event.set())

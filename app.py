@@ -1,4 +1,4 @@
-"""MDMT main application entry point with NiceGUI sidebar navigation."""
+"""MDMT main application entry point (the UI itself is pages/shell.py)."""
 import multiprocessing
 
 # Must come first.  In a frozen build every multiprocessing child (NiceGUI's
@@ -31,7 +31,7 @@ from nicegui import ui, app
 
 from common.opener import open_external
 from common.ui_mode import use_native_window
-from config import AppConfig, get_app_data_dir
+from config import get_app_data_dir
 from version import __version__
 
 log = logging.getLogger("mdmt")
@@ -110,149 +110,6 @@ def _append_user_tool_paths():
     os.environ["PATH"] = os.pathsep.join(p for p in path if p)
 
 
-def create_sidebar():
-    """Build the persistent sidebar navigation."""
-    config = AppConfig()
-    dark = ui.dark_mode(config.get("ui.dark_mode", False))
-
-    ui.add_head_html('''<style>
-    body.body--light .mdmt-drawer { background-color: #eee; }
-    body.body--dark .mdmt-drawer { background-color: #1a1a1a; }
-    </style>''')
-    with ui.left_drawer(value=True).classes("mdmt-drawer").style("padding: 8px") as drawer:
-        ui.label("MDMT").classes("text-h4")
-
-        ui.label("Document Processing").classes("text-overline")
-        ui.button("OCR", on_click=lambda: ui.navigate.to("/ocr"), icon="document_scanner").props("flat dense align=left").classes("w-full")
-        ui.button("Audio Transcription", on_click=lambda: ui.navigate.to("/audio"), icon="mic").props("flat dense align=left").classes("w-full")
-        ui.button("Translation", on_click=lambda: ui.navigate.to("/translation"), icon="translate").props("flat dense align=left").classes("w-full")
-
-        ui.label("Analysis").classes("text-overline")
-        ui.button("Keyword Search", on_click=lambda: ui.navigate.to("/keywords"), icon="search").props("flat dense align=left").classes("w-full")
-        ui.button("Named Entities", on_click=lambda: ui.navigate.to("/ner"), icon="person_search").props("flat dense align=left").classes("w-full")
-        ui.button("Relationships", on_click=lambda: ui.navigate.to("/relationships"), icon="hub").props("flat dense align=left").classes("w-full")
-        ui.button("Co-Words", on_click=lambda: ui.navigate.to("/cowords"), icon="grain").props("flat dense align=left").classes("w-full")
-
-        ui.label("AI").classes("text-overline")
-        ui.button("RAGBot", on_click=lambda: ui.navigate.to("/rag"), icon="smart_toy").props("flat dense align=left").classes("w-full")
-
-        ui.separator()
-        ui.button("Downloads", on_click=lambda: ui.navigate.to("/downloads"), icon="download").props("flat dense align=left").classes("w-full")
-        ui.button("Help / About", on_click=lambda: ui.navigate.to("/about"), icon="info").props("flat dense align=left").classes("w-full")
-
-        def toggle_dark(e):
-            dark.set_value(e.value)
-            config.set("ui.dark_mode", e.value)
-            config.save()
-
-        ui.switch("Dark Mode", value=config.get("ui.dark_mode", False), on_change=toggle_dark)
-
-        if not use_native_window():
-            # In the browser, closing the tab does not stop the server.
-            def quit_mdmt():
-                ui.notify("MDMT has stopped. You can close this tab.", type="info", timeout=0)
-                ui.timer(0.5, app.shutdown, once=True)
-
-            ui.separator()
-            ui.button("Quit MDMT", on_click=quit_mdmt, icon="power_settings_new") \
-                .props("flat dense align=left").classes("w-full")
-
-    return drawer
-
-
-@ui.page("/")
-def index():
-    ui.navigate.to("/welcome")
-
-
-@ui.page("/welcome")
-def welcome():
-    create_sidebar()
-    from pages.welcome import welcome_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        welcome_page()
-
-
-@ui.page("/about")
-def about():
-    create_sidebar()
-    from pages.about import about_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        about_page()
-
-
-@ui.page("/downloads")
-def downloads():
-    create_sidebar()
-    from pages.downloads import downloads_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        downloads_page()
-
-
-@ui.page("/ocr")
-def ocr():
-    create_sidebar()
-    from pages.ocr import ocr_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        ocr_page()
-
-
-@ui.page("/audio")
-def audio():
-    create_sidebar()
-    from pages.audio import audio_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        audio_page()
-
-
-@ui.page("/translation")
-def translation():
-    create_sidebar()
-    from pages.translation import translation_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        translation_page()
-
-
-@ui.page("/keywords")
-def keywords():
-    create_sidebar()
-    from pages.keywords import keywords_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        keywords_page()
-
-
-@ui.page("/ner")
-def ner():
-    create_sidebar()
-    from pages.ner import ner_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        ner_page()
-
-
-@ui.page("/relationships")
-def relationships():
-    create_sidebar()
-    from pages.relationships import relationships_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        relationships_page()
-
-
-@ui.page("/cowords")
-def cowords():
-    create_sidebar()
-    from pages.cowords import cowords_page
-    with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-        cowords_page()
-
-
-@ui.page("/rag")
-def rag():
-    create_sidebar()
-    from pages.rag import rag_page
-    with ui.column().classes("w-full h-full px-4 py-2").style("overflow: hidden"):
-        rag_page()
-
-
 def _parse_args(argv=None):
     parser = argparse.ArgumentParser(prog="mdmt", description="Modular Digital Methodologies Toolkit")
     parser.add_argument("--self-test", action="store_true",
@@ -315,7 +172,8 @@ def _run_native_window():
     port = _free_port()
     app.add_middleware(LocalAccessMiddleware, port=port, token=None)  # Host check only
     app.native.window_args["text_select"] = True
-    ui.run(native=True, port=port, title=TITLE, window_size=(1200, 800), reload=False)
+    from pages.shell import root
+    ui.run(root, native=True, port=port, title=TITLE, window_size=(1200, 800), reload=False)
 
 
 def _run_in_browser():
@@ -345,7 +203,8 @@ def _run_in_browser():
         threading.Thread(target=_open_when_ready, args=(port, url), daemon=True).start()
     print(f"MDMT {__version__} is running at:\n  {url}\n"
           "Use 'Quit MDMT' in the sidebar, or press Ctrl+C here, to stop it.", flush=True)
-    ui.run(native=False, host="127.0.0.1", port=port, show=False, reload=False,
+    from pages.shell import root
+    ui.run(root, native=False, host="127.0.0.1", port=port, show=False, reload=False,
            title=TITLE, show_welcome_message=False)
 
 
