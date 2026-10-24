@@ -304,9 +304,10 @@ Nothing leaves your computer.
   complex questions.
 - Ask in the language of your documents. A question in another language
   (English about a French text, say) often misses the right passages.
-- The 0.8B model is fast but often gets details wrong. If your computer can
-  run them, the 2B and 4B models from the **Downloads** page answer more
-  accurately.
+- Two chat models are offered. **2B** (1.28 GB) suits any computer from the
+  last few years and runs well without a GPU.
+  **4B** (2.74 GB) is somewhat more accurate but needs a GPU to be quick;
+  MDMT recommends it when it finds one.
         """)
 
     # License
@@ -348,7 +349,7 @@ Nothing leaves your computer.
 |---|---|---|
 | Whisper tiny/base/small/medium, CTranslate2 conversions | MIT | [Systran on Hugging Face](https://huggingface.co/Systran) |
 | Tesseract language data (`tessdata`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tessdata) |
-| Qwen 3.5 GGUF (0.8B / 2B / 4B) | Apache-2.0 | [unsloth on Hugging Face](https://huggingface.co/unsloth) |
+| Qwen 3.5 GGUF (2B / 4B) | Apache-2.0 | [unsloth on Hugging Face](https://huggingface.co/unsloth) |
 | Argos Translate models (one per language pair) | Varies by model: 59 of 100 state CC-BY 4.0 (derived from OPUS-MT); the rest cite their OPUS training data or state no license. See each model's README. | [Argos Translate](https://github.com/argosopentech/argos-translate) |
 | multilingual-e5-small, ONNX export (RAG retrieval) | MIT | [Hugging Face](https://huggingface.co/intfloat/multilingual-e5-small) |
 | bge-reranker-v2-m3, ONNX export (RAG reranking, optional) | Apache-2.0 | [Hugging Face](https://huggingface.co/BAAI/bge-reranker-v2-m3) |

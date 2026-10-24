@@ -22,7 +22,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 - **Co-Word Analysis**: Generate word co-occurrence networks to reveal conceptual relationships
 
 ### AI Integration
-- **RAGBot**: Ask questions about a folder of documents and get answers that cite the passages they come from, from a local Qwen 3.5 model. Retrieval combines keyword search with multilingual embeddings and an optional reranker. MDMT auto-detects your hardware (NVIDIA, AMD, and Apple Metal GPUs) and recommends the best model size for your system.
+- **RAGBot**: Ask questions about a folder of documents and get answers that cite the passages they come from, from a local Qwen 3.5 model. Retrieval combines keyword search with multilingual embeddings and an optional reranker. MDMT detects your hardware (NVIDIA, AMD and Apple Metal GPUs) and recommends Qwen 3.5 4B when it can run on a GPU, and 2B otherwise.
 
 <p align="center"><img src="docs/images/ragbot.gif" alt="RAGBot answering a question about Frederick Douglass's Narrative and citing its source" width="800"></p>
 

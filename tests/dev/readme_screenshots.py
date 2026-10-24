@@ -1,7 +1,7 @@
 """Capture the README screenshots headlessly (Linux, browser mode).
 
     # in a separate environment with playwright and pillow (and `playwright install chromium`):
-    python tests/dev/readme_screenshots.py --models ~/.local/share/mdmt --llm Qwen3.5-0.8B-Q4_K_M.gguf
+    python tests/dev/readme_screenshots.py --models ~/.local/share/mdmt --llm Qwen3.5-2B-Q4_K_M.gguf
 
 Starts MDMT with a throwaway data folder under /tmp/mdmt-demo (its model
 folders are links to --models, so nothing is downloaded), indexes the eval
@@ -70,7 +70,7 @@ def save_gif(frames, path, width=800):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--models", required=True, help="an MDMT data folder with downloaded models (…/mdmt)")
-    parser.add_argument("--llm", default="Qwen3.5-0.8B-Q4_K_M.gguf")
+    parser.add_argument("--llm", default="Qwen3.5-2B-Q4_K_M.gguf")
     parser.add_argument("--app-python", default=os.path.join(REPO, ".venv", "bin", "python"))
     args = parser.parse_args()
     from playwright.sync_api import sync_playwright

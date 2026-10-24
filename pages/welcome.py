@@ -33,6 +33,6 @@ on the **Downloads** page:
 - **Translation**: one model per language direction, 65–285 MB each
 - **Named entities and relationships**: the multilingual NER model, 182 MB
 - **RAGBot**: retrieval models (135 MB, plus 588 MB for the optional reranker)
-  and a Qwen 3.5 chat model (533 MB to 2.74 GB)
+  and a Qwen 3.5 chat model (1.28 GB, or 2.74 GB for the larger one)
         """)
         ui.button("Open Downloads", icon="download", on_click=lambda: ui.navigate.to("/downloads")).props("outline")
