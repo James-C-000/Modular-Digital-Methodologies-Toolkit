@@ -170,6 +170,11 @@ def root():
     ui.add_head_html(STYLE)
     ui.query(".nicegui-content").classes("p-0")
     items = _sidebar()
+    from common import bundle
+    if bundle.PROBLEM:
+        with ui.row().classes("w-full items-center no-wrap q-pa-sm bg-negative text-white"):
+            ui.icon("error")
+            ui.label(bundle.PROBLEM).classes("text-body2")
 
     def highlight(path: str):
         for item_path, item in items.items():

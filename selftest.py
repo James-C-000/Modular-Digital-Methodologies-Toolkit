@@ -446,6 +446,16 @@ class SelfTest:
             gs = find_ghostscript()
             return {"ghostscript": gs, "pdfa_available": bool(gs)}
 
+        @self.check("bundle intact (symlinks survived extraction)")
+        def _():
+            from common.bundle import flattened_symlinks
+            bundle = _bundle_dir()
+            flattened = flattened_symlinks(bundle) if bundle else []
+            if flattened:
+                raise RuntimeError(f"{len(flattened)} library symlinks were extracted as text files, e.g. "
+                                   f"{flattened[:3]}")
+            return {"checked": bundle}
+
         @self.check("torch-free build")
         def _():
             import importlib.util

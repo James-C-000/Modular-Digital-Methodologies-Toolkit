@@ -144,3 +144,11 @@ async def test_welcome_offers_the_recommended_setup(user):
     await user.should_see("Recommended setup")
     await user.should_see("Whisper small")
     await user.should_see("Download all")
+
+
+@pytest.mark.anyio
+async def test_a_broken_extraction_is_explained_on_every_page(user, monkeypatch):
+    from common import bundle
+    monkeypatch.setattr(bundle, "PROBLEM", bundle.EXTRACTION_HELP)
+    await user.open("/rag")
+    await user.should_see("does not keep symbolic links")

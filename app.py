@@ -95,6 +95,16 @@ def _setup_frozen_env(base_path: str = None):
         pass
 
 
+def _check_extraction():
+    """Warn (log, terminal and an in-app banner) if the download was unpacked without its symlinks."""
+    from common import bundle
+    flattened = bundle.flattened_symlinks(getattr(sys, "_MEIPASS", os.path.dirname(sys.executable)))
+    if flattened:
+        bundle.PROBLEM = bundle.EXTRACTION_HELP
+        log.error("%d library symlinks were extracted as text files (e.g. %s)", len(flattened), flattened[:3])
+        print(bundle.EXTRACTION_HELP, file=sys.stderr, flush=True)
+
+
 def _append_user_tool_paths():
     """Let a frozen macOS app find user-installed tools such as Ghostscript.
 
@@ -138,6 +148,7 @@ def main():
 
     if getattr(sys, "frozen", False):
         _setup_frozen_env()
+        _check_extraction()
     _append_user_tool_paths()
 
     get_app_data_dir()
