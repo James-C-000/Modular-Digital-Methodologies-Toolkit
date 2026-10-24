@@ -152,3 +152,26 @@ async def test_a_broken_extraction_is_explained_on_every_page(user, monkeypatch)
     monkeypatch.setattr(bundle, "PROBLEM", bundle.EXTRACTION_HELP)
     await user.open("/rag")
     await user.should_see("does not keep symbolic links")
+
+
+@pytest.mark.anyio
+async def test_thinking_mode_raises_the_context_length_and_restores_it(user):
+    await user.open("/rag")
+    context = user.find(kind=ui.number, content="Context length")
+    context.clear().type("8192")
+    assert config.AppConfig().get("defaults.rag_context_window") == 8192
+    user.find(kind=ui.switch, content="Thinking mode").click()
+    await user.should_see("Context length set to 32768")
+    assert config.AppConfig().get("defaults.rag_context_window") == 32768
+    user.find(kind=ui.switch, content="Thinking mode").click()        # off again: back to 8192
+    assert config.AppConfig().get("defaults.rag_context_window") == 8192
+
+
+@pytest.mark.anyio
+async def test_a_saved_short_context_is_raised_when_thinking_is_on(user):
+    from pages.components import save
+    save("defaults.rag_thinking_mode", True)
+    save("defaults.rag_context_window", 8192)
+    await user.open("/rag")
+    await user.should_see("Context length set to 32768")
+    assert config.AppConfig().get("defaults.rag_context_window") == 32768

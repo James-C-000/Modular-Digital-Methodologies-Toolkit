@@ -57,7 +57,8 @@ def main(argv=None):
     parser.add_argument("--llm", required=True, help="Qwen 3.5 GGUF model file")
     parser.add_argument("--question", action="append", help="answer this question and exit (repeatable)")
     parser.add_argument("--json", action="store_true", help="print answers as JSON lines")
-    parser.add_argument("--context-window", type=int, default=8192)
+    parser.add_argument("--context-window", type=int, default=None,
+                        help="tokens of context (default 8192, or 32768 with --enable-thinking)")
     parser.add_argument("--top-k", type=int, default=6, help="chunks given to the model")
     parser.add_argument("--no-rerank", action="store_true", help="skip the cross-encoder reranker")
     parser.add_argument("--enable-thinking", action="store_true", help="let the model reason first")
@@ -70,7 +71,9 @@ def main(argv=None):
     if not os.path.isfile(args.llm):
         parser.error(f"model file not found: {args.llm}")
 
-    settings = RagSettings(documents_dir=args.documents, llm_path=args.llm, n_ctx=args.context_window,
+    from RAG.session import THINKING_CONTEXT
+    n_ctx = args.context_window or (THINKING_CONTEXT if args.enable_thinking else 8192)
+    settings = RagSettings(documents_dir=args.documents, llm_path=args.llm, n_ctx=n_ctx,
                            top_k=args.top_k, rerank=not args.no_rerank, enable_thinking=args.enable_thinking,
                            n_gpu_layers=args.gpu_layers, threads=args.threads)
     session = RagSession(settings)

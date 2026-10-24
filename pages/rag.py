@@ -135,8 +135,25 @@ def _setup_ui(state, on_ready):
                                if short else "")
             room_hint.set_visibility(short)
 
+        raised = {"from": None}
+        raised_note = hint("")
+
+        def fit_context_to_thinking(_=None):
+            """Thinking needs a long context: raise it when thinking is on, restore it when off."""
+            current = int(ctx_length.value or 0)
+            if thinking.value and current < THINKING_CONTEXT:
+                raised["from"] = current
+                ctx_length.set_value(THINKING_CONTEXT)
+                raised_note.set_text(f"Context length set to {THINKING_CONTEXT} for thinking mode.")
+            elif not thinking.value and raised["from"] and current == THINKING_CONTEXT:
+                ctx_length.set_value(raised["from"])
+                raised["from"] = None
+                raised_note.set_text("")
+
+        thinking.on_value_change(fit_context_to_thinking)
         thinking.on_value_change(update_room_hint)
         ctx_length.on_value_change(update_room_hint)
+        fit_context_to_thinking()
         update_room_hint()
         needed = [m for m in (models.EMBEDDER, models.RERANKER) if not models.is_installed(m)]
         if needed:
