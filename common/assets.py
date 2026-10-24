@@ -206,6 +206,15 @@ def _llm_section() -> Section:
             download_fn=lambda cb, k=key: models.download_llm(k, None, cb),
             paths_fn=lambda k=key: [models.llm_path(k)],
             in_use_fn=lambda k=key: _rag_in_use(models.llm_path(k))))
+    # Other .gguf files (an older MDMT's 0.8B model, or the user's own) can still be deleted here.
+    listed = {info["filename"] for info in models.QWEN_MODELS.values()}
+    root = get_models_dir()
+    for name in sorted(f for f in os.listdir(root) if f.endswith(".gguf") and f not in listed):
+        path = os.path.join(root, name)
+        section.assets.append(Asset(
+            f"llm:file:{name}", "llm", name, None, "Not in the current list (an older download, or one you added).",
+            installed_fn=lambda p=path: os.path.isfile(p), download_fn=None,
+            paths_fn=lambda p=path: [p], in_use_fn=lambda p=path: _rag_in_use(p)))
     return section
 
 

@@ -139,7 +139,7 @@ def _section_view(sec_id: str, recommended_llm: str):
         installed = asset.installed()
         with ui.row().classes("w-full items-center no-wrap q-py-xs"):
             with ui.column().classes("gap-0 flex-grow"):
-                label = f"{asset.name} ({human_bytes(asset.size)})"
+                label = asset.name + (f" ({human_bytes(asset.size)})" if asset.size else "")
                 ui.label(label + ("  ★ Recommended for this computer" if star else "")).classes("text-body2")
                 if asset.note:
                     hint(asset.note)

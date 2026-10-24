@@ -10,8 +10,11 @@ from common.proc import no_window_kwargs
 
 logger = logging.getLogger("rag-hardware")
 
-# Minimum VRAM (MB) to justify GPU offloading (model + KV cache overhead)
-_MIN_GPU_VRAM_MB = 1024
+# Minimum VRAM (MB) to offload to the GPU: Qwen3.5-2B with an 8k context fits.
+_MIN_GPU_VRAM_MB = 3072
+# 4B is recommended only where it runs on a GPU.  On a CPU it takes about a
+# minute per answer on a laptop, for a small gain over 2B (eval/ runs).
+_MIN_4B_GPU_MB = 4096
 
 
 @dataclass
@@ -22,17 +25,13 @@ class HardwareInfo:
     gpu_type: str  # "nvidia", "amd", "metal", "none"
     vram_mb: int  # 0 if no GPU
     ram_mb: int
-    recommended_model: str  # "0.8B", "2B", or "4B"
+    recommended_model: str  # "2B" or "4B"
     n_gpu_layers: int  # -1 (all GPU) or 0 (CPU only)
 
 
-def recommend_model(available_mb: int) -> str:
-    """Recommend a Qwen 3.5 model size based on available memory in MB."""
-    if available_mb >= 4096:
-        return "4B"
-    if available_mb >= 2048:
-        return "2B"
-    return "0.8B"
+def recommend_model(gpu_mb: int) -> str:
+    """Recommend a Qwen 3.5 model size from the GPU memory it can use (0 = CPU only)."""
+    return "4B" if gpu_mb >= _MIN_4B_GPU_MB else "2B"
 
 
 def detect_hardware() -> HardwareInfo:
@@ -56,14 +55,12 @@ def detect_hardware() -> HardwareInfo:
     if gpu_result:
         gpu_type, vram_mb = gpu_result
         use_gpu = vram_mb >= _MIN_GPU_VRAM_MB
-        # Use VRAM for recommendation if GPU will be used, else RAM
-        rec_memory = vram_mb if use_gpu else ram_mb
         return HardwareInfo(
             gpu_available=True,
             gpu_type=gpu_type,
             vram_mb=vram_mb,
             ram_mb=ram_mb,
-            recommended_model=recommend_model(rec_memory if rec_memory > 0 else 0),
+            recommended_model=recommend_model(vram_mb if use_gpu else 0),
             n_gpu_layers=-1 if use_gpu else 0,
         )
 
@@ -74,7 +71,7 @@ def detect_hardware() -> HardwareInfo:
             gpu_type="none",
             vram_mb=0,
             ram_mb=ram_mb,
-            recommended_model=recommend_model(ram_mb),
+            recommended_model=recommend_model(0),
             n_gpu_layers=0,
         )
 
@@ -84,7 +81,7 @@ def detect_hardware() -> HardwareInfo:
         gpu_type="none",
         vram_mb=0,
         ram_mb=0,
-        recommended_model="0.8B",
+        recommended_model="2B",
         n_gpu_layers=0,
     )
 

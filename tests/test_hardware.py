@@ -25,23 +25,16 @@ class TestHardwareInfo:
 
 
 class TestRecommendModel:
-    def test_low_memory_recommends_0_8b(self):
-        assert recommend_model(available_mb=1500) == "0.8B"
+    # On a CPU, 4B takes about a minute per answer for a small gain over 2B
+    # (eval/ runs), so 4B is recommended only where it runs on a GPU.
+    def test_no_usable_gpu_recommends_2b(self):
+        assert recommend_model(gpu_mb=0) == "2B"
 
-    def test_medium_memory_recommends_2b(self):
-        assert recommend_model(available_mb=3000) == "2B"
+    def test_small_gpu_recommends_2b(self):
+        assert recommend_model(gpu_mb=3072) == "2B"
 
-    def test_high_memory_recommends_4b(self):
-        assert recommend_model(available_mb=5000) == "4B"
-
-    def test_boundary_2gb_recommends_2b(self):
-        assert recommend_model(available_mb=2048) == "2B"
-
-    def test_boundary_4gb_recommends_4b(self):
-        assert recommend_model(available_mb=4096) == "4B"
-
-    def test_very_low_memory_recommends_0_8b(self):
-        assert recommend_model(available_mb=500) == "0.8B"
+    def test_gpu_with_4gb_recommends_4b(self):
+        assert recommend_model(gpu_mb=4096) == "4B"
 
 
 class TestDetectHardware:
@@ -65,7 +58,7 @@ class TestDetectHardware:
         mock_nvidia.return_value = None
         mock_amd.return_value = None
         mock_metal.return_value = None
-        mock_ram.return_value = 3000
+        mock_ram.return_value = 16000          # plenty of RAM, but no GPU: still 2B
         info = detect_hardware()
         assert info.gpu_available is False
         assert info.gpu_type == "none"
@@ -81,9 +74,9 @@ class TestDetectHardware:
         info = detect_hardware()
         assert info.gpu_available is True
         assert info.vram_mb == 512
-        # Low VRAM: use RAM for model recommendation, CPU for inference
+        # Too little VRAM: run on the CPU, so 2B
         assert info.n_gpu_layers == 0
-        assert info.recommended_model == "4B"
+        assert info.recommended_model == "2B"
 
     @patch("RAG.hardware._detect_nvidia_gpu")
     @patch("RAG.hardware._detect_amd_gpu")
@@ -96,8 +89,18 @@ class TestDetectHardware:
         mock_ram.side_effect = Exception("detection failed")
         info = detect_hardware()
         assert info.gpu_available is False
-        assert info.recommended_model == "0.8B"
+        assert info.recommended_model == "2B"
         assert info.n_gpu_layers == 0
+
+
+class TestAppleSilicon:
+    @patch("RAG.hardware._detect_nvidia_gpu", return_value=None)
+    @patch("RAG.hardware._detect_amd_gpu", return_value=None)
+    @patch("RAG.hardware._detect_metal", return_value=("metal", 8192))
+    @patch("RAG.hardware._get_system_ram_mb", return_value=8192)
+    def test_an_8gb_mac_runs_4b_on_metal(self, *_mocks):
+        info = detect_hardware()
+        assert info.n_gpu_layers == -1 and info.recommended_model == "4B"
 
 
 class TestNoConsoleWindows:

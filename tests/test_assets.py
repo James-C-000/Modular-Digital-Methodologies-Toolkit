@@ -64,9 +64,9 @@ def test_llm_lands_in_the_models_folder(app_data, monkeypatch):
     monkeypatch.setattr(hf, "download_file", lambda repo, rev, name, target, on_progress=None:
                         calls.append((repo, rev, name, target, on_progress)) or target)
     progress = object()
-    assets.find("llm:0.8B").download(progress)
+    assets.find("llm:2B").download(progress)
     repo, rev, name, target, on_progress = calls[0]
-    assert target == os.path.join(str(app_data), "models", "Qwen3.5-0.8B-Q4_K_M.gguf")
+    assert target == os.path.join(str(app_data), "models", "Qwen3.5-2B-Q4_K_M.gguf")
     assert len(rev) == 40 and on_progress is progress
 
 
@@ -81,3 +81,15 @@ def test_human_bytes():
     assert assets.human_bytes(512) == "512 B"
     assert assets.human_bytes(135 * 10**6) == "135 MB"
     assert assets.human_bytes(2740937888) == "2.74 GB"
+
+
+def test_older_chat_models_can_still_be_deleted(app_data):
+    models = app_data / "models"
+    models.mkdir(exist_ok=True)
+    (models / "Qwen3.5-0.8B-Q4_K_M.gguf").write_bytes(b"x" * 500)
+    llm = assets.section("llm")
+    extra = [a for a in llm.assets if a.key == "llm:file:Qwen3.5-0.8B-Q4_K_M.gguf"]
+    assert len(extra) == 1 and extra[0].installed() and extra[0].disk_bytes() == 500
+    extra[0].delete()
+    assert not (models / "Qwen3.5-0.8B-Q4_K_M.gguf").exists()
+    assert [a.key for a in assets.section("llm").assets] == ["llm:2B", "llm:4B"]
