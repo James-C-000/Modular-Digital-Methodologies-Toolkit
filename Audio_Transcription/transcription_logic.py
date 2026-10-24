@@ -55,11 +55,12 @@ def legacy_model_files(models_root: str) -> list[str]:
         return []
 
 
-def download_model(name: str, models_root: str) -> str:
+def download_model(name: str, models_root: str, on_progress=None) -> str:
     """Download a Whisper model into ``models_root/<name>`` atomically."""
     from common.hf_models import download_snapshot
     info = WHISPER_MODELS[name]
-    return download_snapshot(info["repo_id"], info["revision"], _MODEL_FILES, model_dir(name, models_root))
+    return download_snapshot(info["repo_id"], info["revision"], _MODEL_FILES, model_dir(name, models_root),
+                             on_progress)
 
 
 def load_model(name: str, models_root: str):

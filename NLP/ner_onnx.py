@@ -48,11 +48,11 @@ def is_model_installed(key: str = DEFAULT_NER_MODEL, models_root: str | None = N
     return is_snapshot_complete(model_dir(key, models_root or _default_root()), NER_MODELS[key]["files"])
 
 
-def download_model(key: str = DEFAULT_NER_MODEL, models_root: str | None = None) -> str:
+def download_model(key: str = DEFAULT_NER_MODEL, models_root: str | None = None, on_progress=None) -> str:
     from common.hf_models import download_snapshot
     info = NER_MODELS[key]
     return download_snapshot(info["repo_id"], info["revision"], info["files"],
-                             model_dir(key, models_root or _default_root()))
+                             model_dir(key, models_root or _default_root()), on_progress)
 
 
 def _default_root() -> str:

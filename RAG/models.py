@@ -42,6 +42,34 @@ RERANKER = {
 }
 RAG_MODELS = {EMBEDDER["key"]: EMBEDDER, RERANKER["key"]: RERANKER}
 
+# Chat models (GGUF), one file each, saved directly in the models folder where
+# the RAG page lists *.gguf files.  Revisions are pinned like the other models.
+QWEN_MODELS = {
+    "0.8B": {"name": "Qwen3.5-0.8B-Q4_K_M", "repo_id": "unsloth/Qwen3.5-0.8B-GGUF",
+             "revision": "6ab461498e2023f6e3c1baea90a8f0fe38ab64d0", "filename": "Qwen3.5-0.8B-Q4_K_M.gguf",
+             "bytes": 532517120, "size": "~533 MB", "desc": "Fast; best for systems with < 2 GB available."},
+    "2B": {"name": "Qwen3.5-2B-Q4_K_M", "repo_id": "unsloth/Qwen3.5-2B-GGUF",
+           "revision": "f6d5376be1edb4d416d56da11e5397a961aca8ae", "filename": "Qwen3.5-2B-Q4_K_M.gguf",
+           "bytes": 1280835840, "size": "~1.28 GB", "desc": "Good balance for 2–4 GB systems."},
+    "4B": {"name": "Qwen3.5-4B-Q4_K_M", "repo_id": "unsloth/Qwen3.5-4B-GGUF",
+           "revision": "e87f176479d0855a907a41277aca2f8ee7a09523", "filename": "Qwen3.5-4B-Q4_K_M.gguf",
+           "bytes": 2740937888, "size": "~2.74 GB", "desc": "Most accurate; needs 4 GB or more."},
+}
+QWEN_LICENSE = "Apache-2.0"
+
+
+def llm_path(key: str, root: str | None = None) -> str:
+    if root is None:
+        from config import get_models_dir
+        root = get_models_dir()
+    return os.path.join(root, QWEN_MODELS[key]["filename"])
+
+
+def download_llm(key: str, root: str | None = None, on_progress=None) -> str:
+    from common.hf_models import download_file
+    info = QWEN_MODELS[key]
+    return download_file(info["repo_id"], info["revision"], info["filename"], llm_path(key, root), on_progress)
+
 
 def models_root() -> str:
     from config import get_models_dir
@@ -57,9 +85,9 @@ def is_installed(info: dict, root: str | None = None) -> bool:
     return is_snapshot_complete(model_dir(info, root), info["files"])
 
 
-def download(info: dict, root: str | None = None) -> str:
+def download(info: dict, root: str | None = None, on_progress=None) -> str:
     from common.hf_models import download_snapshot
-    return download_snapshot(info["repo_id"], info["revision"], info["files"], model_dir(info, root))
+    return download_snapshot(info["repo_id"], info["revision"], info["files"], model_dir(info, root), on_progress)
 
 
 def _session(path: str, threads: int | None):

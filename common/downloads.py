@@ -48,13 +48,13 @@ def download_file(url: str, dest: str, on_progress=None, timeout: float = 60) ->
 
 
 def remove_stale_parts(directory: str):
-    """Delete ``*.part`` leftovers (files or dirs) from an earlier crash."""
+    """Delete ``*.part`` and ``*.download`` leftovers (files or dirs) from an earlier crash."""
     try:
         names = os.listdir(directory)
     except OSError:
         return
     for name in names:
-        if name.endswith(".part"):
+        if name.endswith((".part", ".download")):
             path = os.path.join(directory, name)
             if os.path.isdir(path):
                 shutil.rmtree(path, ignore_errors=True)
