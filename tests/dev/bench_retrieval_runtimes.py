@@ -140,7 +140,9 @@ class LlamaEncoder:
         from llama_cpp.llama_embedding import LlamaEmbedding
         gpu = -1 if sys.platform == "darwin" else 0  # Metal on Apple Silicon
         self.llm = LlamaEmbedding(
-            model_path=hf_hub_download(repo, file), n_ctx=8192, n_batch=2048, n_ubatch=512,
+            # Encoder models (BERT/XLM-R) are not causal: llama.cpp aborts the whole
+            # process unless a batch fits in one micro-batch (n_ubatch >= n_tokens).
+            model_path=hf_hub_download(repo, file), n_ctx=8192, n_batch=2048, n_ubatch=2048,
             n_threads=threads, n_gpu_layers=gpu, verbose=False,
             pooling_type=LLAMA_POOLING_TYPE_RANK if rank else LLAMA_POOLING_TYPE_UNSPECIFIED)
 
