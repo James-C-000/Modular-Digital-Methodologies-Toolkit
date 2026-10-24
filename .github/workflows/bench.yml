@@ -1,0 +1,60 @@
+name: Retrieval runtime benchmark
+
+# Dev-only: runs tests/dev/bench_retrieval_runtimes.py on each CI platform when
+# the script changes, for the Phase 3 RAG design. Not part of the release.
+on:
+  push:
+    branches: ['polish/**']
+    paths: ['tests/dev/bench_retrieval_runtimes.py', '.github/workflows/bench.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, name: linux}
+          - {os: macos-15, name: macos}
+          - {os: windows-latest, name: windows, cmake_extra: '-DGGML_OPENMP=OFF'}
+    runs-on: ${{ matrix.os }}
+    env:
+      CMAKE_ARGS: -DGGML_NATIVE=OFF ${{ matrix.cmake_extra }}
+      HF_HUB_DISABLE_PROGRESS_BARS: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/*-${{ matrix.name }}.txt
+      - name: Install locked dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/lock-${{ matrix.name }}.txt
+      - id: llama
+        run: echo "sha=$(grep -oE '@[0-9a-f]{40}' requirements/llama.txt | tr -d @)" >> "$GITHUB_OUTPUT"
+      - name: Restore llama-cpp-python wheel (built by build.yml)
+        id: llama-cache
+        uses: actions/cache@v4
+        with:
+          path: wheels
+          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.sha }}-${{ env.CMAKE_ARGS }}
+      - name: Build llama-cpp-python wheel
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        run: pip wheel --no-deps -r requirements/llama.txt -w wheels
+      - run: pip install --no-deps wheels/llama_cpp_python-*.whl
+      - name: CPU info
+        run: python -c "import os, platform; print(platform.platform(), platform.processor(), os.cpu_count())"
+      - name: Benchmark (4 threads)
+        run: python tests/dev/bench_retrieval_runtimes.py --threads 4 --out bench-${{ matrix.name }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-${{ matrix.name }}
+          path: bench-${{ matrix.name }}.json
