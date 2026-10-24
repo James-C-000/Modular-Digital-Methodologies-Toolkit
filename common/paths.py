@@ -49,3 +49,38 @@ def unique_safe_filenames(names, suffix: str = "") -> dict:
 def same_path(a: str, b: str) -> bool:
     """True if two paths refer to the same location (symlinks, case, separators)."""
     return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def is_inside(child: str, parent: str) -> bool:
+    """True if *child* is strictly below *parent* (after resolving links and case)."""
+    c = os.path.normcase(os.path.realpath(child))
+    p = os.path.normcase(os.path.realpath(parent))
+    try:
+        return c != p and os.path.commonpath([c, p]) == p
+    except ValueError:  # different drives on Windows
+        return False
+
+
+def folder_problem(path: str) -> str | None:
+    """Why *path* cannot be used as an input folder, or None."""
+    if not path:
+        return "Choose a folder."
+    if not os.path.isdir(path):
+        return "Folder not found."
+    return None
+
+
+def output_folder_problem(input_dir: str, output_dir: str, reprocesses_outputs: bool) -> str | None:
+    """Why *output_dir* cannot be used with *input_dir*, or None.
+
+    reprocesses_outputs: the tool searches the input folder recursively for
+    files of the kind it writes (OCR reads and writes PDFs), so an output
+    folder inside the input folder would be processed again on the next run.
+    """
+    if not output_dir:
+        return "Choose an output folder."
+    if same_path(input_dir, output_dir):
+        return "The output folder must differ from the input folder."
+    if reprocesses_outputs and is_inside(output_dir, input_dir):
+        return "The output folder is inside the input folder, so running again would process the outputs too."
+    return None

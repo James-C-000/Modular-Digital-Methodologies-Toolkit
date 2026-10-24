@@ -1,0 +1,50 @@
+"""Input/output folder checks used by the pages."""
+import os
+import sys
+
+import pytest
+
+from common.paths import folder_problem, is_inside, output_folder_problem, same_path
+
+
+def test_same_path_sees_through_dots_and_links(tmp_path):
+    d = tmp_path / "scans"
+    d.mkdir()
+    assert same_path(str(d), str(tmp_path / "x" / ".." / "scans"))
+    if sys.platform != "win32":
+        (tmp_path / "link").symlink_to(d)
+        assert same_path(str(d), str(tmp_path / "link"))
+
+
+def test_is_inside(tmp_path):
+    assert is_inside(str(tmp_path / "in" / "out"), str(tmp_path / "in"))
+    assert not is_inside(str(tmp_path / "in"), str(tmp_path / "in"))
+    assert not is_inside(str(tmp_path / "input2"), str(tmp_path / "in"))   # prefix, not parent
+
+
+def test_folder_problem(tmp_path):
+    assert folder_problem("") == "Choose a folder."
+    assert folder_problem(str(tmp_path / "missing")) == "Folder not found."
+    (tmp_path / "f.txt").write_text("x")
+    assert folder_problem(str(tmp_path / "f.txt")) == "Folder not found."
+    assert folder_problem(str(tmp_path)) is None
+
+
+@pytest.mark.parametrize("out, reprocesses, problem", [
+    ("in", False, "The output folder must differ from the input folder."),
+    ("in/./", False, "The output folder must differ from the input folder."),
+    ("in/ocr", True, "The output folder is inside the input folder, so running again would process the outputs too."),
+    ("in/ocr", False, None),
+    ("out", True, None),
+    ("", True, "Choose an output folder."),
+])
+def test_output_folder_problem(tmp_path, out, reprocesses, problem):
+    (tmp_path / "in").mkdir()
+    out_path = str(tmp_path / out) if out else ""
+    assert output_folder_problem(str(tmp_path / "in"), out_path, reprocesses_outputs=reprocesses) == problem
+
+
+def test_output_folder_may_be_created_later(tmp_path):
+    (tmp_path / "in").mkdir()
+    assert output_folder_problem(str(tmp_path / "in"), str(tmp_path / "new" / "deep"), True) is None
+    assert os.path.exists(tmp_path / "in")
