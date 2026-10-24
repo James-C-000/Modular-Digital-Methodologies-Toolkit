@@ -1,9 +1,10 @@
-from RAG.generation import chatml_fallback, sampling_params
+from RAG.generation import chatml_fallback, completion_kwargs, model_kwargs, short_completion_kwargs
 
 
 def test_sampling_params_follow_qwen_recommendations():
-    assert sampling_params(True)["temperature"] == 1.0 and sampling_params(True)["top_p"] == 0.95
-    assert sampling_params(False)["temperature"] == 0.7 and sampling_params(False)["top_p"] == 0.8
+    thinking, instruct = completion_kwargs(True, max_tokens=8), completion_kwargs(False, max_tokens=8)
+    assert thinking["temperature"] == 1.0 and thinking["top_p"] == 0.95
+    assert instruct["temperature"] == 0.7 and instruct["top_p"] == 0.8
 
 
 def test_fallback_template_switches_thinking_like_qwen():
@@ -17,13 +18,22 @@ def test_fallback_template_switches_thinking_like_qwen():
 
 def test_every_argument_mdmt_passes_exists_in_the_installed_llama_cpp():
     # The JamePeng fork renamed presence_penalty to present_penalty; a mismatch
-    # only shows up when a real model generates, so check the signature here.
+    # only shows up when a real model generates, so check the signatures here.
     # Runs in tests.yml's llama-cpp job and in build.yml, which install it.
     import inspect
 
     import pytest
-    from RAG.generation import completion_kwargs
     llama_cpp = pytest.importorskip("llama_cpp")
-    accepted = set(inspect.signature(llama_cpp.Llama.create_completion).parameters)
+
+    def named_parameters(func):
+        # Llama.__init__ also takes **kwargs, which would silently swallow a
+        # misspelled argument, so only explicitly named parameters count.
+        return {name for name, p in inspect.signature(func).parameters.items()
+                if p.kind is not p.VAR_KEYWORD}
+
+    constructor = named_parameters(llama_cpp.Llama.__init__)
+    completion = named_parameters(llama_cpp.Llama.create_completion)
+    assert set(model_kwargs("m.gguf", 8192, None, 0, False)) <= constructor
     for thinking in (False, True):
-        assert set(completion_kwargs(thinking, max_tokens=8)) <= accepted
+        assert set(completion_kwargs(thinking, max_tokens=8)) <= completion
+    assert set(short_completion_kwargs(max_tokens=8)) <= completion

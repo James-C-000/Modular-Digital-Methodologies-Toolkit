@@ -16,14 +16,26 @@ PRESENCE_PENALTY = 1.5
 STOP = ["<|im_end|>", "<|im_start|>", "<|endoftext|>"]
 
 
-def sampling_params(enable_thinking: bool) -> dict:
-    return dict(THINKING_PARAMS if enable_thinking else INSTRUCT_PARAMS)
+# Every keyword argument MDMT passes to llama-cpp-python comes from one of the
+# three functions below, which tests/test_rag_generation.py checks against the
+# installed version's signatures.
+
+def model_kwargs(model_path: str, n_ctx: int, n_threads: int | None, n_gpu_layers: int,
+                 verbose: bool) -> dict:
+    """Keyword arguments for the Llama constructor."""
+    return {"model_path": model_path, "n_ctx": n_ctx, "n_batch": 512, "n_threads": n_threads,
+            "n_gpu_layers": n_gpu_layers, "verbose": verbose}
 
 
 def completion_kwargs(enable_thinking: bool, max_tokens: int) -> dict:
-    """Keyword arguments for Llama.create_completion when generating an answer."""
-    return dict(sampling_params(enable_thinking), max_tokens=max_tokens, stop=STOP,
-                presence_penalty=PRESENCE_PENALTY)
+    """Keyword arguments for Llama.create_completion when streaming an answer."""
+    return {**(THINKING_PARAMS if enable_thinking else INSTRUCT_PARAMS), "max_tokens": max_tokens,
+            "stop": STOP, "presence_penalty": PRESENCE_PENALTY, "stream": True}
+
+
+def short_completion_kwargs(max_tokens: int) -> dict:
+    """Keyword arguments for Llama.create_completion in LlmEngine.complete()."""
+    return {"max_tokens": max_tokens, "temperature": 0.0, "stop": STOP}
 
 
 def chatml_fallback(messages, enable_thinking: bool) -> str:
@@ -36,8 +48,7 @@ class LlmEngine:
     def __init__(self, model_path: str, n_ctx: int = 8192, n_threads: int | None = None,
                  n_gpu_layers: int = 0, verbose: bool = False):
         from llama_cpp import Llama
-        self.llm = Llama(model_path=model_path, n_ctx=n_ctx, n_batch=512, n_threads=n_threads,
-                         n_gpu_layers=n_gpu_layers, verbose=verbose)
+        self.llm = Llama(**model_kwargs(model_path, n_ctx, n_threads, n_gpu_layers, verbose))
         self.n_ctx = n_ctx
         self._template = None
         source = self.llm.metadata.get("tokenizer.chat_template")
@@ -65,8 +76,7 @@ class LlmEngine:
         """
         self.last_finish_reason = None
         with self.lock:
-            for chunk in self.llm.create_completion(prompt, stream=True,
-                                                    **completion_kwargs(enable_thinking, max_tokens)):
+            for chunk in self.llm.create_completion(prompt, **completion_kwargs(enable_thinking, max_tokens)):
                 if stop_event is not None and stop_event.is_set():
                     break
                 choice = chunk["choices"][0]
@@ -78,7 +88,7 @@ class LlmEngine:
     def complete(self, prompt: str, max_tokens: int = 128) -> str:
         """Short deterministic completion (used for query rewriting)."""
         with self.lock:
-            out = self.llm.create_completion(prompt, max_tokens=max_tokens, temperature=0.0, stop=STOP)
+            out = self.llm.create_completion(prompt, **short_completion_kwargs(max_tokens))
         return out["choices"][0]["text"]
 
     def close(self):
