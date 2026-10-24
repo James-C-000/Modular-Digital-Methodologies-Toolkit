@@ -1,0 +1,17 @@
+{
+  "note": "Public-domain texts from Project Gutenberg, fetched by eval/fetch_corpus.py into eval/corpus/ (not committed). The Gutenberg header and license footer are removed.",
+  "documents": [
+    {"file": "douglass_narrative.txt", "gutenberg_id": 23, "language": "en",
+     "title": "Narrative of the Life of Frederick Douglass, an American Slave", "author": "Frederick Douglass", "year": 1845},
+    {"file": "paine_common_sense.txt", "gutenberg_id": 147, "language": "en",
+     "title": "Common Sense", "author": "Thomas Paine", "year": 1776},
+    {"file": "franklin_autobiography.txt", "gutenberg_id": 20203, "language": "en",
+     "title": "Autobiography of Benjamin Franklin", "author": "Benjamin Franklin", "year": 1791},
+    {"file": "wollstonecraft_vindication.txt", "gutenberg_id": 3420, "language": "en",
+     "title": "A Vindication of the Rights of Woman", "author": "Mary Wollstonecraft", "year": 1792},
+    {"file": "voltaire_candide_fr.txt", "gutenberg_id": 4650, "language": "fr",
+     "title": "Candide, ou l'optimisme", "author": "Voltaire", "year": 1759},
+    {"file": "kafka_verwandlung_de.txt", "gutenberg_id": 22367, "language": "de",
+     "title": "Die Verwandlung", "author": "Franz Kafka", "year": 1915}
+  ]
+}

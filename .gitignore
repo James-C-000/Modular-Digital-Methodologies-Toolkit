@@ -41,3 +41,8 @@ docs/superpowers/
 # PyInstaller output
 build/
 dist/
+
+# RAG evaluation: fetched corpus, index and local results
+eval/corpus/
+eval/.index/
+eval/results/
