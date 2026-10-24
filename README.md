@@ -6,7 +6,7 @@ A comprehensive suite of digital humanities and research tools designed to strea
 
 ## Overview
 
-MDMT is a desktop application that provides researchers, scholars, and digital humanists with a variety of specialized tools for working with text-based documents. It offers a modular approach, allowing users to perform tasks ranging from optical character recognition to language translation and advanced text analysis, all through a unified web-based interface running in a native window.
+MDMT is a desktop application that provides researchers, scholars, and digital humanists with a variety of specialized tools for working with text-based documents. It offers a modular approach, allowing users to perform tasks ranging from optical character recognition to language translation and advanced text analysis, all through a unified web-based interface running in a native window (Windows, macOS) or your browser (Linux).
 
 ## Features
 
@@ -42,7 +42,9 @@ The apps are **not code-signed or notarized**: MDMT is an independent open-sourc
 
 - **macOS:** open `MDMT.app` once and dismiss the warning, then go to **System Settings → Privacy & Security**, click **Open Anyway** next to the message about MDMT (available for about an hour after the attempt), and confirm with your password. Since macOS 15, Control-click → Open no longer bypasses this check. Alternatively, run `xattr -dr com.apple.quarantine /path/to/MDMT.app` in Terminal.
 - **Windows:** if SmartScreen shows "Windows protected your PC", click **More info → Run anyway**, then run `mdmt.exe` from the extracted folder.
-- **Linux:** run `mdmt/mdmt` from the extracted folder.
+- **Linux:** run `mdmt/mdmt` from the extracted folder. MDMT opens in your web browser (on Linux it runs as a private local web app rather than in its own window); use **Quit MDMT** in the sidebar to stop it. To add it to your application menu, run `./install-desktop-entry.sh` in the extracted folder.
+
+On Linux, MDMT only listens on 127.0.0.1 and every launch uses a fresh random access token, so other users and web pages cannot reach it. Starting MDMT again while it is running opens a new tab on the existing instance.
 
 Logs are written to the MDMT app data folder (Help / About → **Open log folder**).
 
@@ -75,7 +77,7 @@ python app.py --self-test --self-test-out report.json
 
 ## Usage
 
-Launch MDMT with `python app.py`. The application opens in a native desktop window with a sidebar for navigation between modules:
+Launch MDMT with `python app.py`. The application opens in a native desktop window on Windows and macOS, and in your web browser on Linux, with a sidebar for navigation between modules:
 
 <p align="center"><img src="MDMT_Welcome.png" alt="MDMT Welcome Screen"></p>
 
@@ -134,8 +136,6 @@ MDMT is licensed under the MIT License — see [`LICENSE`](LICENSE).
 The distributed apps contain no GPL code: FFmpeg is built LGPL-only for releases, and Ghostscript (AGPL) is never bundled.
 
 This project uses several open-source libraries, each with their own licenses. The full text of each bundled library's license is in [`THIRD_PARTY_LICENSES`](THIRD_PARTY_LICENSES). See the Help/About page within the application for a per-library attribution table with license types and project links.
-
-On Linux, the application bundles PySide6 (LGPL-3.0) for its native window backend. PySide6 is bundled as dynamically-linked shared libraries inside the PyInstaller distribution, satisfying the LGPL's relinking requirement — users who wish to substitute a different version of PySide6 can replace the bundled `.so` files in the application directory.
 
 ## Contact
 

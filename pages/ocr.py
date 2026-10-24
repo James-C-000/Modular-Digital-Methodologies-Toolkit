@@ -1,6 +1,7 @@
 """OCR processing page."""
 import os
-from nicegui import app, ui, run
+from nicegui import ui, run
+from pages.pickers import browse_dir
 from config import AppConfig
 
 
@@ -37,10 +38,10 @@ def ocr_page():
 
     with ui.card().classes("w-full"):
         input_dir = ui.input("Input Directory", value=config.get("defaults.ocr_input_dir", "")).classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_dir(input_dir), icon="folder_open").props("flat")
 
         output_dir = ui.input("Output Directory", value=config.get("defaults.ocr_output_dir", "")).classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_dir(output_dir), icon="folder_open").props("flat")
 
     with ui.card().classes("w-full"):
         lang_options = list(available_langs.keys()) + ["\u2913 Download more languages..."]
@@ -151,13 +152,3 @@ def ocr_page():
         config.save()
 
     ui.button("Run OCR", on_click=run_ocr, icon="play_arrow").props("color=primary")
-
-
-async def _browse_dir(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.FOLDER,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])

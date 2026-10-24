@@ -30,10 +30,20 @@ import sys
 from nicegui import ui, app
 
 from common.opener import open_external
+from common.ui_mode import use_native_window
 from config import AppConfig, get_app_data_dir
 from version import __version__
 
 log = logging.getLogger("mdmt")
+
+
+TITLE = f"MDMT {__version__} - Modular Digital Methodologies Toolkit"
+
+
+@app.get('/_mdmt/ping')
+async def _ping():
+    """Lets a second launch confirm that this instance is alive (browser mode)."""
+    return {'app': 'mdmt', 'version': __version__, 'pid': os.getpid()}
 
 
 # Open external links in the system browser instead of navigating within pywebview
@@ -136,6 +146,16 @@ def create_sidebar():
             config.save()
 
         ui.switch("Dark Mode", value=config.get("ui.dark_mode", False), on_change=toggle_dark)
+
+        if not use_native_window():
+            # In the browser, closing the tab does not stop the server.
+            def quit_mdmt():
+                ui.notify("MDMT has stopped. You can close this tab.", type="info", timeout=0)
+                ui.timer(0.5, app.shutdown, once=True)
+
+            ui.separator()
+            ui.button("Quit MDMT", on_click=quit_mdmt, icon="power_settings_new") \
+                .props("flat dense align=left").classes("w-full")
 
     return drawer
 
@@ -277,13 +297,70 @@ def main():
         from selftest import run_self_test
         sys.exit(run_self_test(args.self_test_out))
 
+    if use_native_window():
+        _run_native_window()
+    else:
+        _run_in_browser()
+
+
+def _free_port() -> int:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def _run_native_window():
+    from common.local_server import LocalAccessMiddleware
+    port = _free_port()
+    app.add_middleware(LocalAccessMiddleware, port=port, token=None)  # Host check only
     app.native.window_args["text_select"] = True
-    ui.run(
-        native=True,
-        title=f"MDMT {__version__} - Modular Digital Methodologies Toolkit",
-        window_size=(1200, 800),
-        reload=False,
-    )
+    ui.run(native=True, port=port, title=TITLE, window_size=(1200, 800), reload=False)
+
+
+def _run_in_browser():
+    """Linux: serve on 127.0.0.1 with a per-launch token and open the user's browser."""
+    import atexit
+    import threading
+
+    from common import instance
+    from common.local_server import LocalAccessMiddleware, new_token
+
+    lock = instance.lock_path()
+    existing = instance.running_instance_url(lock)
+    if existing:
+        log.info("MDMT is already running; opening a new tab")
+        print("MDMT is already running; opening it in your browser.", flush=True)
+        if os.environ.get("MDMT_NO_BROWSER") != "1":
+            open_external(existing)
+        return
+
+    port, token = _free_port(), new_token()
+    url = f"http://127.0.0.1:{port}/?token={token}"
+    app.add_middleware(LocalAccessMiddleware, port=port, token=token)
+    instance.write_lock(lock, port=port, token=token)
+    atexit.register(instance.clear_lock, lock)
+    app.on_shutdown(lambda: instance.clear_lock(lock))
+    if os.environ.get("MDMT_NO_BROWSER") != "1":
+        threading.Thread(target=_open_when_ready, args=(port, url), daemon=True).start()
+    print(f"MDMT {__version__} is running at:\n  {url}\n"
+          "Use 'Quit MDMT' in the sidebar, or press Ctrl+C here, to stop it.", flush=True)
+    ui.run(native=False, host="127.0.0.1", port=port, show=False, reload=False,
+           title=TITLE, show_welcome_message=False)
+
+
+def _open_when_ready(port: int, url: str, timeout: float = 30.0):
+    """Open the browser once the server accepts connections."""
+    import socket
+    import time
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                break
+        except OSError:
+            time.sleep(0.2)
+    open_external(url)
 
 
 # Only when run as a script.  Multiprocessing re-imports this module as

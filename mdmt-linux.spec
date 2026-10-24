@@ -4,8 +4,6 @@ import shutil
 import subprocess
 import sys
 
-from PyInstaller.utils.hooks import collect_submodules
-
 sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
 from spec_common import UPX, common_binaries, common_datas, common_hiddenimports, prune  # noqa: E402
 
@@ -48,8 +46,9 @@ for td in tessdata_candidates:
 else:
     raise SystemExit('eng.traineddata not found: install tesseract-ocr-eng before building')
 
-# Hidden imports — PyInstaller can't discover these via static analysis
-hiddenimports = common_hiddenimports() + collect_submodules('webview')
+# Hidden imports — PyInstaller can't discover these via static analysis.
+# (No pywebview on Linux: MDMT runs in the user's browser.)
+hiddenimports = common_hiddenimports()
 
 a = Analysis(
     ['app.py'],
@@ -60,6 +59,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
+    # A bundled libreadline breaks system tools (xdg-open) started from MDMT.
     excludes=['readline'],
     noarchive=False,
 )

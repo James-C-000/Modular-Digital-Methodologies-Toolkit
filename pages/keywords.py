@@ -1,6 +1,6 @@
 """Advanced keyword search page."""
-import os
-from nicegui import app, ui, run
+from nicegui import ui, run
+from pages.pickers import browse_dir, browse_file
 from config import AppConfig
 
 
@@ -20,10 +20,10 @@ def keywords_page():
 
     with ui.card().classes("w-full"):
         pdf_dir = ui.input("PDF Input Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(pdf_dir), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_dir(pdf_dir), icon="folder_open").props("flat")
 
         output_dir = ui.input("Output Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(output_dir), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_dir(output_dir), icon="folder_open").props("flat")
 
         context_length = ui.number("Context Length (words)", value=5, min=1, max=50).classes("w-48")
 
@@ -47,9 +47,9 @@ def keywords_page():
 
     with ui.expansion("Or load from files...").classes("w-full"):
         keyword_file = ui.input("Keyword File Path").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_file(keyword_file), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_file(keyword_file, [".txt"], "Text files"), icon="folder_open").props("flat")
         filter_file = ui.input("Filter File Path").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_file(filter_file), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_file(filter_file, [".txt"], "Text files"), icon="folder_open").props("flat")
 
     ui.separator()
 
@@ -106,23 +106,3 @@ def keywords_page():
         config.save()
 
     ui.button("Analyze", on_click=run_analysis, icon="play_arrow").props("color=primary")
-
-
-async def _browse_dir(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.FOLDER,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])
-
-
-async def _browse_file(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.OPEN,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])

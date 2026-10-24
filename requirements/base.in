@@ -20,9 +20,8 @@ faiss-cpu~=1.13
 beautifulsoup4~=4.14
 docx2txt~=0.9
 nicegui~=3.8
-pywebview~=6.1
-qtpy~=2.4; sys_platform == 'linux'
-PySide6~=6.9; sys_platform == 'linux'
+# Native window on Windows/macOS only; Linux runs in the user's browser.
+pywebview~=6.1; sys_platform != 'linux'
 platformdirs~=4.3
 huggingface_hub~=1.3
 transformers~=5.3

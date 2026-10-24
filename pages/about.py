@@ -327,9 +327,7 @@ Generation (RAG) to find relevant passages and generate answers.
 | pypdfium2 | Apache-2.0 / BSD-3-Clause | [GitHub](https://github.com/pypdfium2-team/pypdfium2) |
 | sacremoses | MIT | [GitHub](https://github.com/hplt-project/sacremoses) |
 | SentencePiece | Apache-2.0 | [GitHub](https://github.com/google/sentencepiece) |
-| PySide6 | LGPL-3.0 | [qt.io/qt-for-python](https://wiki.qt.io/Qt_for_Python) |
-| pywebview | BSD-3-Clause | [GitHub](https://github.com/r0x0r/pywebview) |
-| QtPy | MIT | [GitHub](https://github.com/spyder-ide/qtpy) |
+| pywebview (Windows and macOS) | BSD-3-Clause | [GitHub](https://github.com/r0x0r/pywebview) |
 | Requests | Apache-2.0 | [GitHub](https://github.com/psf/requests) |
 | Sentence-Transformers | Apache-2.0 | [GitHub](https://github.com/UKPLab/sentence-transformers) |
 | Tesseract OCR (and bundled tessdata `eng`, `osd`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tesseract) |

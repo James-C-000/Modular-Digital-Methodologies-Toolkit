@@ -1,6 +1,7 @@
 """RAG chatbot page."""
 import os
-from nicegui import app, ui, run
+from nicegui import ui, run
+from pages.pickers import browse_dir
 from config import AppConfig, get_models_dir
 
 
@@ -40,7 +41,7 @@ def rag_page():
 
         with ui.card().classes("w-full"):
             doc_dir = ui.input("Documents Directory").classes("w-full")
-            ui.button("Browse...", on_click=lambda: _browse_dir(doc_dir), icon="folder_open").props("flat")
+            ui.button("Browse...", on_click=lambda: browse_dir(doc_dir), icon="folder_open").props("flat")
             ui.label(
                 "Supported formats: TXT, PDF, Markdown, HTML, CSV, JSON, DOCX"
             ).classes("text-caption text-grey-7")
@@ -91,14 +92,9 @@ def rag_page():
 
             async def browse_and_sync():
                 """Browse for a .gguf file and add it to the dropdown."""
-                import webview
-                result = await app.native.main_window.create_file_dialog(
-                    dialog_type=webview.FileDialog.OPEN,
-                    allow_multiple=False,
-                    file_types=("GGUF Models (*.gguf)",),
-                )
-                if result and len(result) > 0:
-                    path = result[0]
+                from pages.pickers import pick_file
+                path = await pick_file(model_select.value or get_models_dir(), [".gguf"], "GGUF models")
+                if path:
                     # Add to dropdown and select it
                     opts = dict(model_select.options)
                     if path not in opts:
@@ -249,24 +245,3 @@ def rag_page():
         message_input.on("keydown.enter", send_message)
 
     content()
-
-
-async def _browse_dir(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.FOLDER,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])
-
-
-async def _browse_file(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.OPEN,
-        allow_multiple=False,
-        file_types=("GGUF Models (*.gguf)",),
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])

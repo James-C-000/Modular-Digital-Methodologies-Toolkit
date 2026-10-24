@@ -237,7 +237,7 @@ def _translation_section():
 
 
 def _ner_section():
-    from NLP.ner_onnx import NER_MODELS, download_model, is_model_installed, model_dir
+    from NLP.ner_onnx import NER_MODELS, download_model, is_model_installed
 
     with ui.card().classes("w-full mt-4"):
         ui.label("Named Entity Model (NER, Relationships)").classes("text-h5")

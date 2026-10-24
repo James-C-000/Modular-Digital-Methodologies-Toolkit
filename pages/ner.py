@@ -1,6 +1,7 @@
 """Named Entity Recognition page."""
 import os
-from nicegui import app, ui, run
+from nicegui import ui, run
+from pages.pickers import browse_dir
 from config import AppConfig
 
 
@@ -13,7 +14,7 @@ def ner_page():
 
     with ui.card().classes("w-full"):
         input_dir = ui.input("Input Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+        ui.button("Browse...", on_click=lambda: browse_dir(input_dir), icon="folder_open").props("flat")
 
     progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
     progress.set_visibility(False)
@@ -49,13 +50,3 @@ def ner_page():
         config.save()
 
     ui.button("Run NER", on_click=run_ner, icon="play_arrow").props("color=primary")
-
-
-async def _browse_dir(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.FOLDER,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])
