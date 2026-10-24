@@ -236,10 +236,8 @@ def downloads_page():
     page_header("Downloads", "Optional models and language data. Everything is downloaded from its official"
                              " source and runs offline afterwards.")
     hw = detect_hardware()
-    hw_text = (f"{hw.gpu_type.upper()} GPU, {hw.vram_mb} MB VRAM" if hw.gpu_available
-               else f"no GPU, {hw.ram_mb} MB RAM")
     with ui.row().classes("w-full items-center"):
-        hint(f"This computer: {hw_text}.")
+        hint(f"This computer: {hw.describe()}.")
         ui.space()
         ui.button("Recommended setup", icon="auto_awesome", on_click=lambda: ui.navigate.to("/welcome")) \
             .props("flat dense")

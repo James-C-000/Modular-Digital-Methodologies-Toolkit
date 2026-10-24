@@ -3,7 +3,10 @@ import subprocess
 from unittest.mock import patch, MagicMock
 import pytest
 
+import RAG.hardware
 from RAG.hardware import HardwareInfo, detect_hardware, recommend_model
+
+_REAL_PROBE = RAG.hardware._llama_gpu_offload
 
 
 class TestHardwareInfo:
@@ -35,6 +38,12 @@ class TestRecommendModel:
 
     def test_gpu_with_4gb_recommends_4b(self):
         assert recommend_model(gpu_mb=4096) == "4B"
+
+
+@pytest.fixture(autouse=True)
+def offload_supported(monkeypatch):
+    """Most tests assume a llama.cpp build that can use the GPU (as on macOS)."""
+    monkeypatch.setattr("RAG.hardware._llama_gpu_offload", lambda: True)
 
 
 class TestDetectHardware:
@@ -125,3 +134,27 @@ class TestNoConsoleWindows:
         monkeypatch.setattr(proc.sys, "platform", "linux")
         assert proc.no_window_kwargs() == {}
 
+
+
+class TestCpuOnlyBuild:
+    """The Windows and Linux builds ship llama.cpp's CPU backend only."""
+
+    @patch("RAG.hardware._detect_nvidia_gpu", return_value=("nvidia", 12288))
+    @patch("RAG.hardware._get_system_ram_mb", return_value=32768)
+    def test_an_unusable_gpu_is_reported_but_not_used(self, *_mocks):
+        with patch.object(RAG.hardware, "_llama_gpu_offload", return_value=False):
+            info = detect_hardware()
+            assert info.gpu_available and not info.gpu_used
+            assert info.n_gpu_layers == 0 and info.recommended_model == "2B"
+            assert "runs chat models on the CPU" in info.describe()
+
+    @patch("RAG.hardware._detect_nvidia_gpu", return_value=("nvidia", 8192))
+    @patch("RAG.hardware._get_system_ram_mb", return_value=16384)
+    def test_a_usable_gpu_is_described_plainly(self, *_mocks):
+        info = detect_hardware()
+        assert info.gpu_used and "not used" not in info.describe() and "NVIDIA" in info.describe()
+
+    def test_offload_probe_never_raises(self, monkeypatch):
+        import sys
+        monkeypatch.setitem(sys.modules, "llama_cpp", None)      # import fails
+        assert _REAL_PROBE() is False

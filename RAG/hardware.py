@@ -27,6 +27,30 @@ class HardwareInfo:
     ram_mb: int
     recommended_model: str  # "2B" or "4B"
     n_gpu_layers: int  # -1 (all GPU) or 0 (CPU only)
+    gpu_used: bool = False  # the GPU will run the model (this llama.cpp build can offload to it)
+
+    def describe(self) -> str:
+        if not self.gpu_available:
+            return f"no GPU, {self.ram_mb} MB RAM"
+        gpu = f"{self.gpu_type.upper()} GPU, {self.vram_mb} MB"
+        if self.gpu_used:
+            return gpu
+        if not _llama_gpu_offload():
+            return f"{gpu} (not used: this build of MDMT runs chat models on the CPU), {self.ram_mb} MB RAM"
+        return f"{gpu} (not used: too little GPU memory), {self.ram_mb} MB RAM"
+
+
+def _llama_gpu_offload() -> bool:
+    """True if the bundled llama.cpp can run models on a GPU.
+
+    The macOS build includes the Metal backend; the Windows and Linux builds
+    are CPU-only, so a detected NVIDIA or AMD card is not used there.
+    """
+    try:
+        import llama_cpp
+        return bool(llama_cpp.llama_supports_gpu_offload())
+    except Exception:
+        return False
 
 
 def recommend_model(gpu_mb: int) -> str:
@@ -54,7 +78,7 @@ def detect_hardware() -> HardwareInfo:
 
     if gpu_result:
         gpu_type, vram_mb = gpu_result
-        use_gpu = vram_mb >= _MIN_GPU_VRAM_MB
+        use_gpu = vram_mb >= _MIN_GPU_VRAM_MB and _llama_gpu_offload()
         return HardwareInfo(
             gpu_available=True,
             gpu_type=gpu_type,
@@ -62,6 +86,7 @@ def detect_hardware() -> HardwareInfo:
             ram_mb=ram_mb,
             recommended_model=recommend_model(vram_mb if use_gpu else 0),
             n_gpu_layers=-1 if use_gpu else 0,
+            gpu_used=use_gpu,
         )
 
     # No GPU — use RAM

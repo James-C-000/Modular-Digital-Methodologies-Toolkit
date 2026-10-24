@@ -78,9 +78,7 @@ def _setup_ui(state, on_ready):
              " that changed.")
 
     with section("Model"):
-        hw_text = (f"{hw.gpu_type.upper()} GPU — {hw.vram_mb} MB VRAM" if hw.gpu_available
-                   else f"No GPU — {hw.ram_mb} MB RAM")
-        hint(f"Detected hardware: {hw_text}")
+        hint(f"Detected hardware: {hw.describe()}")
         models_dir = get_models_dir()
         ggufs = sorted(f for f in os.listdir(models_dir) if f.endswith(".gguf")) if os.path.isdir(models_dir) else []
         options = {os.path.join(models_dir, f): f for f in ggufs}
