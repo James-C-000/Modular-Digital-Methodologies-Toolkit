@@ -29,8 +29,19 @@ gold quote still occurs in the text, so a re-edited Gutenberg file fails loudly.
 | `type` | `factual` (shares words with the passage), `paraphrase` (says it differently), `cross-lingual` (English question, French or German passage) or `unanswerable` (not in the corpus) |
 | `question` | what is asked |
 | `gold` | `{file, quote}` pairs: a retrieved chunk is relevant if it is from `file` and contains `quote` (case, whitespace and quote style ignored) |
-| `answers` | accepted short answers: an answer is correct if it contains any of them (accents ignored) |
+| `answers` | accepted short answers, each occurring in a gold quote: an answer is correct if it contains any of them or of `equivalents` as whole words (case and accents ignored) |
+| `equivalents` | other accepted wordings that are not the book's own: modern spellings, translations of a French or German answer, paraphrases |
 | `reviewed` | set to `true` once a person has checked the question, gold passage and answers |
+
+## Checking the questions
+
+    python -m eval.check_questions
+
+finds every gold quote in its book and widens it to whole sentences, checks that
+each answer occurs in its gold passage and that the passage fits in one indexed
+chunk, flags answers too short to match safely, and lists every other sentence in
+the book where an answer occurs (a possible missing gold passage, or a sign the
+question is ambiguous). `--write` saves the widened quotes. CI runs it too.
 
 ## Running
 

@@ -2,8 +2,20 @@
   "note": "Retrieval regression floor for CI (python -m eval.run_eval --no-rerank --check eval/baseline.json). Measured locally on the draft question set; update it when the questions, chunking or retrieval change on purpose.",
   "tolerance": 0.05,
   "retrieval": {
-    "dense": {"recall@6": 0.52, "recall@20": 0.61, "mrr": 0.44},
-    "bm25": {"recall@6": 0.48, "recall@20": 0.63, "mrr": 0.40},
-    "hybrid": {"recall@6": 0.48, "recall@20": 0.72, "mrr": 0.39}
+    "dense": {
+      "recall@6": 0.52,
+      "recall@20": 0.65,
+      "mrr": 0.45
+    },
+    "bm25": {
+      "recall@6": 0.48,
+      "recall@20": 0.63,
+      "mrr": 0.42
+    },
+    "hybrid": {
+      "recall@6": 0.48,
+      "recall@20": 0.74,
+      "mrr": 0.4
+    }
   }
 }

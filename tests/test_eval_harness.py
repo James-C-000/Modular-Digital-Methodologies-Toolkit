@@ -5,7 +5,7 @@ import os
 import pytest
 
 from eval.fetch_corpus import strip_gutenberg
-from eval.metrics import answer_matches, first_relevant_rank, is_relevant, mrr, normalize, recall_at
+from eval.metrics import answer_matches, contains_term, first_relevant_rank, is_relevant, mrr, normalize, recall_at
 
 EVAL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "eval")
 
@@ -33,9 +33,14 @@ def test_ranks_and_metrics():
 
 def test_answer_matching_is_accent_and_case_insensitive():
     assert answer_matches("He was born in TUCKAHOE, Maryland [1].", ["Tuckahoe"])
-    assert answer_matches("Pangloss taught metaphysico-theologo-cosmolonigology", ["cosmolonigolog"])
     assert answer_matches("Il est manichéen.", ["manicheen"])
+    assert answer_matches("“Lady of the Lake,” he said", ['Lady of the Lake'])
     assert not answer_matches("He was born in Easton.", ["Tuckahoe", "Talbot"])
+
+
+def test_answer_matching_needs_whole_words():
+    assert not answer_matches("We must maintain the handle.", ["main", "hand"])
+    assert answer_matches("He lost a hand.", ["hand"])
 
 
 def test_strip_gutenberg_keeps_only_the_book():
@@ -54,8 +59,13 @@ def test_question_set_is_well_formed():
     assert len({q["id"] for q in questions}) == len(questions)
     for q in questions:
         assert q["type"] in {"factual", "paraphrase", "cross-lingual", "unanswerable"}, q["id"]
+        assert isinstance(q["equivalents"], list) and isinstance(q["reviewed"], bool), q["id"]
         if q["type"] == "unanswerable":
-            assert not q["gold"] and not q["answers"], q["id"]
+            assert not q["gold"] and not q["answers"] and not q["equivalents"], q["id"]
         else:
             assert q["gold"] and q["answers"], q["id"]
-            assert all(g["file"] in files and len(g["quote"].split()) <= 20 for g in q["gold"]), q["id"]
+            assert all(g["file"] in files for g in q["gold"]), q["id"]
+            # Every accepted answer is visible in a gold quote; spellings and
+            # paraphrases that are not go in "equivalents".
+            quotes = " ".join(g["quote"] for g in q["gold"])
+            assert all(contains_term(quotes, a) for a in q["answers"]), q["id"]

@@ -77,7 +77,7 @@ def answer_run(args, questions):
             valid = [is_relevant(c.chunk.file, c.chunk.text, q["gold"]) for c in a.citations]
             rows.append({
                 "id": q["id"], "type": q["type"], "answer": a.text, "not_found": a.not_found,
-                "correct": (a.not_found if q["type"] == "unanswerable" else answer_matches(a.text, q["answers"])),
+                "correct": (a.not_found if q["type"] == "unanswerable" else answer_matches(a.text, q["answers"] + q.get("equivalents", []))),
                 "citations": len(a.citations), "valid_citations": sum(valid),
                 "dropped_citations": len(a.dropped_citations), "seconds": round(sum(a.timings.values()), 2),
             })

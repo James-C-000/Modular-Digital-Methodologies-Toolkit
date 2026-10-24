@@ -43,6 +43,10 @@ def mrr(ranks: list[int | None]) -> float:
     return sum(1 / r for r in ranks if r is not None) / len(ranks) if ranks else 0.0
 
 
+def contains_term(text: str, term: str) -> bool:
+    """*term* occurs in *text* as whole words (case, accents and quote style ignored)."""
+    return re.search(r"(?<!\w)" + re.escape(fold(term)) + r"(?!\w)", fold(text)) is not None
+
+
 def answer_matches(answer: str, accepted: list[str]) -> bool:
-    body = fold(answer)
-    return any(fold(a) in body for a in accepted)
+    return any(contains_term(answer, a) for a in accepted)

@@ -105,6 +105,9 @@ jobs:
       - name: Retrieval regression
         run: python -m eval.run_eval --no-rerank --check eval/baseline.json
 
+      - name: Check the questions against the corpus
+        run: python -m eval.check_questions > eval/results/check.txt
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
