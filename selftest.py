@@ -47,6 +47,7 @@ SELF_TEST_MODULES = [
     "pages.keywords",
     "pages.ner",
     "pages.ocr",
+    "pages.pickers",
     "pages.rag",
     "pages.relationships",
     "pages.translation",
@@ -147,6 +148,105 @@ def loaded_shared_libraries() -> list[str]:
                 if psapi.GetModuleFileNameExW(process, modules[i], buf, len(buf)):
                     libs.add(buf.value)
     return sorted(libs)
+
+
+def _app_command() -> list[str]:
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")]
+
+
+def check_browser_server(work: str) -> dict:
+    """Start a second MDMT in browser mode and probe its server from outside."""
+    import re
+    import socket
+    import urllib.error
+    import urllib.request
+
+    import psutil
+
+    env = dict(os.environ, MDMT_NO_BROWSER="1", MDMT_BROWSER="1",
+               XDG_DATA_HOME=os.path.join(work, "xdg-data"))  # separate app data and instance lock
+    proc = subprocess.Popen(_app_command(), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", **no_window_kwargs())
+    try:
+        url, seen, deadline = None, [], time.time() + 120
+        while time.time() < deadline and url is None:
+            line = proc.stdout.readline()
+            if not line:
+                if proc.poll() is not None:
+                    break
+                continue
+            seen.append(line)
+            m = re.search(r"(http://127\.0\.0\.1:(\d+)/\?token=([\w-]+))", line)
+            if m:
+                url, port, token = m.group(1), int(m.group(2)), m.group(3)
+        if url is None:
+            raise RuntimeError("server did not start:\n" + "".join(seen[-30:]))
+        base = f"http://127.0.0.1:{port}"
+        for _ in range(100):
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                    break
+            except OSError:
+                time.sleep(0.2)
+
+        listening = sorted({c.laddr.ip for c in psutil.Process(proc.pid).net_connections(kind="inet")
+                            if c.status == psutil.CONN_LISTEN})
+        if listening != ["127.0.0.1"]:
+            raise RuntimeError(f"server listens on {listening}, expected only 127.0.0.1")
+
+        lan_ip = None
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("192.0.2.1", 9))  # TEST-NET-1: no packets are sent
+                lan_ip = s.getsockname()[0]
+        except OSError:
+            pass
+        if lan_ip and not lan_ip.startswith("127."):
+            try:
+                with socket.create_connection((lan_ip, port), timeout=2):
+                    raise RuntimeError(f"server reachable on {lan_ip}")
+            except OSError:
+                pass
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *args, **kwargs):
+                return None
+
+        opener = urllib.request.build_opener(NoRedirect)
+
+        def status(path, headers=None):
+            try:
+                with opener.open(urllib.request.Request(base + path, headers=headers or {}), timeout=10) as r:
+                    return r.status, dict(r.headers), r.read().decode("utf-8", "replace")
+            except urllib.error.HTTPError as e:
+                return e.code, dict(e.headers), e.read().decode("utf-8", "replace")
+
+        no_token, _h, _b = status("/welcome")
+        bad_host, _h, _b = status(f"/?token={token}", {"Host": f"evil.example:{port}"})
+        redirect, headers, _b = status(f"/?token={token}")
+        cookie = headers.get("Set-Cookie", headers.get("set-cookie", "")).split(";")[0]
+        page, _h, body = status("/welcome", {"Cookie": cookie})
+        problems = []
+        if no_token != 403:
+            problems.append(f"tokenless request returned {no_token}, expected 403")
+        if bad_host != 400:
+            problems.append(f"foreign Host header returned {bad_host}, expected 400")
+        if redirect != 302 or not cookie.startswith("mdmt_token="):
+            problems.append(f"token link returned {redirect} with cookie {cookie!r}")
+        if page != 200 or "MDMT" not in body:
+            problems.append(f"page with cookie returned {page}")
+        if problems:
+            raise RuntimeError("; ".join(problems))
+        return {"listening": listening, "lan_ip_refused": lan_ip, "no_token": no_token,
+                "bad_host": bad_host, "token_link": redirect, "with_cookie": page}
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 class SelfTest:
@@ -339,6 +439,13 @@ class SelfTest:
         def _():
             import importlib.util
             return {"torch_importable": importlib.util.find_spec("torch") is not None}
+
+        @self.check("browser mode: local server security")
+        def _():
+            from common.ui_mode import use_native_window
+            if use_native_window():
+                return "skipped: native-window platform"
+            return check_browser_server(work)
 
         @self.check("bundled binaries and libraries")
         def _():
