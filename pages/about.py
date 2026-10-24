@@ -327,9 +327,15 @@ Nothing leaves your computer.
 |---|---|---|
 | PyAV | BSD-3-Clause | [GitHub](https://github.com/PyAV-Org/PyAV) |
 | FFmpeg (audio decoders only, built without GPL components; see `THIRD_PARTY_LICENSES`) | LGPL-2.1-or-later | [ffmpeg.org](https://ffmpeg.org/) |
+| bidict | MPL-2.0 | [GitHub](https://github.com/jab/bidict) |
+| certifi | MPL-2.0 | [GitHub](https://github.com/certifi/python-certifi) |
 | CTranslate2 | MIT | [GitHub](https://github.com/OpenNMT/CTranslate2) |
+| Docutils | Public domain / BSD-2-Clause | [docutils.sourceforge.io](https://docutils.sourceforge.io/) |
 | faster-whisper (includes Silero VAD model) | MIT | [GitHub](https://github.com/SYSTRAN/faster-whisper) |
+| fpdf2 (shipped as replaceable source files) | LGPL-3.0 | [GitHub](https://github.com/py-pdf/fpdf2) |
+| hf-xet | Apache-2.0 | [GitHub](https://github.com/huggingface/xet-core) |
 | Hugging Face Hub | Apache-2.0 | [GitHub](https://github.com/huggingface/huggingface_hub) |
+| img2pdf (shipped as replaceable source files) | LGPL-3.0 | [GitLab](https://gitlab.mister-muffin.de/josch/img2pdf) |
 | Jinja2 | BSD-3-Clause | [GitHub](https://github.com/pallets/jinja) |
 | llama-cpp-python (fork) | MIT | [GitHub](https://github.com/JamePeng/llama-cpp-python) |
 | Matplotlib | PSF-2.0 | [GitHub](https://github.com/matplotlib/matplotlib) |
@@ -337,6 +343,8 @@ Nothing leaves your computer.
 | NiceGUI | MIT | [GitHub](https://github.com/zauberzeug/nicegui) |
 | OCRmyPDF | MPL-2.0 | [GitHub](https://github.com/ocrmypdf/OCRmyPDF) |
 | ONNX Runtime | MIT | [GitHub](https://github.com/microsoft/onnxruntime) |
+| orjson | Apache-2.0 / MIT (parts MPL-2.0) | [GitHub](https://github.com/ijl/orjson) |
+| pikepdf | MPL-2.0 | [GitHub](https://github.com/pikepdf/pikepdf) |
 | platformdirs | MIT | [GitHub](https://github.com/tox-dev/platformdirs) |
 | Snowball stopword lists (bundled data) | BSD-3-Clause | [snowballstem.org](https://snowballstem.org/) |
 | stopwords-iso (bundled data) | MIT | [GitHub](https://github.com/stopwords-iso/stopwords-iso) |
@@ -348,6 +356,7 @@ Nothing leaves your computer.
 | pywebview (Windows and macOS) | BSD-3-Clause | [GitHub](https://github.com/r0x0r/pywebview) |
 | Tesseract OCR (and bundled tessdata `eng`, `osd`) | Apache-2.0 | [GitHub](https://github.com/tesseract-ocr/tesseract) |
 | Tokenizers (Hugging Face) | Apache-2.0 | [GitHub](https://github.com/huggingface/tokenizers) |
+| tqdm | MPL-2.0 / MIT | [GitHub](https://github.com/tqdm/tqdm) |
 """)
         ui.markdown("""
 **Downloadable models** (never bundled; fetched on demand from the Downloads page):
