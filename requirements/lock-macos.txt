@@ -54,7 +54,7 @@ mdurl==0.1.2              # via markdown-it-py
 multidict==7.1.0          # via aiohttp, nicegui, yarl
 networkx==3.7             # via -r base.in
 nicegui==3.18.0           # via -r base.in
-numpy==2.3.2              # via contourpy, ctranslate2, matplotlib, onnxruntime, py3langid, -r base.in
+numpy==2.5.4              # via contourpy, ctranslate2, matplotlib, onnxruntime, py3langid, -r base.in
 ocrmypdf==17.13.0         # via -r base.in
 onnxruntime==1.31.0       # via faster-whisper, -r base.in
 opentelemetry-api==1.45.1  # via fastapi

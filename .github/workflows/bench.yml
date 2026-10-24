@@ -48,7 +48,8 @@ jobs:
           key: llama-cpp-python-${{ matrix.name }}-py312-${{ env.BENCH_LLAMA_SHA }}-${{ env.CMAKE_ARGS }}
       - name: Build the fork's llama-cpp-python wheel
         if: steps.llama-cache.outputs.cache-hit != 'true'
-        run: pip wheel --no-deps -w wheels "llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git@${BENCH_LLAMA_SHA}"
+        # --no-cache-dir: pip's wheel cache ignores CMAKE_ARGS (see build.yml).
+        run: pip wheel --no-deps --no-cache-dir -w wheels "llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git@${BENCH_LLAMA_SHA}"
       - run: pip install --no-deps wheels/llama_cpp_python-*.whl
       - name: CPU info
         run: python -c "import os, platform; print(platform.platform(), platform.processor(), os.cpu_count())"

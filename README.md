@@ -118,11 +118,14 @@ Platform-specific PyInstaller spec files are provided, each bundling Tesseract O
 
 ```
 pip install -r requirements/lock-<os>.txt -r requirements/dev-<os>.txt
-CMAKE_ARGS=-DGGML_NATIVE=OFF pip install --no-deps -r requirements/llama.txt
+CMAKE_ARGS="-DGGML_NATIVE=OFF" pip install --no-deps --no-cache-dir -r requirements/llama.txt
+#   on Windows: CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_OPENMP=OFF"
 pyinstaller mdmt-linux.spec    # Linux   -> dist/mdmt/
 pyinstaller mdmt-macos.spec    # macOS   -> dist/MDMT.app
 pyinstaller mdmt-windows.spec  # Windows -> dist/mdmt/
 ```
+
+llama-cpp-python is always compiled from source. `GGML_NATIVE=OFF` targets a baseline CPU instead of the build machine's, so the bundle runs on older CPUs; on Windows, `GGML_OPENMP=OFF` avoids a dependency on MSVC's OpenMP runtime (`vcomp140.dll`), which PyInstaller does not bundle. `--no-cache-dir` matters because pip's wheel cache ignores `CMAKE_ARGS` and would reuse an earlier build made with other flags (for example by `pip install -r requirements.txt`).
 
 Release builds also replace PyPI's PyAV wheel, whose bundled FFmpeg is linked with the GPL encoders libx264/libx265, with PyAV compiled against a decoder-only FFmpeg built from source with no GPL components (`packaging/build_ffmpeg_lgpl.sh`, see `build.yml`). A plain `pip install` is fine for development.
 

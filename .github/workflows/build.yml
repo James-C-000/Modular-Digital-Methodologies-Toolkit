@@ -139,16 +139,14 @@ jobs:
           pip install --no-deps --force-reinstall av-wheel/av-*.whl
           python -c "import av; m = av._core.library_meta['libavcodec']; print(av.__version__, av.ffmpeg_version_info, m['license']); assert 'x264' not in m['configuration'] and m['license'].startswith('LGPL')"
 
-      - name: Read pinned llama-cpp-python version
-        id: llama
-        run: echo "version=$(grep -oE '^llama-cpp-python==[^ ]+' requirements/llama.txt | cut -d= -f3)" >> "$GITHUB_OUTPUT"
-
+      # Keyed on the whole of llama.txt, so any change to the pin rebuilds.
+      # tests.yml's llama-cpp job uses the same key on Linux.
       - name: Cache llama-cpp-python wheel
         id: llama-cache
         uses: actions/cache@v4
         with:
           path: wheels
-          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.version }}-${{ env.CMAKE_ARGS }}
+          key: llama-cpp-python-${{ matrix.name }}-py312-${{ hashFiles('requirements/llama.txt') }}-${{ env.CMAKE_ARGS }}
 
       - name: Build llama-cpp-python wheel
         if: steps.llama-cache.outputs.cache-hit != 'true'
