@@ -10,12 +10,12 @@
     "bm25": {
       "recall@6": 0.48,
       "recall@20": 0.63,
-      "mrr": 0.42
+      "mrr": 0.41
     },
     "hybrid": {
-      "recall@6": 0.48,
-      "recall@20": 0.74,
-      "mrr": 0.4
+      "recall@6": 0.59,
+      "recall@20": 0.76,
+      "mrr": 0.44
     }
   }
 }

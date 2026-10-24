@@ -61,6 +61,13 @@ class BM25:
         return [(int(i), float(scores[i])) for i in best]
 
 
+# Reciprocal Rank Fusion constant.  The usual 60 let a passage ranked first by
+# one search fall below passages both searches ranked middling; on eval/ a small
+# k gave Recall@6 0.59 vs 0.48 without the reranker (0.72 vs 0.67 with it), and
+# a leave-one-book-out choice of k picked 2-5 for every book.
+RRF_K = 5
+
+
 def dense_top(matrix: np.ndarray, query: np.ndarray, k: int) -> list[tuple[int, float]]:
     """Top-k rows of an L2-normalised *matrix* by cosine similarity to *query*."""
     if matrix.shape[0] == 0:
@@ -72,7 +79,7 @@ def dense_top(matrix: np.ndarray, query: np.ndarray, k: int) -> list[tuple[int, 
     return [(int(i), float(scores[i])) for i in best]
 
 
-def rrf_fuse(rankings: list[list[int]], k: int = 60) -> list[tuple[int, float]]:
+def rrf_fuse(rankings: list[list[int]], k: int = RRF_K) -> list[tuple[int, float]]:
     """Reciprocal Rank Fusion: sum of 1 / (k + rank) over the rankings (rank from 1)."""
     fused = defaultdict(float)
     for ranking in rankings:

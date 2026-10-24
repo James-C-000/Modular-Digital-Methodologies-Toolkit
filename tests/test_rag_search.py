@@ -57,5 +57,14 @@ def test_rrf_fuse_rewards_agreement():
     assert dict(fused)[1] > dict(fused)[3]
 
 
+def test_rrf_default_keeps_a_single_list_top_hit_near_the_top():
+    # A passage ranked first by one search must not sink below passages that
+    # both searches rank middling (k=60 let it fall out of the top 20 in eval/).
+    dense = [100] + list(range(1, 30))
+    lexical = list(range(30, 1, -1))   # shares 2..29 with dense, lacks 100
+    order = [d for d, _ in rrf_fuse([dense, lexical])]
+    assert order.index(100) < 3
+
+
 def test_rrf_fuse_with_one_empty_ranking():
     assert [d for d, _ in rrf_fuse([[5, 6], []])] == [5, 6]
