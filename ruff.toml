@@ -1,0 +1,10 @@
+# Targeted lint rules that guard against real cross-platform bugs.
+# Not a style gate: only the rules selected here are enforced.
+extend-exclude = ["build", "dist"]
+
+[lint]
+preview = true
+explicit-preview-rules = true
+select = [
+    "PLW1514",  # open() without encoding= -- cp1252 on Windows (Python < 3.15)
+]

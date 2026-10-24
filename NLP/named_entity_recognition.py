@@ -1,38 +1,20 @@
 #!/usr/bin/env python3
+"""Named entity recognition over a folder of PDF/TXT files (see NLP.ner_onnx)."""
+import html
 import os
-from pypdf import PdfReader
 from collections import Counter
 
-_ner_pipeline = None
-
-
-def _get_pipeline():
-    """Lazy-load the NER pipeline (downloads model on first use)."""
-    global _ner_pipeline
-    if _ner_pipeline is None:
-        from transformers import pipeline
-        _ner_pipeline = pipeline(
-            "ner",
-            model="dbmdz/bert-large-cased-finetuned-conll03-english",
-            revision="4c53496",
-            aggregation_strategy="simple"
-        )
-    return _ner_pipeline
+from common.pdf_text import extract_text
+from NLP.ner_onnx import load_model
 
 
 def process_pdf(file_path):
-    """Extract text from a PDF file using pypdf."""
-    text = ""
+    """Extract text from a PDF file."""
     try:
-        with open(file_path, "rb") as f:
-            reader = PdfReader(f)
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        return extract_text(file_path)
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
-    return text
+        return ""
 
 
 def process_txt(file_path):
@@ -56,38 +38,12 @@ def process_file(file_path):
         return ""
 
 
-def chunk_text_by_char(text, max_length=1000, overlap=200):
-    """
-    Split the text into chunks of at most `max_length` characters,
-    with an overlap of `overlap` characters between chunks.
-    Returns a list of tuples (chunk_text, start_offset).
-    """
-    chunks = []
-    start = 0
-    text_len = len(text)
-    while start < text_len:
-        end = min(start + max_length, text_len)
-        chunks.append((text[start:end], start))
-        if end == text_len:
-            break
-        start = end - overlap  # Overlap to preserve entity boundaries
-    return chunks
+def run_ner_on_text(text):
+    """Entities in *text* (dicts with entity_group, word, start, end, score).
 
-
-def run_ner_on_text(text, max_length=1000, overlap=200):
+    Long texts are handled by the model's overlapping token windows.
     """
-    Run the NER pipeline on the full text by processing it in chunks.
-    Adjusts entity offsets so they correspond to positions in the full text.
-    """
-    chunks = chunk_text_by_char(text, max_length, overlap)
-    aggregated_entities = []
-    for chunk, offset in chunks:
-        entities = _get_pipeline()(chunk)
-        for ent in entities:
-            ent["start"] += offset
-            ent["end"] += offset
-            aggregated_entities.append(ent)
-    return aggregated_entities
+    return load_model().predict(text)
 
 
 def summarize_entities(entities):
@@ -110,13 +66,13 @@ def generate_summary_html(file_name, summary):
     Generate an HTML snippet containing a summary table for the file.
     The table shows each entity type, its total count, and the top entities.
     """
-    snippet = f"<h2>{file_name}</h2>\n"
+    snippet = f"<h2>{html.escape(file_name)}</h2>\n"
     snippet += "<table border='1' cellspacing='0' cellpadding='5'>"
     snippet += "<tr><th>Entity Type</th><th>Total Count</th><th>Top Entities (count)</th></tr>"
     for label, counter in summary.items():
         total = sum(counter.values())
         top_entities = counter.most_common(3)  # Display top 3 entities for brevity
-        top_str = ", ".join([f"{entity} ({count})" for entity, count in top_entities])
+        top_str = ", ".join([f"{html.escape(entity)} ({count})" for entity, count in top_entities])
         snippet += f"<tr><td>{label}</td><td>{total}</td><td>{top_str}</td></tr>"
     snippet += "</table><br><hr><br>\n"
     return snippet
@@ -130,8 +86,8 @@ def generate_highlight_html(file_name, text, entities):
     # Sort entities by their start index.
     entities = sorted(entities, key=lambda e: e["start"])
 
-    html = f"<html><head><meta charset='utf-8'><title>{file_name} - Highlighted NER</title></head><body>\n"
-    html += f"<h2>{file_name}</h2>\n<p>"
+    out = f"<html><head><meta charset='utf-8'><title>{html.escape(file_name)} - Highlighted NER</title></head><body>\n"
+    out += f"<h2>{html.escape(file_name)}</h2>\n<p>"
     last_idx = 0
     for ent in entities:
         start = ent["start"]
@@ -142,29 +98,35 @@ def generate_highlight_html(file_name, text, entities):
             "PER": "#faa",  # Person: light red
             "ORG": "#afa",  # Organization: light green
             "LOC": "#aaf",  # Location: light blue
-            "MISC": "#ffa"  # Miscellaneous: light yellow
+            "MISC": "#ffa",  # Miscellaneous: light yellow
+            "DATE": "#fda",  # Date: light orange
         }
         color = color_map.get(label, "#ddd")  # default to light gray if not mapped
 
+        if start < last_idx:
+            continue  # overlapping entity (should not happen)
         # Append text before the entity.
-        html += text[last_idx:start]
+        out += html.escape(text[last_idx:start])
         # Append highlighted entity text.
-        html += f"<span style='background-color: {color};' title='{label}'>{text[start:end]}</span>"
+        out += f"<span style='background-color: {color};' title='{label}'>{html.escape(text[start:end])}</span>"
         last_idx = end
-    html += text[last_idx:]
-    html += "</p>\n</body></html>"
-    return html
+    out += html.escape(text[last_idx:])
+    out += "</p>\n</body></html>"
+    return out
 
 
-def main(directory):
+def main(directory, on_progress=None, cancel=None):
     """
     Process PDF and TXT files in the directory, run NER on each,
     generate both a summary HTML file with statistics and individual
     HTML files with highlighted entities for each document.
+
+    on_progress(done, total, current_file) is called before each file; a set
+    *cancel* event stops before the next one.  Returns {"files": files read,
+    "total": files found, "summary": path of the summary HTML}.
     """
     if not os.path.isdir(directory):
-        print(f"{directory} is not a valid directory.")
-        return
+        raise NotADirectoryError(f"{directory} is not a valid directory.")
 
     summary_html_content = (
         "<html><head><meta charset='utf-8'><title>NER Summary Statistics</title></head><body>\n"
@@ -173,36 +135,42 @@ def main(directory):
 
     overall_summary = {}
 
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.lower().endswith((".pdf", ".txt")):
-                file_path = os.path.join(root, file)
-                print(f"Processing file: {file_path}")
-                text = process_file(file_path)
-                if text:
-                    # Run NER on the entire text by chunking.
-                    entities = run_ner_on_text(text)
-                    summary = summarize_entities(entities)
+    paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
+                   for file in files if file.lower().endswith((".pdf", ".txt")))
+    read = 0
+    for i, file_path in enumerate(paths):
+        if cancel is not None and cancel.is_set():
+            break
+        file = os.path.basename(file_path)
+        if on_progress:
+            on_progress(i, len(paths), file)
+        read += 1
+        print(f"Processing file: {file_path}")
+        text = process_file(file_path)
+        if text:
+            # Run NER on the entire text by chunking.
+            entities = run_ner_on_text(text)
+            summary = summarize_entities(entities)
 
-                    # Update overall summary
-                    for label, counter in summary.items():
-                        if label not in overall_summary:
-                            overall_summary[label] = Counter()
-                        overall_summary[label] += counter
+            # Update overall summary
+            for label, counter in summary.items():
+                if label not in overall_summary:
+                    overall_summary[label] = Counter()
+                overall_summary[label] += counter
 
-                    # Append file summary to overall summary HTML.
-                    summary_html_content += generate_summary_html(file, summary)
+            # Append file summary to overall summary HTML.
+            summary_html_content += generate_summary_html(file, summary)
 
-                    # Generate highlighted HTML for the individual document.
-                    highlight_html = generate_highlight_html(file, text, entities)
-                    # Build output file name: replace extension with _highlight.html
-                    base_name = os.path.splitext(file)[0]
-                    highlight_file = os.path.join(directory, f"{base_name}_Named_Entity_Recognition_Highlight.html")
-                    with open(highlight_file, "w", encoding="utf-8") as f:
-                        f.write(highlight_html)
-                    print(f"Saved highlighted HTML to {highlight_file}")
-                else:
-                    print(f"No text extracted from {file_path}\n")
+            # Generate highlighted HTML for the individual document.
+            highlight_html = generate_highlight_html(file, text, entities)
+            # Build output file name: replace extension with _highlight.html
+            base_name = os.path.splitext(file)[0]
+            highlight_file = os.path.join(directory, f"{base_name}_Named_Entity_Recognition_Highlight.html")
+            with open(highlight_file, "w", encoding="utf-8") as f:
+                f.write(highlight_html)
+            print(f"Saved highlighted HTML to {highlight_file}")
+        else:
+            print(f"No text extracted from {file_path}\n")
 
     # Append overall summary statistics.
     if overall_summary:
@@ -217,6 +185,9 @@ def main(directory):
         f.write(summary_html_content)
 
     print(f"NER summary statistics saved to {output_summary_file}")
+    if on_progress:
+        on_progress(read, len(paths), "")
+    return {"files": read, "total": len(paths), "summary": output_summary_file}
 
 
 if __name__ == "__main__":

@@ -6,10 +6,15 @@ from dataclasses import dataclass
 
 import psutil
 
+from common.proc import no_window_kwargs
+
 logger = logging.getLogger("rag-hardware")
 
-# Minimum VRAM (MB) to justify GPU offloading (model + KV cache overhead)
-_MIN_GPU_VRAM_MB = 1024
+# Minimum VRAM (MB) to offload to the GPU: Qwen3.5-2B with an 8k context fits.
+_MIN_GPU_VRAM_MB = 3072
+# 4B is recommended only where it runs on a GPU.  On a CPU it takes about a
+# minute per answer on a laptop, for a small gain over 2B (eval/ runs).
+_MIN_4B_GPU_MB = 4096
 
 
 @dataclass
@@ -20,17 +25,37 @@ class HardwareInfo:
     gpu_type: str  # "nvidia", "amd", "metal", "none"
     vram_mb: int  # 0 if no GPU
     ram_mb: int
-    recommended_model: str  # "0.8B", "2B", or "4B"
+    recommended_model: str  # "2B" or "4B"
     n_gpu_layers: int  # -1 (all GPU) or 0 (CPU only)
+    gpu_used: bool = False  # the GPU will run the model (this llama.cpp build can offload to it)
+
+    def describe(self) -> str:
+        if not self.gpu_available:
+            return f"no GPU, {self.ram_mb} MB RAM"
+        gpu = f"{self.gpu_type.upper()} GPU, {self.vram_mb} MB"
+        if self.gpu_used:
+            return gpu
+        if not _llama_gpu_offload():
+            return f"{gpu} (not used: this build of MDMT runs chat models on the CPU), {self.ram_mb} MB RAM"
+        return f"{gpu} (not used: too little GPU memory), {self.ram_mb} MB RAM"
 
 
-def recommend_model(available_mb: int) -> str:
-    """Recommend a Qwen 3.5 model size based on available memory in MB."""
-    if available_mb >= 4096:
-        return "4B"
-    if available_mb >= 2048:
-        return "2B"
-    return "0.8B"
+def _llama_gpu_offload() -> bool:
+    """True if the bundled llama.cpp can run models on a GPU.
+
+    The macOS build includes the Metal backend; the Windows and Linux builds
+    are CPU-only, so a detected NVIDIA or AMD card is not used there.
+    """
+    try:
+        import llama_cpp
+        return bool(llama_cpp.llama_supports_gpu_offload())
+    except Exception:
+        return False
+
+
+def recommend_model(gpu_mb: int) -> str:
+    """Recommend a Qwen 3.5 model size from the GPU memory it can use (0 = CPU only)."""
+    return "4B" if gpu_mb >= _MIN_4B_GPU_MB else "2B"
 
 
 def detect_hardware() -> HardwareInfo:
@@ -53,16 +78,15 @@ def detect_hardware() -> HardwareInfo:
 
     if gpu_result:
         gpu_type, vram_mb = gpu_result
-        use_gpu = vram_mb >= _MIN_GPU_VRAM_MB
-        # Use VRAM for recommendation if GPU will be used, else RAM
-        rec_memory = vram_mb if use_gpu else ram_mb
+        use_gpu = vram_mb >= _MIN_GPU_VRAM_MB and _llama_gpu_offload()
         return HardwareInfo(
             gpu_available=True,
             gpu_type=gpu_type,
             vram_mb=vram_mb,
             ram_mb=ram_mb,
-            recommended_model=recommend_model(rec_memory if rec_memory > 0 else 0),
+            recommended_model=recommend_model(vram_mb if use_gpu else 0),
             n_gpu_layers=-1 if use_gpu else 0,
+            gpu_used=use_gpu,
         )
 
     # No GPU — use RAM
@@ -72,7 +96,7 @@ def detect_hardware() -> HardwareInfo:
             gpu_type="none",
             vram_mb=0,
             ram_mb=ram_mb,
-            recommended_model=recommend_model(ram_mb),
+            recommended_model=recommend_model(0),
             n_gpu_layers=0,
         )
 
@@ -82,7 +106,7 @@ def detect_hardware() -> HardwareInfo:
         gpu_type="none",
         vram_mb=0,
         ram_mb=0,
-        recommended_model="0.8B",
+        recommended_model="2B",
         n_gpu_layers=0,
     )
 
@@ -92,7 +116,7 @@ def _detect_nvidia_gpu():
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, **no_window_kwargs(),
         )
         if result.returncode == 0 and result.stdout.strip():
             vram_mb = int(result.stdout.strip().splitlines()[0].strip())
@@ -107,7 +131,7 @@ def _detect_amd_gpu():
     try:
         result = subprocess.run(
             ["rocm-smi", "--showmeminfo", "vram"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, **no_window_kwargs(),
         )
         if result.returncode == 0 and result.stdout.strip():
             for line in result.stdout.splitlines():
@@ -134,7 +158,7 @@ def _detect_metal():
     try:
         result = subprocess.run(
             ["sysctl", "-n", "hw.memsize"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, **no_window_kwargs(),
         )
         if result.returncode == 0 and result.stdout.strip():
             ram_bytes = int(result.stdout.strip())

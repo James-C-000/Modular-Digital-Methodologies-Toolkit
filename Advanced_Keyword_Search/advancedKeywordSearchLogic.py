@@ -1,10 +1,49 @@
-import pypdf
-import matplotlib
-import matplotlib.pyplot as plt
 import re
 import collections
 import csv
+import logging
 import os
+import unicodedata
+
+from matplotlib.figure import Figure
+
+from common.paths import unique_safe_filenames
+from common.pdf_text import extract_pages
+
+log = logging.getLogger(__name__)
+
+# CSVs are opened by researchers in Excel: UTF-8 with a BOM so non-Latin text
+# displays correctly, and newline="" so the csv module controls line endings
+# (otherwise Windows gets a blank line after every row).
+CSV_ENCODING = "utf-8-sig"
+
+
+def basic_filter(text: str) -> str:
+    """Keep letters of any script (with their accents, also as combining marks),
+    digits and whitespace; drop punctuation, symbols and OCR noise."""
+    return "".join(ch for ch in text if ch.isspace() or unicodedata.category(ch)[0] in "LMN")
+
+
+def _save_pie(path, counts, labels, title):
+    fig = Figure()
+    ax = fig.subplots()
+    ax.pie(counts, labels=labels, autopct=make_autopct(counts), radius=2.0)
+    ax.set_title(title)
+    ax.axis('equal')
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches='tight')
+
+
+def _save_bar(path, counts, labels, title, xlabel):
+    fig = Figure()
+    ax = fig.subplots()
+    y_pos = list(range(len(labels)))
+    ax.barh(y_pos, counts, align='center', alpha=0.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel('Words')
+    ax.set_title(title)
+    ax.set_yticks(y_pos, labels)
+    fig.savefig(path, bbox_inches='tight')
 
 
 # Format values for the charts
@@ -19,24 +58,21 @@ def make_autopct(values):
 
 def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath,
                manualKeywords, filterFilePath, manualFilters,
-               on_error=None, on_message=None):
+               on_error=None, on_message=None, on_progress=None, cancel=None):
+    """Count keywords in every PDF of PDFDirectory; write CSVs and charts to outputDirectory.
+
+    on_progress(done, total, current_file) is called before each PDF; a set
+    *cancel* event stops before the next one (totals cover the PDFs read).
+    Returns {"files": PDFs read, "total": PDFs found, "charts": [total chart paths]},
+    or None after reporting an error through on_error.
+    """
     logic_error = on_error or print
     logic_message = on_message or print
-    # Turn off matplotlib interactive mode
-    matplotlib.use('Agg')
-    plt.ioff()
-    # Get user input from the GUI and feed into logic code
-    print("contextLength: " + contextLength)
-    print("basicFilterState: " + str(basicFilterState))
-    print("PDFDirectory: " + PDFDirectory)
-    print("outputDirectory: " + outputDirectory)
-    print("keywordFilePath: " + keywordFilePath)
-    print("manualKeywords: " + manualKeywords)
-    print("filterFilePath: " + filterFilePath)
-    print("manualFilters: " + manualFilters)
+    log.debug("keyword search: context=%s basic_filter=%s pdfs=%s out=%s keyword_file=%s filter_file=%s",
+              contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath, filterFilePath)
     # Get a list of files in the pdf directory
     try:
-        pdfsInDirectory = [f for f in os.listdir(PDFDirectory) if f.endswith('.pdf')]
+        pdfsInDirectory = sorted(f for f in os.listdir(PDFDirectory) if f.endswith('.pdf'))
     except Exception as e:
         error = "ERROR: " + str(e) + ".\nCheck PDFs and retry."
         logic_error(error)
@@ -75,14 +111,16 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
         logic_error(error)
         return
 
-    # Create a csv file for each keyword
+    # Create a csv file for each keyword.  Keywords can contain characters
+    # that are not allowed in Windows filenames, so map them to safe names.
+    keywordFiles = {k: os.path.join(outputDirectory, f)
+                    for k, f in unique_safe_filenames(dictOfKeywords, '.csv').items()}
     keywords = dictOfKeywords.keys()
     for key in keywords:
         try:
-            with open(os.path.join(outputDirectory, str(key) + '.csv'), mode='w') as keywordCSV:
+            with open(keywordFiles[key], mode='w', encoding=CSV_ENCODING, newline='') as keywordCSV:
                 writer = csv.writer(keywordCSV)
                 writer.writerow(['Year', 'Page', 'Context: ' + str(key)])
-                keywordCSV.close()
         except Exception as e:
             error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
             logic_error(error)
@@ -93,23 +131,28 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
 
     # Write the csv descriptors (i.e. year and keyword) to the first row
     try:
-        with open(os.path.join(outputDirectory, "Data_Overview.csv"), mode='w') as csv_file:
+        with open(os.path.join(outputDirectory, "Data_Overview.csv"), mode='w',
+                  encoding=CSV_ENCODING, newline='') as csv_file:
             fieldNames = list(dictOfKeywords.keys())  # convert the dict descriptors into a list
             fieldNames.insert(0, "Year")  # manually insert 'year' into 0,0 as it is not in the dict
             writer = csv.writer(csv_file)
             writer.writerow(fieldNames)
-            csv_file.close()
     except Exception as e:
         error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
         logic_error(error)
         return
 
     # Open each pdf in a for loop
-    for i in pdfsInDirectory:
+    filesRead = 0
+    for index, i in enumerate(pdfsInDirectory):
+        if cancel is not None and cancel.is_set():
+            break
+        if on_progress:
+            on_progress(index, len(pdfsInDirectory), str(i))
+        filesRead += 1
         try:
-            # Open PDF file with pypdf instead of pdftotext
-            pdf_reader = pypdf.PdfReader(os.path.join(PDFDirectory, str(i)))
-            numOfPages = len(pdf_reader.pages)  # Get number of pages in open pdf
+            pageTexts = extract_pages(os.path.join(PDFDirectory, str(i)))
+            numOfPages = len(pageTexts)  # Get number of pages in open pdf
         except Exception as e:
             error = "ERROR: " + str(e) + " in file: " + str(i) + ".\nCheck PDFs and retry."
             logic_error(error)
@@ -118,25 +161,15 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
         pageNumber = 0  # Set current page
 
         # Check for hits page by page
-        for page in pdf_reader.pages:
+        for allText in pageTexts:
             # Running page number
             pageNumber += 1
-
-            try:
-                # Extract text from current page
-                allText = page.extract_text()
-                if not allText:
-                    continue  # Skip empty pages
-            except Exception as e:
-                error = "ERROR: " + str(e) + " in file: " + str(i) + " on page: " + str(
-                    pageNumber) + ".\nCheck PDF and retry."
-                logic_error(error)
-                continue
+            if not allText:
+                continue  # Skip empty pages
 
             # Strip user filters from text
             if basicFilterState == 1:
-                # filter everything that isn't a letter, number, or space
-                allText = re.sub(r'[^a-zA-Z0-9 ]', '', allText)
+                allText = basic_filter(allText)
             elif filterFilePath != '':
                 # use the filter file to get filters
                 try:
@@ -172,11 +205,12 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                     totalDictOfKeywords.update({k: valueOfLongTermKey})
                     # Write reference data for each keyword while we are checking for it
                     try:
-                        with open(os.path.join(outputDirectory, str(k) + '.csv'), mode='a') as keywordCSV:
+                        with open(keywordFiles[k], mode='a', encoding=CSV_ENCODING, newline='') as keywordCSV:
                             writer = csv.writer(keywordCSV)
                             if k.find(' ') != -1 and k.find('-') == -1:  # Check if keyword has spaces AND no hyphens
+                                # Split on any whitespace (not just spaces) so a keyword at a line end still gets context.
                                 # NOTE: Words that continue onto the next page will not be picked up here
-                                allTextFiltered = re.split('[- ]', allText)  # Split allText based on space/hyphen
+                                allTextFiltered = re.split(r'[-\s]', allText)  # Split allText based on space/hyphen
                                 matchedK = k.split()  # Split our keyword based on whitespace
                                 # Only iterate within allTextFiltered bounds
                                 # Check if allTextFiltered contains our k sequence.
@@ -202,7 +236,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                                     if n < len(allTextFiltered):
                                         del allTextFiltered[n]
                             elif k.find('-') == -1:  # If the keyword is unhyphenated, remove hyphens from text
-                                allTextFiltered = re.split('[- ]', allText)
+                                allTextFiltered = re.split(r'[-\s]', allText)
                             else:  # If not, just split it into a list based on whitespace
                                 allTextFiltered = allText.split()
                             # Concat keywords with spaces
@@ -222,7 +256,6 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                                     formattedContext = ' '.join(
                                         [str(word) for word in snippet])  # Cast from list -> str
                                     writer.writerow([i, pageNumber, formattedContext])
-                            keywordCSV.close()
                     except Exception as e:
                         error = "ERROR: " + str(e) + ".\nCheck keyword csv file and retry."
                         logic_error(error)
@@ -230,12 +263,12 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
 
         # Write the findings to the CSV file
         try:
-            with open(os.path.join(outputDirectory, 'Data_Overview.csv'), mode='a') as csv_file:
+            with open(os.path.join(outputDirectory, 'Data_Overview.csv'), mode='a',
+                      encoding=CSV_ENCODING, newline='') as csv_file:
                 writer = csv.writer(csv_file)
                 csvList = list(dictOfKeywords.values())
                 csvList.insert(0, str(i))
                 writer.writerow(csvList)
-                csv_file.close()
         except Exception as e:
             error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
             logic_error(error)
@@ -253,31 +286,15 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
                 sortedDictOfKeywords.pop(j)
 
         # Chart formatting
-        plt.pie(list(count), labels=list(label), autopct=make_autopct(list(count)), radius=2.0)
-        plt.title("Count for PDF " + str(i) + "\nPage count (PDF): " + str(numOfPages))
-        plt.axis('equal')
-        plt.tight_layout()
+        title = "Count for PDF " + str(i) + "\nPage count (PDF): " + str(numOfPages)
         try:
-            plt.savefig(os.path.join(outputDirectory, str(i) + '-PIE.png'), bbox_inches='tight')
+            _save_pie(os.path.join(outputDirectory, str(i) + '-PIE.png'), list(count), list(label), title)
+            _save_bar(os.path.join(outputDirectory, str(i) + '-BAR.png'), list(count), list(label), title,
+                      'Word Count')
         except Exception as e:
             error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
             logic_error(error)
             return
-        plt.close()
-
-        y_pos = [i for i, _ in enumerate(list(label))]
-        plt.barh(y_pos, list(count), align='center', alpha=0.5)
-        plt.xlabel('Word Count')
-        plt.ylabel('Words')
-        plt.title("Count for PDF " + str(i) + "\nPage count (PDF): " + str(numOfPages))
-        plt.yticks(y_pos, list(label))
-        try:
-            plt.savefig(os.path.join(outputDirectory, str(i) + '-BAR.png'), bbox_inches='tight')
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-            logic_error(error)
-            return
-        plt.close()
 
         dictOfKeywords = dictOfKeywords.fromkeys(dictOfKeywords, 0)
 
@@ -293,30 +310,20 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
     totalLabels = sortedTotalDictOfKeywords.keys()
 
     # Chart formatting
-    plt.pie(totalCount, labels=totalLabels, autopct=make_autopct(totalCount), radius=2.0)
-    plt.title('Total word count for every PDF')
-    plt.axis('equal')
-    plt.tight_layout()
     try:
-        plt.savefig(os.path.join(outputDirectory, 'totalPie.png'), bbox_inches='tight')
+        _save_pie(os.path.join(outputDirectory, 'totalPie.png'), list(totalCount), list(totalLabels),
+                  'Total word count for every PDF')
+        _save_bar(os.path.join(outputDirectory, 'totalBar.png'), list(totalCount), list(totalLabels),
+                  'Total word count for every PDF', 'Total Word Count')
     except Exception as e:
         error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
         logic_error(error)
         return
-    plt.close()
 
-    y_pos = [i for i, _ in enumerate(totalLabels)]
-    plt.barh(y_pos, totalCount, align='center', alpha=0.5)
-    plt.xlabel('Total Word Count')
-    plt.ylabel('Words')
-    plt.title('Total word count for every PDF')
-    plt.yticks(y_pos, totalLabels)
-    try:
-        plt.savefig(os.path.join(outputDirectory, 'totalBar.png'), bbox_inches='tight')
-    except Exception as e:
-        error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-        logic_error(error)
-        return
-    plt.close()
+    if on_progress:
+        on_progress(filesRead, len(pdfsInDirectory), "")
+    return {"files": filesRead, "total": len(pdfsInDirectory),
+            "charts": [os.path.join(outputDirectory, 'totalBar.png'),
+                       os.path.join(outputDirectory, 'totalPie.png')]}
 
     logic_message("Processing Complete")

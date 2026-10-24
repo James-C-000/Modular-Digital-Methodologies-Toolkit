@@ -61,3 +61,37 @@ def test_config_save_and_load_utf8(tmp_path):
     config2 = AppConfig(config_path)
     assert config2.get("defaults.ocr_language") == "français"
     assert config2.get("user.name") == "日本語テスト"
+
+
+def test_a_corrupt_config_is_set_aside_not_fatal(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"defaults": {"ocr_input_dir": "/scans"', encoding="utf-8")   # cut off mid-write
+    config = AppConfig(str(path))
+    assert config.get("defaults.ocr_input_dir") is None
+    backups = list(tmp_path.glob("config.json.corrupt-*"))
+    assert len(backups) == 1 and backups[0].read_text(encoding="utf-8").startswith('{"defaults"')
+    config.set("ui.dark_mode", True)
+    config.save()
+    assert json.loads(path.read_text(encoding="utf-8")) == {"ui": {"dark_mode": True}}
+
+
+def test_a_config_that_is_not_an_object_is_set_aside(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text("[]", encoding="utf-8")
+    assert AppConfig(str(path)).get("ui.dark_mode", False) is False
+
+
+def test_save_replaces_the_file_atomically(tmp_path, monkeypatch):
+    path = tmp_path / "config.json"
+    AppConfig(str(path)).save()
+    config = AppConfig(str(path))
+    config.set("defaults.whisper_model", "small")
+
+    def crash(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(json, "dump", crash)
+    with pytest.raises(OSError):
+        config.save()
+    assert json.loads(path.read_text(encoding="utf-8")) == {}      # the old file is intact
+    assert [p.name for p in tmp_path.iterdir()] == ["config.json"]   # no temporary left behind

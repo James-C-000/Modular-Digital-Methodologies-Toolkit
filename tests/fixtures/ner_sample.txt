@@ -1,0 +1,7 @@
+In the spring of 1843, Ada Lovelace published her notes on the Analytical Engine in Scientific Memoirs, a journal edited by Richard Taylor in London. Charles Babbage had described the machine in a lecture at the University of Turin in 1840, and the Italian engineer Luigi Menabrea wrote up the lecture in French for the Bibliothèque universelle de Genève.
+
+Lovelace corresponded with Michael Faraday and with Augustus De Morgan, who taught mathematics at University College London. The Royal Society later held several of these letters, and the British Library acquired others from the family in Somerset.
+
+Meanwhile, in Paris, the Académie des sciences discussed similar calculating machines. Thomas de Colmar sold his arithmometer to insurance companies in France and Belgium, while the Prussian government ordered copies for its statistical bureau in Berlin.
+
+Babbage never completed the engine. In 1991 the Science Museum in London built his Difference Engine No. 2 from the original drawings, with support from Doron Swade and engineers at Hewlett-Packard.

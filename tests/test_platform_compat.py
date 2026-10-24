@@ -5,25 +5,68 @@ import sys
 from unittest.mock import patch
 
 
-def test_multiprocessing_start_method_spawn_on_windows():
-    """On Windows, the app should use 'spawn' (the only supported method)."""
-    with patch("platform.system", return_value="Windows"):
-        from app import _preferred_start_method
-        assert _preferred_start_method() == "spawn"
+APP_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app.py")
 
 
-def test_multiprocessing_start_method_fork_on_linux():
-    """On Linux, the app should use 'fork' for NiceGUI compatibility."""
-    with patch("platform.system", return_value="Linux"):
-        from app import _preferred_start_method
-        assert _preferred_start_method() == "fork"
+def _app_source():
+    with open(APP_PY, encoding="utf-8") as f:
+        return f.read()
 
 
-def test_multiprocessing_start_method_fork_on_macos():
-    """On macOS, the app should use 'fork' for NiceGUI compatibility."""
-    with patch("platform.system", return_value="Darwin"):
-        from app import _preferred_start_method
-        assert _preferred_start_method() == "fork"
+def _app_tree():
+    import ast
+    return ast.parse(_app_source())
+
+
+def test_freeze_support_is_the_first_statement():
+    """Frozen multiprocessing children must exit before any app setup runs."""
+    import ast
+    body = [n for n in _app_tree().body
+            if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant))]  # skip docstring
+    assert isinstance(body[0], ast.Import) and body[0].names[0].name == "multiprocessing"
+    call = body[1].value
+    assert ast.unparse(call) == "multiprocessing.freeze_support()"
+
+
+def test_start_method_is_not_overridden():
+    """macOS must keep Python's default 'spawn'; forking is unsafe with system frameworks."""
+    assert "set_start_method" not in _app_source()
+
+
+def test_agg_backend_is_forced_before_heavy_imports():
+    import ast
+    body = _app_tree().body
+    env_idx = next(i for i, n in enumerate(body) if 'os.environ["MPLBACKEND"] = "Agg"' in ast.unparse(n).replace("'", '"'))
+    first_heavy = next(i for i, n in enumerate(body)
+                       if isinstance(n, (ast.Import, ast.ImportFrom))
+                       and any(m in ast.unparse(n) for m in ("nicegui", "matplotlib", "config", "pages")))
+    assert env_idx < first_heavy
+
+
+def test_main_does_nothing_in_a_spawned_child():
+    """Source runs: NiceGUI's spawned window process re-imports app.py and calls main()."""
+    import app
+    with patch("multiprocessing.current_process") as cp, \
+         patch("app._parse_args", side_effect=AssertionError("setup ran in child")):
+        cp.return_value.name = "SpawnProcess-1"
+        assert app.main() is None
+
+
+def test_open_external_endpoint_rejects_non_http(monkeypatch):
+    import asyncio
+    import app
+    opened = []
+    monkeypatch.setattr(app, "open_external", opened.append)
+    asyncio.run(app._open_external_url("file:///etc/passwd"))
+    asyncio.run(app._open_external_url(r"C:\Windows\System32\calc.exe"))
+    asyncio.run(app._open_external_url("https://example.org"))
+    assert opened == ["https://example.org"]
+
+
+def test_self_test_flags_parse():
+    from app import _parse_args
+    args = _parse_args(["--self-test", "--self-test-out", "r.json", "-psn_0_1234"])
+    assert args.self_test and args.self_test_out == "r.json"
 
 
 def test_get_tesseract_path_returns_string():
@@ -69,3 +112,21 @@ def test_setup_frozen_tesseract_env_sets_path(tmp_path):
     finally:
         os.environ["PATH"] = old_path
         os.environ.pop("TESSDATA_PREFIX", None)
+
+
+def test_main_runs_only_as_a_script():
+    """Spawned children and the 3.14 forkserver import app.py as __mp_main__."""
+    import ast
+    guards = [ast.unparse(n.test) for n in _app_tree().body if isinstance(n, ast.If)]
+    assert "__name__ == '__main__'" in guards
+    assert not any("__mp_main__" in g for g in guards)
+
+
+def test_missing_streams_are_patched_before_nicegui_is_imported():
+    import ast
+    body = _app_tree().body
+    patch_idx = next(i for i, n in enumerate(body)
+                     if isinstance(n, ast.If) and "setup_logging()" in ast.unparse(n))
+    nicegui_idx = next(i for i, n in enumerate(body)
+                       if isinstance(n, ast.ImportFrom) and n.module == "nicegui")
+    assert patch_idx < nicegui_idx

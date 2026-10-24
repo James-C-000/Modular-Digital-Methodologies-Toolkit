@@ -1,61 +1,45 @@
 """Named Entity Recognition page."""
-import os
-from nicegui import app, ui, run
-from config import AppConfig
+from nicegui import ui
+
+from common.paths import folder_problem
+from pages.components import FolderField, JobPanel, hint, page_header, run_button, section, start_job
 
 
 def ner_page():
-    config = AppConfig()
+    page_header("Named Entities", "Find people, organizations, places and dates in documents")
+    from NLP.ner_onnx import DEFAULT_NER_MODEL, NER_MODELS, is_model_installed
+    info = NER_MODELS[DEFAULT_NER_MODEL]
 
-    ui.label("Named Entity Recognition").classes("text-h4")
-    ui.label("Identify people, organizations, locations, and other entities in documents").classes("text-subtitle1")
-    ui.separator()
+    with section("Folder"):
+        src = FolderField("Input folder (.txt and .pdf, searched recursively)", "defaults.ner_input_dir")
+        hint("Writes a summary report and one highlighted copy of each document, as HTML, into the input folder.")
+        if not is_model_installed(DEFAULT_NER_MODEL):
+            hint(f"The {info['name']} model ({info['size']}) downloads on first use, or from the Downloads page.")
 
-    with ui.card().classes("w-full"):
-        input_dir = ui.input("Input Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
-
-    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
-    progress.set_visibility(False)
-    status_label = ui.label("Ready")
-
-    async def run_ner():
-        in_dir = input_dir.value
-        if not in_dir or not os.path.isdir(in_dir):
-            ui.notify("Please select a valid input directory.", type="warning")
+    def describe(job):
+        summary = job.result or {}
+        if not summary:
             return
+        ui.label(f"{summary['files']} of {summary['total']} file(s) analysed.").classes("text-body2")
+        open_report_button(summary["summary"])
 
-        progress.set_visibility(True)
-        status_label.set_text("Loading NER model (may download ~1.3 GB on first run)...")
+    def start():
+        problem = folder_problem(src.value)
+        if problem:
+            return src.error(problem)
+        folder = src.value
 
-        try:
-            def do_ner():
-                from NLP.named_entity_recognition import main as ner_main
-                ner_main(in_dir)
+        def work(job):
+            from NLP.named_entity_recognition import main as ner_main
+            job.progress(0, 0, "Loading the NER model...")
+            return ner_main(folder, on_progress=job.progress, cancel=job.cancel_event)
 
-            await run.io_bound(do_ner)
-            status_label.set_text("NER analysis complete! Results saved in input directory.")
-            ui.notify("NER analysis complete!", type="positive")
-        except ImportError as e:
-            status_label.set_text(f"Missing dependency: {e}")
-            ui.notify(f"Missing dependency: {e}", type="negative")
-        except Exception as e:
-            status_label.set_text(f"Error: {e}")
-            ui.notify(f"NER error: {e}", type="negative")
-        finally:
-            progress.set_visibility(False)
+        start_job("ner", "Named entities", work, output_dir=folder)
 
-        config.set("last_page", "/ner")
-        config.save()
-
-    ui.button("Run NER", on_click=run_ner, icon="play_arrow").props("color=primary")
+    run_button("Find entities", start, "ner")
+    JobPanel("ner", describe=describe)
 
 
-async def _browse_dir(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.FOLDER,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])
+def open_report_button(path):
+    from common.opener import open_external
+    ui.button("Open summary report", icon="article", on_click=lambda: open_external(path)).props("flat dense")

@@ -2,99 +2,53 @@
 import os
 import shutil
 import subprocess
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+import sys
 
-# Collect data files for frameworks that bundle static assets
-nicegui_datas = collect_data_files('nicegui')
+sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
+from spec_common import LGPL_SOURCE_MODULES, UPX, common_binaries, common_datas, common_hiddenimports  # noqa: E402
 
-datas = [
-    ('Advanced_Keyword_Search/*.txt', 'Advanced_Keyword_Search'),
-    ('LICENSE', '.'),
-    ('THIRD_PARTY_LICENSES', '.'),
-]
-datas.extend(nicegui_datas)
-datas.extend(collect_data_files('ocrmypdf'))
-datas.extend(collect_data_files('whisper'))
-
-# Bundle certifi CA certificates so SSL works in the frozen app
-try:
-    import certifi
-    datas.append((certifi.where(), 'certifi'))
-except ImportError:
-    pass
-
-# --- llama-cpp-python native libraries ---
-binaries = []
-try:
-    import llama_cpp
-    _llama_pkg = os.path.dirname(llama_cpp.__file__)
-    _llama_lib_dir = os.path.join(_llama_pkg, 'lib')
-    if os.path.isdir(_llama_lib_dir):
-        import glob as _glob
-        for _so in _glob.glob(os.path.join(_llama_lib_dir, '*.so*')):
-            binaries.append((_so, 'llama_cpp/lib'))
-except ImportError:
-    pass
-
-# --- ffmpeg bundling (needed by Whisper for audio loading) ---
-ffmpeg_bin = shutil.which('ffmpeg')
-if ffmpeg_bin:
-    binaries.append((ffmpeg_bin, '.'))
+datas = common_datas()
+binaries = common_binaries()
 
 # --- Tesseract bundling (Linux) ---
+# Core glibc libraries must come from the user's system; everything else
+# tesseract links against is copied next to it (found via LD_LIBRARY_PATH,
+# set in app._setup_frozen_env).
+_SYSTEM_LIB_PREFIXES = ('libc.', 'libm.', 'libdl.', 'libpthread.', 'ld-linux', 'librt.', 'libgcc_s.')
 tesseract_bin = shutil.which('tesseract')
-if tesseract_bin:
-    binaries.append((tesseract_bin, 'tesseract_bin'))
-    # Bundle shared library dependencies discovered via ldd
-    try:
-        ldd_out = subprocess.check_output(['ldd', tesseract_bin], text=True)
-        for line in ldd_out.splitlines():
-            parts = line.strip().split()
-            # Format: libfoo.so.1 => /usr/lib/libfoo.so.1 (0x...)
-            if '=>' in line and len(parts) >= 3 and parts[2].startswith('/'):
-                lib_path = parts[2]
-                # Skip core system libs (libc, libm, libpthread, ld-linux, etc.)
-                basename = os.path.basename(lib_path)
-                if not any(basename.startswith(s) for s in ('libc.', 'libm.', 'libdl.', 'libpthread.', 'ld-linux', 'librt.', 'libgcc_s.')):
-                    binaries.append((lib_path, 'tesseract_bin'))
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+if not tesseract_bin:
+    raise SystemExit('tesseract not found: install tesseract-ocr before building')
+binaries.append((tesseract_bin, 'tesseract_bin'))
+ldd_out = subprocess.check_output(['ldd', tesseract_bin], text=True)
+for line in ldd_out.splitlines():
+    parts = line.strip().split()
+    # Format: libfoo.so.1 => /usr/lib/libfoo.so.1 (0x...)
+    if '=>' in line and len(parts) >= 3 and parts[2].startswith('/'):
+        if not os.path.basename(parts[2]).startswith(_SYSTEM_LIB_PREFIXES):
+            binaries.append((parts[2], 'tesseract_bin'))
 
-# Bundle eng.traineddata as baseline
+# Seed tessdata (eng, osd, configs/); copied into the user's managed tessdata
+# dir on first run by OCR.tessdata.
 tessdata_candidates = [
     '/usr/share/tesseract-ocr/5/tessdata',
     '/usr/share/tesseract-ocr/4.00/tessdata',
     '/usr/share/tessdata',
 ]
 for td in tessdata_candidates:
-    eng = os.path.join(td, 'eng.traineddata')
-    if os.path.isfile(eng):
-        datas.append((td, 'tessdata'))
+    if os.path.isfile(os.path.join(td, 'eng.traineddata')):
+        for name in ('eng.traineddata', 'osd.traineddata', 'pdf.ttf'):
+            if os.path.isfile(os.path.join(td, name)):
+                datas.append((os.path.join(td, name), 'tessdata'))
+        for sub in ('configs', 'tessconfigs'):
+            if os.path.isdir(os.path.join(td, sub)):
+                datas.append((os.path.join(td, sub), os.path.join('tessdata', sub)))
         break
+else:
+    raise SystemExit('eng.traineddata not found: install tesseract-ocr-eng before building')
 
-# Hidden imports — PyInstaller can't discover these via static analysis
-hiddenimports = collect_submodules('nicegui')
-hiddenimports += collect_submodules('webview')
-hiddenimports += [
-    'engineio.async_drivers.threading',
-    'ocrmypdf',
-    'ocrmypdf.builtin_plugins.tesseract_ocr',
-    'ocrmypdf.builtin_plugins.ghostscript',
-    'ocrmypdf.builtin_plugins.concurrency',
-    'ocrmypdf.builtin_plugins.default_filters',
-    'ocrmypdf.builtin_plugins.null_ocr',
-    'ocrmypdf.builtin_plugins.optimize',
-    'ocrmypdf.builtin_plugins.pypdfium',
-    'googletrans',
-    'langchain',
-    'langchain_community',
-    'sentence_transformers',
-    'transformers',
-    'nltk',
-    'networkx',
-    'llama_cpp',
-    'certifi',
-]
+# Hidden imports — PyInstaller can't discover these via static analysis.
+# (No pywebview on Linux: MDMT runs in the user's browser.)
+hiddenimports = common_hiddenimports()
 
 a = Analysis(
     ['app.py'],
@@ -105,8 +59,10 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
+    # A bundled libreadline breaks system tools (xdg-open) started from MDMT.
     excludes=['readline'],
     noarchive=False,
+    module_collection_mode=LGPL_SOURCE_MODULES,
 )
 
 pyz = PYZ(a.pure, a.zipped_data)
@@ -120,7 +76,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=UPX,
     console=False,
     icon='MDMT_logo.png',
 )
@@ -131,6 +87,6 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=UPX,
     name='mdmt',
 )

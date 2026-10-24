@@ -1,101 +1,72 @@
 """Audio transcription page."""
 import os
-from nicegui import app, ui, run
-from config import AppConfig, get_whisper_models_dir
+
+from nicegui import ui
+
+from common.paths import folder_problem
+from config import get_whisper_models_dir
+from pages.components import (
+    FolderField, JobPanel, file_results, hint, missing_dependency, page_header, remember, run_button, saved,
+    section, start_job,
+)
+
+MODEL_NOTES = {
+    "tiny": "Fastest, lowest accuracy. Good for quick drafts or testing.",
+    "base": "Fast, more accurate than tiny. Suitable for clear audio.",
+    "small": "Balanced speed and accuracy. Good for most recordings.",
+    "medium": "Most accurate, slowest. Best for difficult audio or non-English speech.",
+}
 
 
 def audio_page():
-    config = AppConfig()
-
-    ui.label("Audio Transcription").classes("text-h4")
-    ui.label("Convert speech in audio files to text using OpenAI Whisper").classes("text-subtitle1")
-    ui.separator()
-
+    page_header("Audio Transcription", "Convert speech to text with Whisper (faster-whisper, runs offline)")
     try:
-        from Audio_Transcription.transcription_logic import transcribe_directory
+        from Audio_Transcription.transcription_logic import (
+            DEFAULT_VAD, WHISPER_MODELS, is_model_installed, transcribe_directory,
+        )
     except ImportError as e:
-        ui.label(f"Missing dependency: {e}").classes("text-negative q-mt-md")
-        ui.label("Install the required package from the Downloads page or via pip, then restart MDMT.")
+        missing_dependency(e)
         return
 
-    with ui.card().classes("w-full"):
-        input_dir = ui.input("Audio Directory").classes("w-full")
-        ui.button("Browse...", on_click=lambda: _browse_dir(input_dir), icon="folder_open").props("flat")
+    models_root = get_whisper_models_dir()
+    with section("Folder"):
+        src = FolderField("Audio folder (searched recursively)", "defaults.audio_input_dir")
+        hint("Each transcript is saved as a .txt file next to its recording.")
 
-    with ui.card().classes("w-full"):
-        model_select = ui.select(
-            ["tiny", "base", "small", "medium"],
-            label="Whisper Model",
-            value=config.get("defaults.whisper_model", "tiny"),
-        ).classes("w-48")
+    with section("Model"):
+        options = {n: f"{n} ({info['size']})" + ("" if is_model_installed(n, models_root) else " — downloads on first use")
+                   for n, info in WHISPER_MODELS.items()}
+        model = remember(ui.select(options, label="Whisper model",
+                                   value=saved("defaults.whisper_model", "tiny")).classes("w-80"),
+                         "defaults.whisper_model")
+        note = hint("")
+        model.on_value_change(lambda e: note.set_text(MODEL_NOTES.get(e.value, "")))
+        note.set_text(MODEL_NOTES.get(model.value, ""))
+        vad = remember(ui.checkbox("Skip silence (voice activity filter)",
+                                   value=saved("defaults.whisper_vad", DEFAULT_VAD)), "defaults.whisper_vad")
+        hint("Recommended for long recordings: skips silence, music and tape hiss, where Whisper tends to"
+             " invent repeated phrases. Turn off if very quiet speech goes missing.")
 
-        ui.markdown(
-            "**tiny** \u2014 Fastest, lowest accuracy. Good for quick drafts or testing. ~75 MB  \n"
-            "**base** \u2014 Fast with improved accuracy over tiny. Suitable for clear audio. ~142 MB  \n"
-            "**small** \u2014 Balanced speed and accuracy. Good for most use cases. ~466 MB  \n"
-            "**medium** \u2014 Best accuracy, slowest. Recommended for difficult audio or non-English. ~1.5 GB  \n\n"
-            "Larger models require more RAM and processing time but produce more accurate transcriptions."
-        ).classes("text-caption text-grey")
+    def describe(job):
+        file_results(job, "transcribed")
+        for r in job.result or []:
+            if r.get("status") == "success" and r.get("text"):
+                with ui.expansion(f"Transcript: {os.path.basename(r['input'])}").classes("w-full"):
+                    text = r["text"]
+                    ui.label(text[:2000] + ("..." if len(text) > 2000 else "")).classes("text-body2 whitespace-pre-wrap")
 
-    progress = ui.linear_progress(show_value=False).props("indeterminate").classes("w-full")
-    progress.set_visibility(False)
-    status_label = ui.label("Ready")
-    results_area = ui.column().classes("w-full")
+    def start():
+        problem = folder_problem(src.value)
+        if problem:
+            return src.error(problem)
+        name, vad_on, folder = model.value, vad.value, src.value
 
-    async def run_transcription():
-        audio_dir = input_dir.value
-        if not audio_dir:
-            ui.notify("Please select an audio directory.", type="warning")
-            return
+        def work(job):
+            job.progress(0, 0, f"Loading the {name} model...")
+            return transcribe_directory(folder, model_name=name, download_root=models_root, vad_filter=vad_on,
+                                        on_progress=job.progress, cancel=job.cancel_event)
 
-        progress.set_visibility(True)
-        status_label.set_text("Loading model and transcribing...")
-        results_area.clear()
+        start_job("audio", "Transcription", work, output_dir=folder)
 
-        def do_transcribe():
-            return transcribe_directory(
-                directory=audio_dir,
-                model_name=model_select.value,
-                download_root=get_whisper_models_dir(),
-            )
-
-        results = await run.io_bound(do_transcribe)
-        progress.set_visibility(False)
-
-        if not results:
-            status_label.set_text("No audio files found in the selected directory.")
-            return
-
-        success_count = sum(1 for r in results if r["status"] == "success")
-        status_label.set_text(f"Complete: {success_count}/{len(results)} files transcribed")
-
-        with results_area:
-            for r in results:
-                with ui.card().classes("w-full"):
-                    icon = "check_circle" if r["status"] == "success" else "error"
-                    color = "text-positive" if r["status"] == "success" else "text-negative"
-                    with ui.row().classes("items-center"):
-                        ui.icon(icon).classes(color)
-                        ui.label(os.path.basename(r["input"]))
-                    if r["status"] == "success" and r.get("text"):
-                        preview = r["text"][:500] + ("..." if len(r["text"]) > 500 else "")
-                        with ui.expansion("Preview transcript"):
-                            ui.label(preview).classes("font-mono text-sm")
-                    elif r["status"] == "error" and r.get("message"):
-                        ui.label(r["message"]).classes("text-negative text-caption")
-
-        config.set("defaults.whisper_model", model_select.value)
-        config.set("last_page", "/audio")
-        config.save()
-
-    ui.button("Transcribe", on_click=run_transcription, icon="play_arrow").props("color=primary")
-
-
-async def _browse_dir(target_input):
-    import webview
-    result = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.FileDialog.FOLDER,
-        allow_multiple=False,
-    )
-    if result and len(result) > 0:
-        target_input.set_value(result[0])
+    run_button("Transcribe", start, "audio")
+    JobPanel("audio", describe=describe)

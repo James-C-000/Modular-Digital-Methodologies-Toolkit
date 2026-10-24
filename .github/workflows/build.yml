@@ -1,5 +1,7 @@
 name: Build & Release
 
+# Full frozen builds: on version tags (which also publish a release) and on
+# demand. Every build runs the frozen app's --self-test on its own OS.
 on:
   push:
     tags:
@@ -10,140 +12,332 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            artifact: mdmt-linux-x86_64
+          - os: macos-15
+            name: macos
+            artifact: mdmt-macos-arm64
+          - os: windows-latest
+            name: windows
+            artifact: mdmt-windows-x64
+            # MSVC's OpenMP runtime (vcomp140.dll) is not bundled by PyInstaller
+            # and users may lack it; llama.cpp's own thread pool needs nothing.
+            cmake_extra: '-DGGML_OPENMP=OFF'
+    runs-on: ${{ matrix.os }}
+    env:
+      # Portable llama.cpp: compile for a baseline CPU (AVX2/FMA/F16C on x86-64),
+      # not for the CI runner's CPU, or the app crashes on older user machines.
+      CMAKE_ARGS: -DGGML_NATIVE=OFF ${{ matrix.cmake_extra }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng ffmpeg cmake build-essential
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Run tests
-        run: pytest -v
-
-      - name: Build with PyInstaller
-        run: pyinstaller mdmt-linux.spec
-
-      - name: Package artifact
-        run: |
-          cd dist
-          zip -r ../mdmt-linux-x86_64.zip mdmt/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mdmt-linux-x86_64
-          path: mdmt-linux-x86_64.zip
-
-  build-macos:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install system dependencies
-        run: |
-          brew install tesseract ffmpeg cmake
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Run tests
-        run: pytest -v
-
-      - name: Build with PyInstaller
-        run: pyinstaller mdmt-macos.spec
-
-      - name: Package artifact
-        run: |
-          cd dist
-          zip -r ../mdmt-macos-arm64.zip mdmt/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mdmt-macos-arm64
-          path: mdmt-macos-arm64.zip
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Enable long paths
+        if: runner.os == 'Windows'
         run: git config --system core.longpaths true
 
+      - uses: actions/checkout@v4
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/*-${{ matrix.name }}.txt
 
-      - name: Install Tesseract
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd cmake build-essential
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tesseract cmake pkgconf
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
         run: choco install tesseract --no-progress -y
 
-      - name: Install FFmpeg
-        run: choco install ffmpeg --no-progress -y
+      - name: Report UPX availability (specs set upx=False)
+        run: |
+          command -v upx && upx --version | head -1 || echo "upx is not installed"
 
-      - name: Install C++ build tools
-        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --no-progress -y
-
-      - name: Install Python dependencies
+      - name: Install locked Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install -r requirements/lock-${{ matrix.name }}.txt
+          pip install -r requirements/dev-${{ matrix.name }}.txt
 
-      - name: Run tests
+      # ---- PyAV against an LGPL-only FFmpeg ---------------------------------
+      # PyPI's PyAV wheels bundle FFmpeg linked with GPL libx264/libx265.
+      # Releases instead use a decoder-only FFmpeg built from source with
+      # native (LGPL) code only, and PyAV compiled against it.
+
+      - name: Cache LGPL FFmpeg and PyAV wheel
+        id: av-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ffmpeg-lgpl
+            av-wheel
+          key: av-lgpl-${{ matrix.name }}-py312-${{ hashFiles('packaging/build_ffmpeg_lgpl.sh', format('requirements/lock-{0}.txt', matrix.name)) }}
+
+      - name: Build LGPL FFmpeg and PyAV (Linux/macOS)
+        if: runner.os != 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '15.0'
+        run: |
+          packaging/build_ffmpeg_lgpl.sh "$PWD/ffmpeg-lgpl"
+          AV=$(grep -oE '^av==[^ ]+' requirements/lock-${{ matrix.name }}.txt)
+          PKG_CONFIG_PATH="$PWD/ffmpeg-lgpl/lib/pkgconfig" LDFLAGS="-Wl,-rpath,$PWD/ffmpeg-lgpl/lib" \
+            pip wheel --no-binary av --no-deps "$AV" -w av-wheel
+
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set up MSYS2 (Windows)
+        if: runner.os == 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+          path-type: inherit
+          install: make diffutils xz
+
+      - name: Build LGPL FFmpeg (Windows, MSVC toolchain)
+        if: runner.os == 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          # MSYS2's coreutils link.exe would shadow MSVC's linker.
+          mv /usr/bin/link /usr/bin/link.msys
+          packaging/build_ffmpeg_lgpl.sh "$(cygpath -u "$GITHUB_WORKSPACE")/ffmpeg-lgpl"
+
+      - name: Build PyAV against it (Windows)
+        if: runner.os == 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ff = Join-Path $PWD 'ffmpeg-lgpl'
+          $env:INCLUDE = "$ff\include;$env:INCLUDE"
+          # FFmpeg's MSVC build installs its import libraries (avformat.lib, ...)
+          # next to the DLLs in bin\, not in lib\.
+          $env:LIB = "$ff\bin;$ff\lib;$env:LIB"
+          $av = (Select-String -Path requirements/lock-windows.txt -Pattern '^av==\S+').Matches[0].Value
+          pip wheel --no-binary av --no-deps $av -w av-raw
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Bundle the FFmpeg DLLs into the wheel (as PyPI's wheels do).
+          delvewheel repair --add-path "$ff\bin" -w av-wheel (Get-ChildItem av-raw\av-*.whl).FullName
+
+      - name: Install the LGPL PyAV
+        run: |
+          pip install --no-deps --force-reinstall av-wheel/av-*.whl
+          python -c "import av; m = av._core.library_meta['libavcodec']; print(av.__version__, av.ffmpeg_version_info, m['license']); assert 'x264' not in m['configuration'] and m['license'].startswith('LGPL')"
+
+      - name: Read pinned llama-cpp-python commit
+        id: llama
+        run: echo "sha=$(grep -oE '@[0-9a-f]{40}' requirements/llama.txt | tr -d @)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache llama-cpp-python wheel
+        id: llama-cache
+        uses: actions/cache@v4
+        with:
+          path: wheels
+          key: llama-cpp-python-${{ matrix.name }}-py312-${{ steps.llama.outputs.sha }}-${{ env.CMAKE_ARGS }}
+
+      - name: Build llama-cpp-python wheel
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        run: pip wheel --no-deps -r requirements/llama.txt -w wheels
+
+      - name: Install llama-cpp-python
+        run: pip install --no-deps wheels/llama_cpp_python-*.whl
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Check for banned dependencies
+        run: python packaging/check_banned_deps.py
+
+      - name: Run tests (including model downloads)
+        env:
+          MDMT_NETWORK_TESTS: '1'
         run: pytest -v
 
       - name: Build with PyInstaller
-        run: pyinstaller mdmt-windows.spec
+        run: pyinstaller --noconfirm mdmt-${{ matrix.name }}.spec
 
-      - name: Package artifact
-        run: Compress-Archive -Path dist/mdmt -DestinationPath mdmt-windows-x64.zip
+      # ---- verify the bundle ---------------------------------------------
+
+      - name: Check bundled library dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: python packaging/check_bundle_libs.py dist/mdmt
+
+      - name: Check bundled library dependencies and signature (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          python packaging/check_bundle_libs.py dist/MDMT.app
+          # arm64 code must carry at least an ad-hoc signature (not a
+          # distribution signature: the builds are intentionally unsigned).
+          codesign --verify --deep --strict --verbose=2 dist/MDMT.app
+
+      - name: Self-test (Linux, windowed executable)
+        if: runner.os == 'Linux'
+        run: dist/mdmt/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
+
+      - name: Self-test (macOS, inside MDMT.app)
+        if: runner.os == 'macOS'
+        run: dist/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
+
+      # Launched through WMI, detached from this job like a double-click in
+      # Explorer, so it starts with no stdout/stderr: the case where v2.0.7
+      # crashed in tqdm. This first run also downloads the Whisper model, and
+      # the report must show that both streams were missing (and handled).
+      - name: Self-test (Windows, detached like an Explorer launch)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist\mdmt\mdmt.exe').Path
+          $report = Join-Path $PWD 'selftest-windows-detached.json'
+          $cmd = "`"$exe`" --self-test --self-test-out `"$report`""
+          $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+                 -Arguments @{ CommandLine = $cmd; CurrentDirectory = $PWD.Path }
+          if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create failed: $($r.ReturnValue)" }
+          Wait-Process -Id $r.ProcessId -Timeout 1800
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 25 }
+          python packaging/check_selftest_report.py $report --expect-missing-stdio
+
+      - name: Self-test (Windows, windowed executable)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $report = Join-Path $PWD 'selftest-windows.json'
+          $p = Start-Process -FilePath 'dist\mdmt\mdmt.exe' `
+                 -ArgumentList '--self-test', '--self-test-out', "`"$report`"" `
+                 -Wait -PassThru
+          Write-Host "mdmt.exe exited with $($p.ExitCode)"
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 40 }
+          exit $p.ExitCode
+
+      # ---- package ---------------------------------------------------------
+
+      # Linux ships as .tar.gz: the bundle contains library symlinks, and some
+      # archive tools extract the symlinks in a zip as small text files, which
+      # breaks llama.cpp (and others) at load time. Every tool keeps them in a
+      # tarball. macOS keeps a ditto zip, which Finder unpacks faithfully.
+      - name: Choose the archive name
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then ext=tar.gz; else ext=zip; fi
+          echo "ARCHIVE=${{ matrix.artifact }}.$ext" >> "$GITHUB_ENV"
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cp packaging/linux/install-desktop-entry.sh dist/mdmt/
+          cp MDMT_logo.png dist/mdmt/mdmt.png
+          cd dist && tar --owner=0 --group=0 -czf "../$ARCHIVE" mdmt/
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        # ditto keeps the bundle's symlinks; `zip -r` would dereference them,
+        # bloating the archive and breaking the code signature.
+        run: ditto -c -k --keepParent dist/MDMT.app "$ARCHIVE"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/mdmt -DestinationPath $env:ARCHIVE
+
+      # ---- test what users download ----------------------------------------
+
+      # Unpack the release archive the way a user would and self-test that copy
+      # (the checks above ran on dist/, which never went through an archive).
+      - name: Self-test the unpacked archive (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir unpacked && tar -xzf "$ARCHIVE" -C unpacked
+          unpacked/mdmt/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}-archive.json"
+
+      - name: Self-test the unpacked archive (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -x -k "$ARCHIVE" unpacked
+          codesign --verify --deep --strict unpacked/MDMT.app
+          unpacked/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}-archive.json"
+
+      - name: Self-test the unpacked archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path $env:ARCHIVE -DestinationPath unpacked
+          $report = Join-Path $PWD 'selftest-windows-archive.json'
+          $p = Start-Process -FilePath 'unpacked\mdmt\mdmt.exe' `
+                 -ArgumentList '--self-test', '--self-test-out', "`"$report`"" `
+                 -Wait -PassThru
+          Write-Host "mdmt.exe exited with $($p.ExitCode)"
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 25 }
+          exit $p.ExitCode
+
+      - name: Upload self-test report and log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-${{ matrix.name }}
+          path: |
+            selftest-${{ matrix.name }}*.json
+            selftest-${{ matrix.name }}*.json.log
+          if-no-files-found: warn
+
+      - name: Report bundle size
+        run: |
+          du -sh dist/* || true
+          ls -l "$ARCHIVE"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mdmt-windows-x64
-          path: mdmt-windows-x64.zip
+          name: ${{ matrix.artifact }}
+          path: ${{ env.ARCHIVE }}
 
   release:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
+      - name: Check out the release notes
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/release-notes
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+
+      # docs/release-notes/<tag>.md, if there is one, goes above the standard
+      # paragraph; GitHub then appends the list of changes.
+      - name: Compose the release notes
+        run: |
+          notes="docs/release-notes/${GITHUB_REF_NAME}.md"
+          {
+            if [ -f "$notes" ]; then cat "$notes"; echo; fi
+            cat <<'EOF'
+          Also available at [jamescaldwell.net/software.html](https://jamescaldwell.net/software.html).
+
+          **Unsigned builds.** MDMT is an independent open-source project without paid code-signing certificates, so these apps are not signed or notarized; the source code and the CI build logs that produced these files are public. On first launch, macOS needs one approval in System Settings → Privacy & Security → Open Anyway (or run `xattr -dr com.apple.quarantine /path/to/MDMT.app`), and Windows SmartScreen needs "More info" → "Run anyway". The macOS build requires Apple Silicon and macOS 15 or newer; the Linux build is x86-64: extract `mdmt-linux-x86_64.tar.gz` with your archive manager or `tar -xzf`. See the README for details.
+          EOF
+          } > release-body.md
+          cat release-body.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            mdmt-linux-x86_64/mdmt-linux-x86_64.zip
+            mdmt-linux-x86_64/mdmt-linux-x86_64.tar.gz
             mdmt-macos-arm64/mdmt-macos-arm64.zip
             mdmt-windows-x64/mdmt-windows-x64.zip
-          body: |
-            Also available at [jamescaldwell.net/software.html](https://jamescaldwell.net/software.html).
+          body_path: release-body.md
           generate_release_notes: true
