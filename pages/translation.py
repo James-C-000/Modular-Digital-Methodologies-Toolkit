@@ -5,6 +5,7 @@ from nicegui import ui
 
 from common.jobs import JOBS
 from common.paths import folder_problem
+from pages.downloads import progress_text, start_downloads
 from pages.components import (
     FolderField, JobPanel, file_results, hint, missing_dependency, page_header, remember, run_button, saved,
     section, start_job,
@@ -93,17 +94,16 @@ def translation_page():
             hint("Needs: " + ", ".join(f"{names[a]} → {names[b]} ({_size(a, b)})" for a, b in missing))
             if downloading and downloading.running:
                 ui.spinner(size="xs")
-                hint(downloading.current)
+                progress_label["label"] = hint(progress_text(downloading))
             else:
                 ui.button("Download", icon="download", on_click=lambda: download(missing)).props("flat dense")
 
+    progress_label = {"label": None}
+
     def download(pairs):
-        def work(job):
-            for i, (a, b) in enumerate(pairs):
-                job.progress(i, len(pairs), f"Downloading {names[a]} → {names[b]} ({_size(a, b)})...")
-                ot.download_package(a, b)
-            job.progress(len(pairs), len(pairs), "")
-        if start_job("translation-models", "Translation models", work):
+        from common.assets import find
+        if start_downloads("translation-models", "Translation models",
+                           [find(f"translation:{a}_{b}") for a, b in pairs]):
             show_route.refresh()
 
     # Refresh the route note when a model download (possibly started earlier) finishes.
@@ -112,6 +112,8 @@ def translation_page():
     def watch_downloads():
         job = JOBS.latest("translation-models")
         status = job and (job.id, job.status)
+        if job and job.running and progress_label["label"] is not None:
+            progress_label["label"].set_text(progress_text(job))
         if status != seen["status"]:
             seen["status"] = status
             if job and job.status == "failed":
@@ -120,7 +122,7 @@ def translation_page():
 
     with route_area:
         show_route()
-    ui.timer(1.0, watch_downloads)
+    ui.timer(0.5, watch_downloads)
     source.on_value_change(lambda _e: show_route.refresh())
     target.on_value_change(lambda _e: show_route.refresh())
 

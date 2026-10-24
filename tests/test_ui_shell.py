@@ -106,3 +106,41 @@ async def test_output_inside_input_is_rejected_for_keywords_only_when_same(user,
     user.find(kind=ui.textarea, content="Keywords, one per line").type("mill")
     user.find(kind=ui.button, content="Search").click()
     await user.should_see("The output folder must differ from the input folder.")
+
+
+@pytest.mark.anyio
+async def test_downloads_survive_navigation_and_can_be_deleted(user, app_data, monkeypatch):
+    from common import assets
+    release = threading.Event()
+
+    def fake_download(self, on_progress=None):          # writes a "Whisper tiny" model slowly
+        folder = app_data / "whisper_models" / "tiny"
+        folder.mkdir(parents=True, exist_ok=True)
+        on_progress(30 * 10**6, 78 * 10**6)
+        release.wait(10)
+        for name in ("config.json", "model.bin", "tokenizer.json", "vocabulary.txt"):
+            (folder / name).write_bytes(b"x" * 1000)
+
+    monkeypatch.setattr(assets.Asset, "download", fake_download)
+    await user.open("/downloads")
+    await user.should_see("Whisper models (Audio Transcription)")
+    user.find(marker="download:whisper:tiny").click()
+    await user.should_see("Whisper tiny — 30 MB of 78 MB")
+    user.find(marker="nav:/about").click()
+    await user.should_see("About MDMT")
+    user.find(marker="nav:/downloads").click()
+    await user.should_see("Whisper tiny — 30 MB of 78 MB")
+    release.set()
+    await user.should_see("Installed · 4 KB", retries=50)
+    user.find(marker="delete:whisper:tiny").click()
+    user.find(kind=ui.button, content="Delete").click()
+    await user.should_see(marker="download:whisper:tiny", retries=20)
+    assert not (app_data / "whisper_models" / "tiny").exists()
+
+
+@pytest.mark.anyio
+async def test_welcome_offers_the_recommended_setup(user):
+    await user.open("/welcome")
+    await user.should_see("Recommended setup")
+    await user.should_see("Whisper small")
+    await user.should_see("Download all")

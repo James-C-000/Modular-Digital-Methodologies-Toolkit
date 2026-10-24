@@ -38,6 +38,7 @@ class Job:
     summary: str = ""
     error: str | None = None
     images: list = field(default_factory=list)
+    meta: dict = field(default_factory=dict)   # free-form details for the page that owns the job
     cancel_event: threading.Event = field(default_factory=threading.Event)
 
     @property
@@ -100,6 +101,11 @@ class JobManager:
     def latest(self, kind: str) -> Job | None:
         with self._lock:
             return next((j for j in reversed(self._jobs) if j.kind == kind), None)
+
+    def all(self) -> list[Job]:
+        """The latest job of every kind."""
+        with self._lock:
+            return list(self._jobs)
 
     def running(self) -> list[Job]:
         with self._lock:
