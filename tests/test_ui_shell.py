@@ -33,6 +33,9 @@ async def user():
         yield user
 
 
+# Job panels refresh every 0.5 s and the sidebar's job list every 1 s, so
+# assertions about a running job wait up to 3 s (retries=30); the default
+# (0.3 s) failed now and then on a slow Windows runner.
 def _slow_job(kind, release, files=("a.txt", "b.txt", "c.txt")):
     def work(job):
         job.progress(1, len(files), files[1])
@@ -53,12 +56,12 @@ async def test_a_running_job_survives_navigation(user):
     release = threading.Event()
     await user.open("/cowords")
     job = _slow_job("cowords", release)
-    await user.should_see("1 of 3 file(s) — b.txt")
+    await user.should_see("1 of 3 file(s) — b.txt", retries=30)
     user.find(marker="nav:/about").click()
     await user.should_see("About MDMT")
-    await user.should_see("Running")                      # the sidebar lists the job
+    await user.should_see("Running", retries=30)                      # the sidebar lists the job
     user.find(marker="nav:/cowords").click()
-    await user.should_see("1 of 3 file(s) — b.txt")       # re-attached on return
+    await user.should_see("1 of 3 file(s) — b.txt", retries=30)       # re-attached on return
     release.set()
     await user.should_see("Finished in", retries=50)
     await user.should_see("3 of 3 file(s) analysed.")
@@ -70,7 +73,7 @@ async def test_cancel_stops_the_job(user):
     release = threading.Event()
     await user.open("/ner")
     job = _slow_job("ner", release)
-    await user.should_see("1 of 3 file(s) — b.txt")
+    await user.should_see("1 of 3 file(s) — b.txt", retries=30)
     user.find(kind=ui.button, content="Cancel").click()
     assert job.cancelled
     release.set()
@@ -125,11 +128,11 @@ async def test_downloads_survive_navigation_and_can_be_deleted(user, app_data, m
     await user.open("/downloads")
     await user.should_see("Whisper models (Audio Transcription)")
     user.find(marker="download:whisper:tiny").click()
-    await user.should_see("Whisper tiny — 30 MB of 78 MB")
+    await user.should_see("Whisper tiny — 30 MB of 78 MB", retries=30)
     user.find(marker="nav:/about").click()
     await user.should_see("About MDMT")
     user.find(marker="nav:/downloads").click()
-    await user.should_see("Whisper tiny — 30 MB of 78 MB")
+    await user.should_see("Whisper tiny — 30 MB of 78 MB", retries=30)
     release.set()
     await user.should_see("Installed · 4 KB", retries=50)
     user.find(marker="delete:whisper:tiny").click()
