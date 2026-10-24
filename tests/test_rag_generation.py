@@ -13,3 +13,17 @@ def test_fallback_template_switches_thinking_like_qwen():
     assert off.endswith("<|im_start|>assistant\n<think>\n\n</think>\n\n")  # empty block = no thinking
     assert on.endswith("<|im_start|>assistant\n<think>\n")
     assert "<|im_start|>system\nS<|im_end|>" in off
+
+
+def test_every_argument_mdmt_passes_exists_in_the_installed_llama_cpp():
+    # The JamePeng fork renamed presence_penalty to present_penalty; a mismatch
+    # only shows up when a real model generates, so check the signature here.
+    # Runs in the build workflow, which installs llama-cpp-python.
+    import inspect
+
+    import pytest
+    from RAG.generation import completion_kwargs
+    llama_cpp = pytest.importorskip("llama_cpp")
+    accepted = set(inspect.signature(llama_cpp.Llama.create_completion).parameters)
+    for thinking in (False, True):
+        assert set(completion_kwargs(thinking, max_tokens=8)) <= accepted

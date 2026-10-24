@@ -1,6 +1,8 @@
 """Benchmark embedding/reranking runtimes for the Phase 3 RAG design (dev-only).
 
-Compares llama.cpp (the JamePeng fork's LlamaEmbedding, GGUF) with ONNX Runtime
+Compares llama.cpp (the JamePeng fork's LlamaEmbedding, GGUF; MDMT itself now
+uses mainline llama-cpp-python, which lacks it, so install the fork commit
+pinned in .github/workflows/bench.yml to re-run this) with ONNX Runtime
 + tokenizers on the same models, and records speed, memory and how closely the
 two runtimes agree.
 

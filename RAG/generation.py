@@ -1,4 +1,4 @@
-"""Text generation with llama.cpp (JamePeng's llama-cpp-python fork).
+"""Text generation with llama.cpp (llama-cpp-python).
 
 Prompts are rendered with the model's own chat template from the GGUF file
 (Jinja2, sandboxed), which handles Qwen 3.5's thinking switch correctly: with
@@ -18,6 +18,12 @@ STOP = ["<|im_end|>", "<|im_start|>", "<|endoftext|>"]
 
 def sampling_params(enable_thinking: bool) -> dict:
     return dict(THINKING_PARAMS if enable_thinking else INSTRUCT_PARAMS)
+
+
+def completion_kwargs(enable_thinking: bool, max_tokens: int) -> dict:
+    """Keyword arguments for Llama.create_completion when generating an answer."""
+    return dict(sampling_params(enable_thinking), max_tokens=max_tokens, stop=STOP,
+                presence_penalty=PRESENCE_PENALTY)
 
 
 def chatml_fallback(messages, enable_thinking: bool) -> str:
@@ -57,13 +63,10 @@ class LlmEngine:
         Afterwards ``last_finish_reason`` is "length" if generation ran out of
         tokens (max_tokens or the context window), "stop" if the model finished.
         """
-        p = sampling_params(enable_thinking)
         self.last_finish_reason = None
         with self.lock:
-            for chunk in self.llm.create_completion(
-                    prompt, max_tokens=max_tokens, stream=True, stop=STOP,
-                    temperature=p["temperature"], top_p=p["top_p"], top_k=p["top_k"], min_p=p["min_p"],
-                    repeat_penalty=p["repeat_penalty"], present_penalty=PRESENCE_PENALTY):
+            for chunk in self.llm.create_completion(prompt, stream=True,
+                                                    **completion_kwargs(enable_thinking, max_tokens)):
                 if stop_event is not None and stop_event.is_set():
                     break
                 choice = chunk["choices"][0]
