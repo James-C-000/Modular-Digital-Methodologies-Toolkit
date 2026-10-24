@@ -272,6 +272,44 @@ def _ner_section():
         rows()
 
 
+def _rag_section():
+    from RAG import models as rag_models
+
+    roles = {rag_models.EMBEDDER["key"]: "Required: finds the passages relevant to a question.",
+             rag_models.RERANKER["key"]: "Optional (the \"Rerank passages\" switch): reorders them for accuracy."}
+
+    with ui.card().classes("w-full mt-4"):
+        ui.label("Retrieval Models (RAG Chat)").classes("text-h5")
+        ui.label(f"Install location: {rag_models.models_root()}").classes("text-caption")
+        ui.label("RAG Chat also downloads these on first start if they are missing.").classes("text-caption")
+
+        @ui.refreshable
+        def rows():
+            for info in rag_models.RAG_MODELS.values():
+                installed = rag_models.is_installed(info)
+                with ui.row().classes("items-center w-full"):
+                    ui.label(f"{info['name']} ({info['size']})").classes("w-80")
+                    status = ui.label("Installed" if installed else "Not installed").classes(
+                        "text-positive" if installed else "text-grey")
+                    if not installed:
+                        ui.button("Download", on_click=lambda i=info, sl=status: download(i, sl)).props("flat dense")
+                ui.label(f"{roles[info['key']]} Multilingual. License: {info['license']}.").classes("text-caption ml-2")
+
+        async def download(info, status_label):
+            status_label.set_text("Downloading...")
+            status_label.classes("text-warning", remove="text-grey")
+            try:
+                await run.io_bound(rag_models.download, info)
+            except Exception as e:
+                status_label.set_text(f"Download failed: {e}")
+                status_label.classes("text-negative", remove="text-warning")
+                ui.notify(f"{info['name']} download failed: {e}", type="negative")
+                return
+            rows.refresh()
+
+        rows()
+
+
 async def _download_qwen_model(model: dict, status_label: ui.label):
     """Download a Qwen GGUF model from HuggingFace."""
     from huggingface_hub import hf_hub_download
@@ -312,6 +350,7 @@ def downloads_page():
 
     _translation_section()
     _ner_section()
+    _rag_section()
 
     # LLM Models (Qwen 3.5)
     with ui.card().classes("w-full mt-4"):
