@@ -3,8 +3,8 @@
 Windows and macOS run MDMT in a native pywebview window and use the operating
 system's dialogs.  Linux runs MDMT in the user's browser, where a page cannot
 see the server's file system, so it uses an in-app picker that browses the
-local disk on the server side.  Pages call browse_dir()/browse_file() (or
-pick_folder()/pick_file()) and never import webview themselves.
+local disk on the server side.  Pages use pick_folder()/pick_file() (usually
+through pages.components.PathField) and never import webview themselves.
 """
 import os
 from pathlib import Path
@@ -33,20 +33,6 @@ async def pick_file(start: str | None = None, extensions: list[str] | None = Non
             file_types=file_types)
         return result[0] if result else None
     return await LocalFilePicker(start, mode="file", extensions=extensions)
-
-
-async def browse_dir(target_input):
-    """Let the user choose a folder and put it into *target_input*."""
-    path = await pick_folder(target_input.value)
-    if path:
-        target_input.set_value(path)
-
-
-async def browse_file(target_input, extensions: list[str] | None = None, description: str = "Files"):
-    """Let the user choose a file and put it into *target_input*."""
-    path = await pick_file(target_input.value, extensions, description)
-    if path:
-        target_input.set_value(path)
 
 
 def _start_dir(start: str | None) -> str:
