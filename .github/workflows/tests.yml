@@ -65,5 +65,8 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Check for banned dependencies
+        run: python packaging/check_banned_deps.py
+
       - name: Run tests
         run: pytest -v
