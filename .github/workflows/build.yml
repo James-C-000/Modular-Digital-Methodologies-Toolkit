@@ -80,31 +80,50 @@ jobs:
       # Releases instead use a decoder-only FFmpeg built from source with
       # native (LGPL) code only, and PyAV compiled against it.
 
-      - name: Cache LGPL FFmpeg and PyAV wheel
+      # FFmpeg depends only on its build script and PyAV only on that and the
+      # pinned av version, so other dependency changes reuse both caches.
+      - name: Read pinned PyAV version
+        id: av
+        run: |
+          # [^[:space:]] also stops at the \r of a CRLF checkout (Windows).
+          AV=$(grep -oE '^av==[^[:space:]]+' requirements/lock-${{ matrix.name }}.txt)
+          [ -n "$AV" ] || { echo "no av== pin in requirements/lock-${{ matrix.name }}.txt"; exit 1; }
+          echo "spec=$AV" >> "$GITHUB_OUTPUT"
+
+      - name: Cache LGPL FFmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-lgpl
+          key: ffmpeg-lgpl-${{ matrix.name }}-${{ hashFiles('packaging/build_ffmpeg_lgpl.sh') }}
+
+      - name: Cache LGPL PyAV wheel
         id: av-cache
         uses: actions/cache@v4
         with:
-          path: |
-            ffmpeg-lgpl
-            av-wheel
-          key: av-lgpl-${{ matrix.name }}-py312-${{ hashFiles('packaging/build_ffmpeg_lgpl.sh', format('requirements/lock-{0}.txt', matrix.name)) }}
+          path: av-wheel
+          key: av-lgpl-${{ matrix.name }}-py312-${{ steps.av.outputs.spec }}-${{ hashFiles('packaging/build_ffmpeg_lgpl.sh') }}
 
-      - name: Build LGPL FFmpeg and PyAV (Linux/macOS)
+      - name: Build LGPL FFmpeg (Linux/macOS)
+        if: runner.os != 'Windows' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '15.0'
+        run: packaging/build_ffmpeg_lgpl.sh "$PWD/ffmpeg-lgpl"
+
+      - name: Build PyAV against it (Linux/macOS)
         if: runner.os != 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
         env:
           MACOSX_DEPLOYMENT_TARGET: '15.0'
         run: |
-          packaging/build_ffmpeg_lgpl.sh "$PWD/ffmpeg-lgpl"
-          AV=$(grep -oE '^av==[^ ]+' requirements/lock-${{ matrix.name }}.txt)
           PKG_CONFIG_PATH="$PWD/ffmpeg-lgpl/lib/pkgconfig" LDFLAGS="-Wl,-rpath,$PWD/ffmpeg-lgpl/lib" \
-            pip wheel --no-binary av --no-deps "$AV" -w av-wheel
+            pip wheel --no-binary av --no-deps "${{ steps.av.outputs.spec }}" -w av-wheel
 
       - name: Set up MSVC (Windows)
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Set up MSYS2 (Windows)
-        if: runner.os == 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
+        if: runner.os == 'Windows' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         uses: msys2/setup-msys2@v2
         with:
           msystem: MSYS
@@ -112,7 +131,7 @@ jobs:
           install: make diffutils xz
 
       - name: Build LGPL FFmpeg (Windows, MSVC toolchain)
-        if: runner.os == 'Windows' && steps.av-cache.outputs.cache-hit != 'true'
+        if: runner.os == 'Windows' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
           # MSYS2's coreutils link.exe would shadow MSVC's linker.
@@ -128,8 +147,7 @@ jobs:
           # FFmpeg's MSVC build installs its import libraries (avformat.lib, ...)
           # next to the DLLs in bin\, not in lib\.
           $env:LIB = "$ff\bin;$ff\lib;$env:LIB"
-          $av = (Select-String -Path requirements/lock-windows.txt -Pattern '^av==\S+').Matches[0].Value
-          pip wheel --no-binary av --no-deps $av -w av-raw
+          pip wheel --no-binary av --no-deps '${{ steps.av.outputs.spec }}' -w av-raw
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Bundle the FFmpeg DLLs into the wheel (as PyPI's wheels do).
           delvewheel repair --add-path "$ff\bin" -w av-wheel (Get-ChildItem av-raw\av-*.whl).FullName
@@ -185,44 +203,6 @@ jobs:
           # distribution signature: the builds are intentionally unsigned).
           codesign --verify --deep --strict --verbose=2 dist/MDMT.app
 
-      - name: Self-test (Linux, windowed executable)
-        if: runner.os == 'Linux'
-        run: dist/mdmt/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
-
-      - name: Self-test (macOS, inside MDMT.app)
-        if: runner.os == 'macOS'
-        run: dist/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}.json"
-
-      # Launched through WMI, detached from this job like a double-click in
-      # Explorer, so it starts with no stdout/stderr: the case where v2.0.7
-      # crashed in tqdm. This first run also downloads the Whisper model, and
-      # the report must show that both streams were missing (and handled).
-      - name: Self-test (Windows, detached like an Explorer launch)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $exe = (Resolve-Path 'dist\mdmt\mdmt.exe').Path
-          $report = Join-Path $PWD 'selftest-windows-detached.json'
-          $cmd = "`"$exe`" --self-test --self-test-out `"$report`""
-          $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
-                 -Arguments @{ CommandLine = $cmd; CurrentDirectory = $PWD.Path }
-          if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create failed: $($r.ReturnValue)" }
-          Wait-Process -Id $r.ProcessId -Timeout 1800
-          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 25 }
-          python packaging/check_selftest_report.py $report --expect-missing-stdio
-
-      - name: Self-test (Windows, windowed executable)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $report = Join-Path $PWD 'selftest-windows.json'
-          $p = Start-Process -FilePath 'dist\mdmt\mdmt.exe' `
-                 -ArgumentList '--self-test', '--self-test-out', "`"$report`"" `
-                 -Wait -PassThru
-          Write-Host "mdmt.exe exited with $($p.ExitCode)"
-          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 40 }
-          exit $p.ExitCode
-
       # ---- package ---------------------------------------------------------
 
       # Linux ships as .tar.gz: the bundle contains library symlinks, and some
@@ -255,8 +235,10 @@ jobs:
 
       # ---- test what users download ----------------------------------------
 
-      # Unpack the release archive the way a user would and self-test that copy
-      # (the checks above ran on dist/, which never went through an archive).
+      # Unpack the release archive the way a user would and self-test that copy:
+      # the app as users get it (the library checks above ran on dist/). The
+      # self-test's "bundle intact" check tells an archive problem from a
+      # broken bundle.
       - name: Self-test the unpacked archive (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -270,11 +252,29 @@ jobs:
           codesign --verify --deep --strict unpacked/MDMT.app
           unpacked/MDMT.app/Contents/MacOS/mdmt --self-test --self-test-out "$PWD/selftest-${{ matrix.name }}-archive.json"
 
-      - name: Self-test the unpacked archive (Windows)
+      # Launched through WMI, detached from this job like a double-click in
+      # Explorer, so it starts with no stdout/stderr: the case where v2.0.7
+      # crashed in tqdm. This first run also downloads the Whisper model, and
+      # the report must show that both streams were missing (and handled).
+      - name: Self-test the unpacked archive (Windows, detached like an Explorer launch)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Expand-Archive -Path $env:ARCHIVE -DestinationPath unpacked
+          $exe = (Resolve-Path 'unpacked\mdmt\mdmt.exe').Path
+          $report = Join-Path $PWD 'selftest-windows-detached.json'
+          $cmd = "`"$exe`" --self-test --self-test-out `"$report`""
+          $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+                 -Arguments @{ CommandLine = $cmd; CurrentDirectory = $PWD.Path }
+          if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create failed: $($r.ReturnValue)" }
+          Wait-Process -Id $r.ProcessId -Timeout 1800
+          if (Test-Path "$report.log") { Get-Content "$report.log" -Tail 25 }
+          python packaging/check_selftest_report.py $report --expect-missing-stdio
+
+      - name: Self-test the unpacked archive (Windows, windowed executable)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           $report = Join-Path $PWD 'selftest-windows-archive.json'
           $p = Start-Process -FilePath 'unpacked\mdmt\mdmt.exe' `
                  -ArgumentList '--self-test', '--self-test-out', "`"$report`"" `
