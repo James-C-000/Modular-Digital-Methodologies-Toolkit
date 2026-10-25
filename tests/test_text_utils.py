@@ -57,6 +57,21 @@ class TestSentences:
         text = "One. Two."
         assert [text[s:e] for s, e in sentence_spans(text)] == ["One.", "Two."]
 
+    def test_abbreviations_deep_in_a_long_text(self):
+        filler = "The mill flooded. " * 5000
+        assert sentences(filler + "Mr. Smith and J. K. Nicholson left. " + "W" * 100 + ". Done.")[-3:] == \
+            ["Mr. Smith and J. K. Nicholson left.", "W" * 100 + ".", "Done."]
+
+    def test_long_texts_split_in_linear_time(self):
+        # Relationship extraction splits whole documents at once. On 100 KB with
+        # a full stop every 10 characters, searching (and copying) all the text
+        # before or after each one took ~40 s; it takes well under 0.1 s.
+        import time
+        text = "It rained. He slept. " * 5000
+        t = time.perf_counter()
+        assert len(sentence_spans(text)) == 10000
+        assert time.perf_counter() - t < 2
+
 
 class TestStopwords:
     def test_english_uses_snowball_function_words(self):

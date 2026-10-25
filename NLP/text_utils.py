@@ -72,6 +72,12 @@ _CLOSERS = "\"'”’»)]"
 _WESTERN_END = re.compile(r"[.!?…]+[" + re.escape(_CLOSERS) + r"]*(?=\s)")
 _CJK_END = re.compile(r"[。！？]+[」』）”’\"']*")
 _PARAGRAPH = re.compile(r"\n[ \t]*\n\s*")
+# The word (letters, possibly with inner dots: "e.g") just before a '.'.
+_TOKEN_BEFORE = re.compile(r"[^\W\d_]+(?:\.[^\W\d_]+)*$")
+# How far back to look for it: far longer than any abbreviation, so a longer
+# word is never one. Searching all of text[:dot] made long texts quadratic.
+_LOOKBACK = 64
+_NON_SPACE = re.compile(r"\S")
 
 
 def _starts_sentence(ch: str) -> bool:
@@ -85,10 +91,10 @@ def _starts_sentence(ch: str) -> bool:
 
 def _is_abbreviation(text: str, dot: int) -> bool:
     """True if the '.' at text[dot] ends an abbreviation or an initial."""
-    m = re.search(r"([^\W\d_]+(?:\.[^\W\d_]+)*)$", text[:dot])
+    m = _TOKEN_BEFORE.search(text, max(0, dot - _LOOKBACK), dot)
     if not m:
         return False
-    token = m.group(1)
+    token = m.group()
     if len(token) == 1 and token.isupper():
         return True  # an initial: "J. K. Nicholson"
     return token.lower() in _ABBREVIATIONS
@@ -102,8 +108,8 @@ def sentence_spans(text: str) -> list[tuple[int, int]]:
     for m in _CJK_END.finditer(text):
         cuts.add(m.end())
     for m in _WESTERN_END.finditer(text):
-        rest = text[m.end():].lstrip()
-        if not rest or not _starts_sentence(rest[0]):
+        nxt = _NON_SPACE.search(text, m.end())   # without copying the rest of the text
+        if not nxt or not _starts_sentence(nxt.group()):
             continue
         if text[m.start()] == "." and m.group().rstrip(_CLOSERS) == "." and _is_abbreviation(text, m.start()):
             continue
