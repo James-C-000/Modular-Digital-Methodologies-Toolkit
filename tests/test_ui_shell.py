@@ -211,3 +211,14 @@ async def test_keyword_search_does_not_blame_the_keywords_when_every_pdf_was_ski
         "skipped": [{"input": "scan.pdf", "message": "no text (scanned PDF? run OCR first)"}]}, output_dir="/tmp")
     await user.should_see("scan.pdf — no text (scanned PDF? run OCR first)", retries=30)
     await user.should_not_see("None of the keywords were found.")
+
+
+@pytest.mark.anyio
+async def test_keyword_search_shows_keyword_notes_and_warnings(user):
+    await user.open("/keywords")
+    JOBS.start("keywords", "keywords", lambda job: {
+        "files": 1, "total": 1, "hits": 2, "charts": [], "skipped": [],
+        "warnings": [{"input": "box/a.pdf", "message": "searched, but its charts could not be saved (too long)"}],
+        "keyword_notes": ['"c#" was counted as "c++": they match the same words.']}, output_dir="/tmp")
+    await user.should_see('"c#" was counted as "c++": they match the same words.', retries=30)
+    await user.should_see("box/a.pdf — searched, but its charts could not be saved (too long)")

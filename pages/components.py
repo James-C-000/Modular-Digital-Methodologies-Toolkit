@@ -178,12 +178,15 @@ def file_results(job, ok_word: str = "done"):
                 ui.label(text).classes("text-body2")
 
 
-def skipped_files(skipped):
-    """List the files a job could not use: [{"input": path, "message": why}]."""
+def skipped_files(skipped, icon="remove_circle_outline", color="mdmt-muted"):
+    """List the files a job could not use: [{"input": path, "message": why}].
+
+    *icon* and *color* mark another kind of list, such as files used with a warning.
+    """
     with ui.column().classes("w-full gap-0"):
         for r in skipped:
             with ui.row().classes("items-center no-wrap gap-2"):
-                ui.icon("remove_circle_outline").classes("mdmt-muted")
+                ui.icon(icon).classes(color)
                 ui.label(f"{r['input']} — {r['message']}").classes("text-body2")
 
 

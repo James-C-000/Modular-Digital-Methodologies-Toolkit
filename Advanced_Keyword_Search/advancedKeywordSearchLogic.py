@@ -5,11 +5,11 @@ page.  Keywords are plain text matched as whole words, ignoring case and
 punctuation at the edges of words ("york." is "york"); a keyword of several
 words matches them in sequence.  Hyphens separate words unless the keyword
 contains one, so "mill race" also finds "mill-race".  The filters apply to the
-keywords as to the text, and both are compared in Unicode NFKC form, so the
-ligature in "\ufb01eld" is "fi" and an accent stored as a separate mark is
-part of its letter.  Keywords that compare alike ("york" and "york.") are
-searched once.  Every occurrence is counted once and gets one row in the
-keyword's CSV.
+keywords as to the text, and both are compared with Latin ligatures spelled
+out (the "\ufb01" in "\ufb01eld" is "fi") and accents stored as separate marks
+joined to their letters.  Keywords that compare alike ("york" and "york.") are
+searched once, and the summary says which were counted together.  Every
+occurrence is counted once and gets one row in the keyword's CSV.
 The output folder receives:
 
 - ``<keyword>.csv``: one row per hit with the PDF, the page and the words
@@ -82,9 +82,15 @@ def _text_filter(basic: bool, filters: str, filter_file: str):
     return lambda text: text.translate(table)
 
 
+# Only the Latin ligatures (U+FB00-FB06, "\ufb01" -> "fi"): full NFKC also rewrites
+# characters people filter out ("\u2122" -> "TM") and splits a spacing accent
+# ("caf\u00b4e", as LaTeX PDFs extract "caf\u00e9") into a space and a mark.
+_LIGATURES = str.maketrans({chr(c): unicodedata.normalize("NFKC", chr(c)) for c in range(0xFB00, 0xFB07)})
+
+
 def _normalize(text: str) -> str:
-    """*text* in NFKC form: ligatures spelled out ("\ufb01" -> "fi"), accents joined to their letters."""
-    return unicodedata.normalize("NFKC", text)
+    """*text* in NFC form (accents joined to their letters) with Latin ligatures spelled out."""
+    return unicodedata.normalize("NFC", text).translate(_LIGATURES)
 
 
 def _bare(word: str) -> str:
@@ -105,24 +111,40 @@ def _words(text: str, hyphens_separate: bool) -> list[tuple[int, int, str]]:
     return [(m.start(), m.end(), _bare(m.group())) for m in _WORDS[hyphens_separate].finditer(text)]
 
 
-def _keywords(lines: list[str], clean) -> dict[str, tuple[list[str], bool]]:
+def _keywords(lines: list[str], clean) -> tuple[dict[str, tuple[list[str], bool]], list[str]]:
     """Each keyword, lower-cased, and how it is compared: its words, and whether hyphens separate words.
 
     A keyword is filtered like the text (*clean*), so with the basic filter
     "o'brien" is compared as "obrien".  Of keywords compared alike only the
-    first is kept; one the filter empties compares as no words and is never
-    found.
+    first is kept, so no match is counted twice; one the filter empties is
+    kept but never found.  Also returns a note for each of these keywords.
     """
-    found, seen = {}, set()
+    found, kept, notes = {}, {}, []
     for line in lines:
         compared = clean(_normalize(line)).lower()
         hyphens_separate = "-" not in compared
-        key = (tuple(bare for _start, _end, bare in _words(compared, hyphens_separate)), hyphens_separate)
-        keyword = line.lower()
-        if key not in seen and keyword not in found:
-            seen.add(key)
-            found[keyword] = list(key[0]), hyphens_separate
-    return found
+        parts = [bare for _start, _end, bare in _words(compared, hyphens_separate)]
+        key, keyword = (tuple(parts), hyphens_separate), line.lower()
+        if key in kept and (parts or kept[key] == keyword):
+            if kept[key] != keyword:
+                notes.append(f'"{keyword}" was counted as "{kept[key]}": they match the same words.')
+            continue
+        n = 2
+        while keyword in found:   # "York" and "york" only differ with a filter that removes capitals
+            keyword, n = f"{line.lower()} ({n})", n + 1
+        if not parts:
+            notes.append(f'"{keyword}" was not searched: the filter leaves nothing of it.')
+        kept[key] = keyword
+        found[keyword] = parts, hyphens_separate
+    return found, notes
+
+
+def _index(words: list) -> dict[str, list[int]]:
+    """Where each word occurs in *words* (see _words), by the word as compared with keywords."""
+    index = {}
+    for at, (_start, _end, bare) in enumerate(words):
+        index.setdefault(bare, []).append(at)
+    return index
 
 
 def _occurrences(words: list, index: dict, parts: list[str]) -> list[int]:
@@ -230,12 +252,21 @@ def _plain(text: str) -> str:
     return text.replace("$", r"\$")
 
 
-def _save_charts(pie: str, bar: str, counts: dict, title: str, xlabel: str):
-    """A pie chart and a bar chart of *counts*."""
+def _save_charts(pie: str, bar: str, counts: dict, title: str, xlabel: str) -> str | None:
+    """A pie chart and a bar chart of *counts*; why they could not be saved, or None.
+
+    A path too long for Windows, say, loses these charts, not the search.
+    """
     values, labels = _chart_data(counts)
     labels, title = [_plain(label) for label in labels], _plain(title)
-    _save_pie(pie, values, labels, title)
-    _save_bar(bar, values, labels, title, xlabel)
+    try:
+        os.makedirs(os.path.dirname(pie) or ".", exist_ok=True)
+        _save_pie(pie, values, labels, title)
+        _save_bar(bar, values, labels, title, xlabel)
+    except (OSError, ValueError) as e:   # ValueError: text matplotlib cannot draw
+        log.warning("keywords: cannot save %s: %s", pie, e)
+        return str(e)
+    return None
 
 
 def _append_rows(path: str, rows):
@@ -260,10 +291,12 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
     on_progress(done, total, current_file) is called before each PDF; a set
     *cancel* event stops before the next one.  Returns {"files": PDFs searched,
     "total": PDFs found, "hits": keyword occurrences found, "charts": [total
-    chart paths], "skipped": [{"input": path relative to *input_dir*,
-    "message": why}]}: PDFs that cannot be read or have no text, and PDFs
-    searched (and counted) whose charts cannot be saved.  PDFs are named by
-    their path relative to *input_dir*.
+    chart paths saved], "skipped": [{"input": path relative to *input_dir*,
+    "message": why}]: PDFs not searched, because they cannot be read or have no
+    text, "warnings": [the same]: PDFs searched (and counted) whose charts
+    cannot be saved, "keyword_notes": [keywords counted with another or not
+    searched (see _keywords)]}.  PDFs are named by their path relative to
+    *input_dir*.
     """
     if not os.path.isdir(input_dir):
         raise NotADirectoryError(f"{input_dir} is not a valid directory.")
@@ -271,7 +304,7 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
               context_words, basic, input_dir, output_dir, keyword_file, filter_file)
     pdfs = find_files(input_dir, [".pdf"])
     clean = _text_filter(basic, filters, filter_file)
-    compared = _keywords(_load_keywords(keywords, keyword_file), clean)
+    compared, keyword_notes = _keywords(_load_keywords(keywords, keyword_file), clean)
     keyword_list = list(compared)
     context_words = int(context_words)
 
@@ -285,7 +318,8 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
     _write_new_csv(overview, ["Year", *keyword_list])
 
     totals = dict.fromkeys(keyword_list, 0)
-    read, done, skipped = 0, 0, []
+    modes = {hyphens_separate for _parts, hyphens_separate in compared.values()}
+    read, done, skipped, warnings = 0, 0, [], []
     for i, path in enumerate(pdfs):
         if cancel is not None and cancel.is_set():
             break
@@ -308,14 +342,9 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
         counts = dict.fromkeys(keyword_list, 0)
         for page, text in enumerate(pages, start=1):
             text = clean(_normalize(text)).lower()
-            split = {}   # once per page for each way of treating hyphens: the words and where each occurs
+            # For each way of treating hyphens: the page's words and where each occurs.
+            split = {mode: (words, _index(words)) for mode in modes for words in [_words(text, mode)]}
             for keyword, (parts, hyphens_separate) in compared.items():
-                if hyphens_separate not in split:
-                    words = _words(text, hyphens_separate)
-                    index = {}
-                    for at, (_start, _end, bare) in enumerate(words):
-                        index.setdefault(bare, []).append(at)
-                    split[hyphens_separate] = words, index
                 words, index = split[hyphens_separate]
                 starts = _occurrences(words, index, parts)
                 if starts:
@@ -325,20 +354,21 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
                     _append_rows(keyword_csv[keyword], [[rel, page, context] for context in contexts])
 
         _append_rows(overview, [[rel, *counts.values()]])
-        # A path too long for Windows, say, loses this PDF's charts, not the search.
         chart = os.path.join(output_dir, rel)
-        try:
-            os.makedirs(os.path.dirname(chart), exist_ok=True)
-            _save_charts(chart + "-PIE.png", chart + "-BAR.png", counts,
-                         f"Count for PDF {rel}\nPage count (PDF): {len(pages)}", "Word Count")
-        except Exception as e:
-            log.warning("keywords: cannot save the charts of %s: %s", path, e)
-            skipped.append({"input": rel, "message": f"searched, but its charts could not be saved ({e})"})
+        problem = _save_charts(chart + "-PIE.png", chart + "-BAR.png", counts,
+                               f"Count for PDF {rel}\nPage count (PDF): {len(pages)}", "Word Count")
+        if problem:
+            warnings.append({"input": rel, "message": f"searched, but its charts could not be saved ({problem})"})
 
     total_pie, total_bar = os.path.join(output_dir, "totalPie.png"), os.path.join(output_dir, "totalBar.png")
-    _save_charts(total_pie, total_bar, totals, "Total word count for every PDF", "Total Word Count")
+    charts = [total_bar, total_pie]
+    problem = _save_charts(total_pie, total_bar, totals, "Total word count for every PDF", "Total Word Count")
+    if problem:
+        charts = []
+        warnings.append({"input": "totalPie.png, totalBar.png", "message": f"could not be saved ({problem})"})
     hits = sum(totals.values())
     log.info("keywords: %d of %d PDF(s) searched, %d hit(s)", read, len(pdfs), hits)
     if on_progress:
         on_progress(done, len(pdfs), "")
-    return {"files": read, "total": len(pdfs), "hits": hits, "charts": [total_bar, total_pie], "skipped": skipped}
+    return {"files": read, "total": len(pdfs), "hits": hits, "charts": charts, "skipped": skipped,
+            "warnings": warnings, "keyword_notes": keyword_notes}

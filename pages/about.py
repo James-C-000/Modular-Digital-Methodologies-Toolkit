@@ -174,7 +174,9 @@ charts.
    Hyphens separate words unless the keyword contains one, so `mill race`
    also finds `mill-race`. Ligatures in a PDF's text (`ﬁ`) and accents stored
    as separate marks match keywords typed normally. Every match is counted
-   once and gets one row of context in the keyword's CSV.
+   once and gets one row of context in the keyword's CSV; keywords that
+   match the same words (`york` and `york.`) are counted once, and the
+   results say which.
 3. Set the **Context length**: the number of words saved for each match,
    the match included, split evenly before and after it (default: 5, two
    words on each side). With an even number, one more word comes before.
