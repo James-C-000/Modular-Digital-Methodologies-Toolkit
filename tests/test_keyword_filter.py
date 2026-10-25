@@ -78,10 +78,22 @@ def test_pdfs_and_runs_without_hits_still_finish(tmp_path):
     assert summary["files"] == 1 and summary["hits"] == 0
     assert all((out / name).stat().st_size > 0
                for name in ("sample.pdf-PIE.png", "sample.pdf-BAR.png", "totalPie.png", "totalBar.png"))
+
+
+
+def test_pdf_without_text_is_skipped_not_counted(tmp_path):
+    from tests.test_encoding import PDF
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    src.mkdir()
+    out.mkdir()
+    shutil.copy(PDF, src / "sample.pdf")
     shutil.copy(os.path.join(os.path.dirname(PDF), "ocr_sample.pdf"), src / "scan.pdf")  # no text layer
     summary = search_directory(str(src), str(out), "москва\nzanzibar", basic=True, context_words=6)
-    assert summary["files"] == 2 and summary["hits"] == 2
-    assert (out / "scan.pdf-PIE.png").stat().st_size > 0
+    assert summary["files"] == 1 and summary["total"] == 2 and summary["hits"] == 2
+    assert summary["skipped"] == [{"input": "scan.pdf", "message": "no text (scanned PDF? run OCR first)"}]
+    assert not (out / "scan.pdf-PIE.png").exists()
+    with open(out / "Data_Overview.csv", encoding="utf-8-sig", newline="") as f:
+        assert [r[0] for r in list(csv.reader(f))[1:]] == ["sample.pdf"]
 
 
 def test_sub_folders_are_searched_and_their_charts_mirrored(tmp_path):
@@ -125,5 +137,60 @@ def test_problems_with_the_inputs_raise_clear_errors(tmp_path):
         search_directory(str(tmp_path / "missing"), out, "москва")
     with pytest.raises(ValueError, match="Cannot read the keyword file"):
         search_directory(str(tmp_path), out, keyword_file=str(tmp_path / "missing.txt"))
-    with pytest.raises(ValueError, match="Cannot search for the keyword 'c\\(\\+\\+'"):
-        search_directory(str(tmp_path), out, "c(++")
+    with pytest.raises(ValueError, match="No keywords to search for"):
+        search_directory(str(tmp_path), out, " \n\n  \n")
+    (tmp_path / "blank.txt").write_text("\n  \n", encoding="utf-8")
+    with pytest.raises(ValueError, match="No keywords to search for: enter one per line in the keyword file"):
+        search_directory(str(tmp_path), out, keyword_file=str(tmp_path / "blank.txt"))
+
+
+def _text_pdf(path, pages):
+    import matplotlib
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.add_font("DejaVu", fname=os.path.join(matplotlib.get_data_path(), "fonts", "ttf", "DejaVuSans.ttf"))
+    for text in pages:
+        pdf.add_page()
+        pdf.set_font("DejaVu", size=11)
+        pdf.multi_cell(0, 7, text)
+    pdf.output(str(path))
+
+
+def _rows(path):
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return list(csv.reader(f))[1:]
+
+
+def test_every_hit_is_counted_once_with_one_context_row(tmp_path):
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    src.mkdir()
+    out.mkdir()
+    _text_pdf(src / "a.pdf", [
+        "Mill opens the page. The mill-race flooded the mill race; the Mill race again and the mill",
+        "new york new york new york. c++ beats c and a.b is not axb. The the the end.",
+    ])
+    # Spaces around keywords, repeats, blank lines and regex characters are all plain keywords.
+    keywords = "  Mill \n\nmill race\nmill-race\nNew   York\nc++\na.b\nthe the\nmill"
+    files = {"mill": "mill.csv", "mill race": "mill race.csv", "mill-race": "mill-race.csv",
+             "new york": "new york.csv", "c++": "c++.csv", "a.b": "a.b.csv", "the the": "the the.csv"}
+
+    def search(**options):
+        summary = search_directory(str(src), str(out), keywords, context_words=4, **options)
+        with open(out / "Data_Overview.csv", encoding="utf-8-sig", newline="") as f:
+            header, row = list(csv.reader(f))
+        assert header == ["Year", *files]
+        counts = dict(zip(header[1:], map(int, row[1:])))
+        assert summary["hits"] == sum(counts.values())
+        for keyword, name in files.items():
+            assert len(_rows(out / name)) == counts[keyword], keyword
+        return counts
+
+    # Whole words: "mill" at both ends of the page and inside "mill-race"; "mill race" also
+    # as "mill-race"; "race;" and "york." keep their punctuation, so they do not match.
+    assert search() == {"mill": 5, "mill race": 2, "mill-race": 1, "new york": 2, "c++": 1, "a.b": 1, "the the": 1}
+    assert [r[1:] for r in _rows(out / "mill.csv")][:2] == [["1", "mill opens"], ["1", "page. the mill race"]]
+    assert [r[2] for r in _rows(out / "new york.csv")] == ["new york new york", "new york new york new"]
+    # The basic filter removes the punctuation, so "race;" and "york." match; it also deletes
+    # hyphens, joining "mill-race" into "millrace", and "c++" and "a.b" can no longer match.
+    assert search(basic=True) == {"mill": 4, "mill race": 2, "mill-race": 0, "new york": 3, "c++": 0, "a.b": 0,
+                                  "the the": 1}

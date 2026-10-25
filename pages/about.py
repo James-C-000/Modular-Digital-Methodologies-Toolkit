@@ -168,7 +168,11 @@ charts.
 1. Choose an **Input folder** containing PDF files (sub-folders are included)
    and a separate **Output folder** for the results. Charts of PDFs in
    sub-folders go in the matching sub-folders of the output folder.
-2. Enter your **Keywords**, one per line.
+2. Enter your **Keywords**, one per line. They are matched as whole words,
+   ignoring case; a keyword of several words matches them in sequence.
+   Hyphens separate words unless the keyword contains one, so `mill race`
+   also finds `mill-race`. Every match is counted once and gets one row of
+   context in the keyword's CSV.
 3. Set the **Context length**: the total number of words saved around each
    match, half before it and half after (default: 5).
 4. Optionally set filters (see below).
@@ -190,6 +194,8 @@ loaded from text files in the "Or load keywords and filters from files" section.
 - Use short, specific keywords for more relevant results.
 - The output directory will contain a spreadsheet and charts summarizing the
   keyword analysis.
+- PDFs without a text layer (scans) are listed as skipped: run them through
+  **OCR** first.
         """)
 
     # Named Entity Recognition

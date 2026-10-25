@@ -1,7 +1,11 @@
 """Keyword search: count keywords in a folder of PDFs and collect their context.
 
 Every PDF under the input folder, sub-folders included, is searched page by
-page.  The output folder receives:
+page.  Keywords are plain text matched as whole words, ignoring case; a
+keyword of several words matches them in sequence.  Hyphens separate words
+unless the keyword contains one, so "mill race" also finds "mill-race".
+Every occurrence is counted once and gets one row in the keyword's CSV.
+The output folder receives:
 
 - ``<keyword>.csv``: one row per hit with the PDF, the page and the words
   around the keyword;
@@ -45,9 +49,18 @@ def _read_file(path: str, what: str) -> str:
 
 
 def _load_keywords(keywords: str, keyword_file: str) -> list[str]:
-    """The keywords, lower-cased and without repeats: one per line of the file if given, else of *keywords*."""
+    """The keywords: one per line of the file if given, else of *keywords*.
+
+    Lower-cased, with surrounding and repeated spaces removed; blank lines and
+    repeats are left out.
+    """
     text = _read_file(keyword_file, "keyword") if keyword_file else keywords
-    return list(dict.fromkeys(line.lower() for line in text.splitlines()))
+    found = list(dict.fromkeys(" ".join(line.split()).lower() for line in text.splitlines()))
+    found = [k for k in found if k]
+    if not found:
+        raise ValueError("No keywords to search for: enter one per line" +
+                         (" in the keyword file." if keyword_file else "."))
+    return found
 
 
 def _text_filter(basic: bool, filters: str, filter_file: str):
@@ -62,47 +75,35 @@ def _text_filter(basic: bool, filters: str, filter_file: str):
     return lambda text: text.translate(table)
 
 
-def _patterns(keywords: list[str]) -> dict:
-    """Each keyword's search pattern: the keyword between two whitespace characters."""
-    patterns = {}
-    for keyword in keywords:
-        try:
-            patterns[keyword] = re.compile(r"\s" + keyword + r"\s")
-        except re.error as e:
-            raise ValueError(f"Cannot search for the keyword {keyword!r}: {e}") from e
-    return patterns
+def _split_words(text: str, hyphens_separate: bool) -> list[str]:
+    return [w for w in re.split(r"[-\s]+", text) if w] if hyphens_separate else text.split()
 
 
-def _words(text: str, keyword: str) -> list[str]:
-    """*text* split into the words *keyword* is compared with to collect its context.
+def _tokens(words: list[str], keyword: str) -> list[str]:
+    """*words* with each occurrence of a keyword of several words joined into one.
 
-    Hyphens separate words unless the keyword has one.  A keyword of several
-    words (without a hyphen) becomes a single word wherever its words follow
-    each other.  Words that continue on the next page are not joined.
+    Occurrences do not overlap: "the the" occurs once in "the the the".
+    Words that continue on the next page are not joined.
     """
-    if "-" in keyword:
-        return text.split()
-    words = re.split(r"[-\s]", text)
-    if " " not in keyword:
-        return words
     parts = keyword.split()
-    merged = []
-    for start in range(len(words) - len(parts)):
-        if words[start:start + len(parts)] == parts:
-            words[start] = keyword
-            merged.extend(range(start + 1, start + len(parts)))
-    for n in sorted(merged, reverse=True):
-        if n < len(words):
-            del words[n]
-    return words
+    if len(parts) == 1:
+        return words
+    tokens, at = [], 0
+    while at < len(words):
+        if words[at:at + len(parts)] == parts:
+            tokens.append(keyword)
+            at += len(parts)
+        else:
+            tokens.append(words[at])
+            at += 1
+    return tokens
 
 
-def _contexts(text: str, keyword: str, context_words: int) -> list[str]:
-    """The words around each occurrence of *keyword*: half before, the keyword and the rest after."""
+def _contexts(words: list[str], keyword: str, context_words: int) -> list[str]:
+    """The context of each occurrence of *keyword*: half the words before it, the keyword and the rest after."""
     half = round(context_words / 2)
-    words = _words(text, keyword)
-    return [" ".join(w for w in words[max(0, at - half):at + half] if w != " ")
-            for at, word in enumerate(words) if word == keyword]
+    tokens = _tokens(words, keyword)
+    return [" ".join(tokens[max(0, at - half):at + half]) for at, token in enumerate(tokens) if token == keyword]
 
 
 def _autopct(values):
@@ -174,14 +175,16 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
     """Count *keywords* in every PDF under *input_dir*; write CSVs and charts to *output_dir*.
 
     keywords / filters: one per line, or read from *keyword_file* /
-    *filter_file* when given.  *basic* applies basic_filter() instead of the
-    filters.  Each hit's context is *context_words* words around it.
+    *filter_file* when given (ValueError if there is no keyword).  *basic*
+    applies basic_filter() instead of the filters.  Each hit's context is
+    *context_words* words around it.
 
     on_progress(done, total, current_file) is called before each PDF; a set
     *cancel* event stops before the next one.  Returns {"files": PDFs searched,
     "total": PDFs found, "hits": keyword occurrences found, "charts": [total
     chart paths], "skipped": [{"input": path relative to *input_dir*,
-    "message": why}]}.  PDFs are named by their path relative to *input_dir*.
+    "message": why}]}: PDFs that cannot be read or have no text.  PDFs are
+    named by their path relative to *input_dir*.
     """
     if not os.path.isdir(input_dir):
         raise NotADirectoryError(f"{input_dir} is not a valid directory.")
@@ -190,7 +193,6 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
     pdfs = find_files(input_dir, [".pdf"])
     keyword_list = _load_keywords(keywords, keyword_file)
     clean = _text_filter(basic, filters, filter_file)
-    patterns = _patterns(keyword_list)
     context_words = int(context_words)
 
     # Keywords can contain characters that are not allowed in Windows
@@ -217,20 +219,24 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
             log.warning("keywords: cannot read %s: %s", path, e)
             skipped.append({"input": rel, "message": f"could not be read ({e})"})
             continue
+        if not any(text.strip() for text in pages):
+            skipped.append({"input": rel, "message": "no text (scanned PDF? run OCR first)"})
+            continue
         read += 1
 
         counts = dict.fromkeys(keyword_list, 0)
         for page, text in enumerate(pages, start=1):
-            if not text:
-                continue
             text = clean(text).lower()
-            for keyword, pattern in patterns.items():
-                hits = len(pattern.findall(text))
-                if hits:
-                    counts[keyword] += hits
-                    totals[keyword] += hits
-                    _append_rows(keyword_csv[keyword],
-                                 [[rel, page, context] for context in _contexts(text, keyword, context_words)])
+            words = {}   # split once per page for each way of treating hyphens
+            for keyword in keyword_list:
+                hyphens_separate = "-" not in keyword
+                if hyphens_separate not in words:
+                    words[hyphens_separate] = _split_words(text, hyphens_separate)
+                contexts = _contexts(words[hyphens_separate], keyword, context_words)
+                if contexts:
+                    counts[keyword] += len(contexts)
+                    totals[keyword] += len(contexts)
+                    _append_rows(keyword_csv[keyword], [[rel, page, context] for context in contexts])
 
         _append_rows(overview, [[rel, *counts.values()]])
         chart = os.path.join(output_dir, rel)
