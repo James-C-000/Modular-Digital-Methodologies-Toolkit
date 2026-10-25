@@ -193,3 +193,11 @@ async def test_finished_jobs_list_the_files_they_skipped(user, page, kind, resul
     await user.open(page)
     JOBS.start(kind, kind, lambda job: result, output_dir="/tmp")
     await user.should_see("box/blank.txt — no text", retries=30)
+
+
+@pytest.mark.anyio
+async def test_keyword_search_says_when_nothing_was_found(user):
+    await user.open("/keywords")
+    JOBS.start("keywords", "keywords", lambda job: {"files": 1, "total": 1, "hits": 0, "charts": []},
+               output_dir="/tmp")
+    await user.should_see("None of the keywords were found.", retries=30)

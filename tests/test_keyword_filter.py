@@ -1,5 +1,6 @@
 """Keyword search's basic filter keeps letters of every script."""
 import csv
+import os
 import shutil
 
 from Advanced_Keyword_Search.advancedKeywordSearchLogic import basic_filter, core_logic
@@ -64,3 +65,21 @@ def test_keyword_and_filter_files_in_legacy_encodings(tmp_path):
     assert sorted(p.name for p in out.glob("*.csv")) == ["Data_Overview.csv", "köln.csv", "москва.csv"]
     with open(out / "москва.csv", encoding="utf-8-sig", newline="") as f:
         assert len(list(csv.reader(f))) == 3
+
+
+def test_pdfs_and_runs_without_hits_still_finish(tmp_path):
+    # matplotlib cannot draw an empty pie: one PDF without hits used to stop the run.
+    from tests.test_encoding import PDF
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    src.mkdir()
+    out.mkdir()
+    shutil.copy(PDF, src / "sample.pdf")
+    errors = []
+    summary = core_logic("6", 1, str(src), str(out), "", "zanzibar", "", "", on_error=errors.append)
+    assert not errors and summary["files"] == 1 and summary["hits"] == 0
+    assert all((out / name).stat().st_size > 0
+               for name in ("sample.pdf-PIE.png", "sample.pdf-BAR.png", "totalPie.png", "totalBar.png"))
+    shutil.copy(os.path.join(os.path.dirname(PDF), "ocr_sample.pdf"), src / "scan.pdf")  # no text layer
+    summary = core_logic("6", 1, str(src), str(out), "", "москва\nzanzibar", "", "", on_error=errors.append)
+    assert not errors and summary["files"] == 2 and summary["hits"] == 2
+    assert (out / "scan.pdf-PIE.png").stat().st_size > 0

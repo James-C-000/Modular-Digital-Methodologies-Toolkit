@@ -25,7 +25,19 @@ def basic_filter(text: str) -> str:
     return "".join(ch for ch in text if ch.isspace() or unicodedata.category(ch)[0] in "LMN")
 
 
+def _save_nothing_found(path, title):
+    """A chart saying no keyword was found (matplotlib cannot draw an empty pie)."""
+    fig = Figure()
+    ax = fig.subplots()
+    ax.text(0.5, 0.5, "No keywords found", ha="center", va="center")
+    ax.set_title(title)
+    ax.axis('off')
+    fig.savefig(path, bbox_inches='tight')
+
+
 def _save_pie(path, counts, labels, title):
+    if not counts:
+        return _save_nothing_found(path, title)
     fig = Figure()
     ax = fig.subplots()
     ax.pie(counts, labels=labels, autopct=make_autopct(counts), radius=2.0)
@@ -36,6 +48,8 @@ def _save_pie(path, counts, labels, title):
 
 
 def _save_bar(path, counts, labels, title, xlabel):
+    if not counts:
+        return _save_nothing_found(path, title)
     fig = Figure()
     ax = fig.subplots()
     y_pos = list(range(len(labels)))
@@ -64,8 +78,9 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
 
     on_progress(done, total, current_file) is called before each PDF; a set
     *cancel* event stops before the next one (totals cover the PDFs read).
-    Returns {"files": PDFs read, "total": PDFs found, "charts": [total chart paths]},
-    or None after reporting an error through on_error.
+    Returns {"files": PDFs read, "total": PDFs found, "hits": keyword occurrences
+    found, "charts": [total chart paths]}, or None after reporting an error
+    through on_error.
     """
     logic_error = on_error or print
     logic_message = on_message or print
@@ -322,7 +337,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
 
     if on_progress:
         on_progress(filesRead, len(pdfsInDirectory), "")
-    return {"files": filesRead, "total": len(pdfsInDirectory),
+    return {"files": filesRead, "total": len(pdfsInDirectory), "hits": sum(totalDictOfKeywords.values()),
             "charts": [os.path.join(outputDirectory, 'totalBar.png'),
                        os.path.join(outputDirectory, 'totalPie.png')]}
 
