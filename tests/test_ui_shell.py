@@ -84,7 +84,7 @@ async def test_cancel_stops_the_job(user):
 async def test_inputs_are_remembered_across_visits(user, app_data):
     await user.open("/keywords")
     user.find(kind=ui.textarea, content="Keywords, one per line").type("harbour\nmill")
-    user.find(kind=ui.input, content="PDF folder").type(str(app_data))
+    user.find(kind=ui.input, content="Input folder (PDFs, searched recursively)").type(str(app_data))
     await user.open("/about")
     await user.open("/keywords")
     await user.should_see("harbour")
@@ -104,7 +104,7 @@ async def test_missing_folder_is_reported(user, app_data):
 async def test_output_inside_input_is_rejected_for_keywords_only_when_same(user, app_data):
     (app_data / "pdfs").mkdir()
     await user.open("/keywords")
-    user.find(kind=ui.input, content="PDF folder").type(str(app_data / "pdfs"))
+    user.find(kind=ui.input, content="Input folder (PDFs, searched recursively)").type(str(app_data / "pdfs"))
     user.find(kind=ui.input, content="Output folder").type(str(app_data / "pdfs" / "."))
     user.find(kind=ui.textarea, content="Keywords, one per line").type("mill")
     user.find(kind=ui.button, content="Search").click()

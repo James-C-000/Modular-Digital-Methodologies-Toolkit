@@ -165,7 +165,9 @@ and produces a detailed report with context snippets, frequency counts, and
 charts.
 
 **How to use:**
-1. Choose a **PDF folder** and a separate **Output folder** for the results.
+1. Choose an **Input folder** containing PDF files (sub-folders are included)
+   and a separate **Output folder** for the results. Charts of PDFs in
+   sub-folders go in the matching sub-folders of the output folder.
 2. Enter your **Keywords**, one per line.
 3. Set the **Context length**: the total number of words saved around each
    match, half before it and half after (default: 5).

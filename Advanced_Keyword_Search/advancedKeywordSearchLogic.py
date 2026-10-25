@@ -1,13 +1,24 @@
-import re
-import collections
+"""Keyword search: count keywords in a folder of PDFs and collect their context.
+
+Every PDF under the input folder, sub-folders included, is searched page by
+page.  The output folder receives:
+
+- ``<keyword>.csv``: one row per hit with the PDF, the page and the words
+  around the keyword;
+- ``Data_Overview.csv``: how often each keyword occurs in each PDF;
+- ``<pdf>-PIE.png`` and ``<pdf>-BAR.png``: one PDF's counts, in the matching
+  sub-folder of the output folder for a PDF in a sub-folder;
+- ``totalPie.png`` and ``totalBar.png``: the counts over every PDF.
+"""
 import csv
 import logging
 import os
+import re
 import unicodedata
 
 from matplotlib.figure import Figure
 
-from common.paths import unique_safe_filenames
+from common.paths import find_files, unique_safe_filenames
 from common.pdf_text import extract_pages
 from common.text_files import read_text
 
@@ -17,6 +28,7 @@ log = logging.getLogger(__name__)
 # displays correctly, and newline="" so the csv module controls line endings
 # (otherwise Windows gets a blank line after every row).
 CSV_ENCODING = "utf-8-sig"
+OVERVIEW_CSV = "Data_Overview.csv"
 
 
 def basic_filter(text: str) -> str:
@@ -25,14 +37,93 @@ def basic_filter(text: str) -> str:
     return "".join(ch for ch in text if ch.isspace() or unicodedata.category(ch)[0] in "LMN")
 
 
+def _read_file(path: str, what: str) -> str:
+    try:
+        return read_text(path)
+    except (OSError, ValueError) as e:
+        raise ValueError(f"Cannot read the {what} file: {e}") from e
+
+
+def _load_keywords(keywords: str, keyword_file: str) -> list[str]:
+    """The keywords, lower-cased and without repeats: one per line of the file if given, else of *keywords*."""
+    text = _read_file(keyword_file, "keyword") if keyword_file else keywords
+    return list(dict.fromkeys(line.lower() for line in text.splitlines()))
+
+
+def _text_filter(basic: bool, filters: str, filter_file: str):
+    """A function removing the characters the user filters out of a page's text."""
+    if basic:
+        return basic_filter
+    if filter_file:
+        remove = _read_file(filter_file, "filter").replace("\r", "").replace("\n", "")
+    else:
+        remove = filters.replace("\n", "")
+    table = str.maketrans("", "", remove)
+    return lambda text: text.translate(table)
+
+
+def _patterns(keywords: list[str]) -> dict:
+    """Each keyword's search pattern: the keyword between two whitespace characters."""
+    patterns = {}
+    for keyword in keywords:
+        try:
+            patterns[keyword] = re.compile(r"\s" + keyword + r"\s")
+        except re.error as e:
+            raise ValueError(f"Cannot search for the keyword {keyword!r}: {e}") from e
+    return patterns
+
+
+def _words(text: str, keyword: str) -> list[str]:
+    """*text* split into the words *keyword* is compared with to collect its context.
+
+    Hyphens separate words unless the keyword has one.  A keyword of several
+    words (without a hyphen) becomes a single word wherever its words follow
+    each other.  Words that continue on the next page are not joined.
+    """
+    if "-" in keyword:
+        return text.split()
+    words = re.split(r"[-\s]", text)
+    if " " not in keyword:
+        return words
+    parts = keyword.split()
+    merged = []
+    for start in range(len(words) - len(parts)):
+        if words[start:start + len(parts)] == parts:
+            words[start] = keyword
+            merged.extend(range(start + 1, start + len(parts)))
+    for n in sorted(merged, reverse=True):
+        if n < len(words):
+            del words[n]
+    return words
+
+
+def _contexts(text: str, keyword: str, context_words: int) -> list[str]:
+    """The words around each occurrence of *keyword*: half before, the keyword and the rest after."""
+    half = round(context_words / 2)
+    words = _words(text, keyword)
+    return [" ".join(w for w in words[max(0, at - half):at + half] if w != " ")
+            for at, word in enumerate(words) if word == keyword]
+
+
+def _autopct(values):
+    total = sum(values)
+    return lambda pct: f"{pct:.2f}% ({int(round(pct * total / 100.0)):d})"
+
+
+def _chart_data(counts: dict) -> tuple[list, list]:
+    """Counts and labels of the keywords that were found, smallest first (for readability)."""
+    found = sorted(((k, n) for k, n in counts.items() if n), key=lambda kv: (kv[1], kv[0]))
+    return [n for _k, n in found], [k for k, _n in found]
+
+
 def _save_nothing_found(path, title):
     """A chart saying no keyword was found (matplotlib cannot draw an empty pie)."""
     fig = Figure()
     ax = fig.subplots()
     ax.text(0.5, 0.5, "No keywords found", ha="center", va="center")
     ax.set_title(title)
-    ax.axis('off')
-    fig.savefig(path, bbox_inches='tight')
+    ax.axis("off")
+    fig.savefig(path, bbox_inches="tight")
 
 
 def _save_pie(path, counts, labels, title):
@@ -40,11 +131,11 @@ def _save_pie(path, counts, labels, title):
         return _save_nothing_found(path, title)
     fig = Figure()
     ax = fig.subplots()
-    ax.pie(counts, labels=labels, autopct=make_autopct(counts), radius=2.0)
+    ax.pie(counts, labels=labels, autopct=_autopct(counts), radius=2.0)
     ax.set_title(title)
-    ax.axis('equal')
+    ax.axis("equal")
     fig.tight_layout()
-    fig.savefig(path, bbox_inches='tight')
+    fig.savefig(path, bbox_inches="tight")
 
 
 def _save_bar(path, counts, labels, title, xlabel):
@@ -53,292 +144,104 @@ def _save_bar(path, counts, labels, title, xlabel):
     fig = Figure()
     ax = fig.subplots()
     y_pos = list(range(len(labels)))
-    ax.barh(y_pos, counts, align='center', alpha=0.5)
+    ax.barh(y_pos, counts, align="center", alpha=0.5)
     ax.set_xlabel(xlabel)
-    ax.set_ylabel('Words')
+    ax.set_ylabel("Words")
     ax.set_title(title)
     ax.set_yticks(y_pos, labels)
-    fig.savefig(path, bbox_inches='tight')
+    fig.savefig(path, bbox_inches="tight")
 
 
-# Format values for the charts
-def make_autopct(values):
-    def my_autopct(pct):
-        total = sum(values)
-        val = int(round(pct * total / 100.0))
-        return '{p:.2f}% ({v:d})'.format(p=pct, v=val)
-
-    return my_autopct
+def _save_charts(pie: str, bar: str, counts: dict, title: str, xlabel: str):
+    """A pie chart and a bar chart of *counts*."""
+    values, labels = _chart_data(counts)
+    _save_pie(pie, values, labels, title)
+    _save_bar(bar, values, labels, title, xlabel)
 
 
-def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath,
-               manualKeywords, filterFilePath, manualFilters,
-               on_error=None, on_message=None, on_progress=None, cancel=None):
-    """Count keywords in every PDF of PDFDirectory; write CSVs and charts to outputDirectory.
+def _append_rows(path: str, rows):
+    with open(path, "a", encoding=CSV_ENCODING, newline="") as f:
+        csv.writer(f).writerows(rows)
+
+
+def _write_new_csv(path: str, header):
+    with open(path, "w", encoding=CSV_ENCODING, newline="") as f:
+        csv.writer(f).writerow(header)
+
+
+def search_directory(input_dir, output_dir, keywords="", keyword_file="", filters="", filter_file="",
+                     basic=False, context_words=5, on_progress=None, cancel=None):
+    """Count *keywords* in every PDF under *input_dir*; write CSVs and charts to *output_dir*.
+
+    keywords / filters: one per line, or read from *keyword_file* /
+    *filter_file* when given.  *basic* applies basic_filter() instead of the
+    filters.  Each hit's context is *context_words* words around it.
 
     on_progress(done, total, current_file) is called before each PDF; a set
-    *cancel* event stops before the next one (totals cover the PDFs read).
-    Returns {"files": PDFs read, "total": PDFs found, "hits": keyword occurrences
-    found, "charts": [total chart paths]}, or None after reporting an error
-    through on_error.
+    *cancel* event stops before the next one.  Returns {"files": PDFs searched,
+    "total": PDFs found, "hits": keyword occurrences found, "charts": [total
+    chart paths], "skipped": [{"input": path relative to *input_dir*,
+    "message": why}]}.  PDFs are named by their path relative to *input_dir*.
     """
-    logic_error = on_error or print
-    logic_message = on_message or print
-    log.debug("keyword search: context=%s basic_filter=%s pdfs=%s out=%s keyword_file=%s filter_file=%s",
-              contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath, filterFilePath)
-    # Get a list of files in the pdf directory
-    try:
-        pdfsInDirectory = sorted(f for f in os.listdir(PDFDirectory) if f.lower().endswith('.pdf'))
-    except Exception as e:
-        error = "ERROR: " + str(e) + ".\nCheck PDFs and retry."
-        logic_error(error)
-        return
+    if not os.path.isdir(input_dir):
+        raise NotADirectoryError(f"{input_dir} is not a valid directory.")
+    log.debug("keyword search: context=%s basic=%s in=%s out=%s keyword_file=%s filter_file=%s",
+              context_words, basic, input_dir, output_dir, keyword_file, filter_file)
+    pdfs = find_files(input_dir, [".pdf"])
+    keyword_list = _load_keywords(keywords, keyword_file)
+    clean = _text_filter(basic, filters, filter_file)
+    patterns = _patterns(keyword_list)
+    context_words = int(context_words)
 
-    # Get user keywords
-    if keywordFilePath != '':
-        try:
-            userKeywords = read_text(keywordFilePath).splitlines()
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck keywords file and retry."
-            logic_error(error)
-            return
-    else:
-        try:
-            userKeywords = manualKeywords.splitlines()
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck keyword entry and retry."
-            logic_error(error)
-            return
+    # Keywords can contain characters that are not allowed in Windows
+    # filenames, so their CSVs get safe names.
+    keyword_csv = {k: os.path.join(output_dir, name)
+                   for k, name in unique_safe_filenames(keyword_list, ".csv").items()}
+    for keyword, path in keyword_csv.items():
+        _write_new_csv(path, ["Year", "Page", f"Context: {keyword}"])
+    overview = os.path.join(output_dir, OVERVIEW_CSV)
+    _write_new_csv(overview, ["Year", *keyword_list])
 
-    # Create a dictionary of keywords, one for current iteration and one for total
-    dictOfKeywords = {}  # current iteration
-    totalDictOfKeywords = {}  # running total
-
-    # Populate the dictionaries with the keywords we are looking for
-    try:
-        for line in userKeywords:
-            line = line.lower()
-            dictOfKeywords.update({line.rstrip("\n"): 0})
-            totalDictOfKeywords.update({line.rstrip("\n"): 0})
-        # Clear unneeded vars from memory
-        del line
-    except Exception as e:
-        error = "ERROR: " + str(e) + ".\nCheck keywords and retry."
-        logic_error(error)
-        return
-
-    # Create a csv file for each keyword.  Keywords can contain characters
-    # that are not allowed in Windows filenames, so map them to safe names.
-    keywordFiles = {k: os.path.join(outputDirectory, f)
-                    for k, f in unique_safe_filenames(dictOfKeywords, '.csv').items()}
-    keywords = dictOfKeywords.keys()
-    for key in keywords:
-        try:
-            with open(keywordFiles[key], mode='w', encoding=CSV_ENCODING, newline='') as keywordCSV:
-                writer = csv.writer(keywordCSV)
-                writer.writerow(['Year', 'Page', 'Context: ' + str(key)])
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-            logic_error(error)
-            return
-    # Clear unneeded vars from memory
-    del key
-    del keywords
-
-    # Write the csv descriptors (i.e. year and keyword) to the first row
-    try:
-        with open(os.path.join(outputDirectory, "Data_Overview.csv"), mode='w',
-                  encoding=CSV_ENCODING, newline='') as csv_file:
-            fieldNames = list(dictOfKeywords.keys())  # convert the dict descriptors into a list
-            fieldNames.insert(0, "Year")  # manually insert 'year' into 0,0 as it is not in the dict
-            writer = csv.writer(csv_file)
-            writer.writerow(fieldNames)
-    except Exception as e:
-        error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-        logic_error(error)
-        return
-
-    # Open each pdf in a for loop
-    filesRead = 0
-    for index, i in enumerate(pdfsInDirectory):
+    totals = dict.fromkeys(keyword_list, 0)
+    read, skipped = 0, []
+    for i, path in enumerate(pdfs):
         if cancel is not None and cancel.is_set():
             break
+        rel = os.path.relpath(path, input_dir)
         if on_progress:
-            on_progress(index, len(pdfsInDirectory), str(i))
-        filesRead += 1
+            on_progress(i, len(pdfs), os.path.basename(path))
+        log.info("keywords: %s", path)
         try:
-            pageTexts = extract_pages(os.path.join(PDFDirectory, str(i)))
-            numOfPages = len(pageTexts)  # Get number of pages in open pdf
+            pages = extract_pages(path)
         except Exception as e:
-            error = "ERROR: " + str(e) + " in file: " + str(i) + ".\nCheck PDFs and retry."
-            logic_error(error)
-            return
+            log.warning("keywords: cannot read %s: %s", path, e)
+            skipped.append({"input": rel, "message": f"could not be read ({e})"})
+            continue
+        read += 1
 
-        pageNumber = 0  # Set current page
+        counts = dict.fromkeys(keyword_list, 0)
+        for page, text in enumerate(pages, start=1):
+            if not text:
+                continue
+            text = clean(text).lower()
+            for keyword, pattern in patterns.items():
+                hits = len(pattern.findall(text))
+                if hits:
+                    counts[keyword] += hits
+                    totals[keyword] += hits
+                    _append_rows(keyword_csv[keyword],
+                                 [[rel, page, context] for context in _contexts(text, keyword, context_words)])
 
-        # Check for hits page by page
-        for allText in pageTexts:
-            # Running page number
-            pageNumber += 1
-            if not allText:
-                continue  # Skip empty pages
+        _append_rows(overview, [[rel, *counts.values()]])
+        chart = os.path.join(output_dir, rel)
+        os.makedirs(os.path.dirname(chart), exist_ok=True)
+        _save_charts(chart + "-PIE.png", chart + "-BAR.png", counts,
+                     f"Count for PDF {rel}\nPage count (PDF): {len(pages)}", "Word Count")
 
-            # Strip user filters from text
-            if basicFilterState == 1:
-                allText = basic_filter(allText)
-            elif filterFilePath != '':
-                # use the filter file to get filters
-                try:
-                    userFilters = read_text(filterFilePath).replace('\r', '').replace('\n', '')
-                    translationTable = allText.maketrans('', '', userFilters)
-                    allText = allText.translate(translationTable)
-                except Exception as e:
-                    error = "ERROR: " + str(e) + ".\nCheck filter file and retry."
-                    logic_error(error)
-                    return
-            else:
-                # use user's manual filters
-                userFilters = manualFilters.replace('\n', '')
-                translationTable = allText.maketrans('', '', userFilters)
-                allText = allText.translate(translationTable)
-            # Format the text into all lowercase
-            allText = allText.lower()
-            # Iterate through each keyword
-            for k in dictOfKeywords:
-                try:
-                    foundWords = re.findall(r'\s' + k + r'\s', allText)  # Find the keyword in the text
-                except Exception as e:
-                    error = ("ERROR: " + str(e) + " in file: " + str(i) +
-                             " with keyword: " + str(k) + " on page: " + str(pageNumber))
-                    logic_error(error)
-                    return
-                numOfFoundWords = len(foundWords)
-                if numOfFoundWords != 0:  # Only update the dict if there are keywords
-                    valueOfKey = int(dictOfKeywords.get(k)) + numOfFoundWords
-                    dictOfKeywords.update({k: valueOfKey})
-                    valueOfLongTermKey = int(totalDictOfKeywords.get(k)) + numOfFoundWords
-                    totalDictOfKeywords.update({k: valueOfLongTermKey})
-                    # Write reference data for each keyword while we are checking for it
-                    try:
-                        with open(keywordFiles[k], mode='a', encoding=CSV_ENCODING, newline='') as keywordCSV:
-                            writer = csv.writer(keywordCSV)
-                            if k.find(' ') != -1 and k.find('-') == -1:  # Check if keyword has spaces AND no hyphens
-                                # Split on any whitespace (not just spaces) so a keyword at a line end still gets context.
-                                # NOTE: Words that continue onto the next page will not be picked up here
-                                allTextFiltered = re.split(r'[-\s]', allText)  # Split allText based on space/hyphen
-                                matchedK = k.split()  # Split our keyword based on whitespace
-                                # Only iterate within allTextFiltered bounds
-                                # Check if allTextFiltered contains our k sequence.
-                                # If it does, change the first found index to the whole
-                                # word (k), then remove the every other index to remove word repetition
-                                flaggedIndicies = []
-                                for l in range(len(allTextFiltered) - len(matchedK)):
-                                    match = True
-                                    startIndex = l
-                                    for m in range(len(matchedK)):
-                                        if l + m < len(allTextFiltered) and allTextFiltered[l + m] == matchedK[m]:
-                                            pass  # Match continues
-                                        else:
-                                            match = False
-                                            break
-                                    if match == True:
-                                        allTextFiltered[startIndex] = str(k)
-                                        for m in range(1, len(matchedK)):
-                                            # Flag every index after allTextFiltered entry point within k bounds
-                                            if startIndex + m < len(allTextFiltered):
-                                                flaggedIndicies.append(startIndex + m)
-                                for n in sorted(flaggedIndicies, reverse=True):
-                                    if n < len(allTextFiltered):
-                                        del allTextFiltered[n]
-                            elif k.find('-') == -1:  # If the keyword is unhyphenated, remove hyphens from text
-                                allTextFiltered = re.split(r'[-\s]', allText)
-                            else:  # If not, just split it into a list based on whitespace
-                                allTextFiltered = allText.split()
-                            # Concat keywords with spaces
-                            # Iterate over each word in the list
-                            for l in range(len(allTextFiltered)):
-                                if allTextFiltered[l] == k:  # Check if current iteration matches keyword
-                                    halfContextLength = round(int(contextLength) / 2)
-                                    preKeyword = allTextFiltered[
-                                                 max(0, l - halfContextLength):l]  # Extract words before
-                                    postKeyword = allTextFiltered[l:min(l + halfContextLength,
-                                                                        len(allTextFiltered))]  # Extract hit + post words
-                                    snippet = preKeyword + postKeyword  # concat the context
-                                    # Remove whitespace indices from context list
-                                    if ' ' in snippet:
-                                        while ' ' in snippet:
-                                            snippet.remove(' ')
-                                    formattedContext = ' '.join(
-                                        [str(word) for word in snippet])  # Cast from list -> str
-                                    writer.writerow([i, pageNumber, formattedContext])
-                    except Exception as e:
-                        error = "ERROR: " + str(e) + ".\nCheck keyword csv file and retry."
-                        logic_error(error)
-                        return
-
-        # Write the findings to the CSV file
-        try:
-            with open(os.path.join(outputDirectory, 'Data_Overview.csv'), mode='a',
-                      encoding=CSV_ENCODING, newline='') as csv_file:
-                writer = csv.writer(csv_file)
-                csvList = list(dictOfKeywords.values())
-                csvList.insert(0, str(i))
-                writer.writerow(csvList)
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-            logic_error(error)
-            return
-
-        # Sort from smallest to largest for readability
-        sortedDictOfKeywords = collections.OrderedDict(
-            sorted(dictOfKeywords.items(), key=lambda kv: (kv[1], kv[0])))
-        count = sortedDictOfKeywords.values()
-        label = sortedDictOfKeywords.keys()
-
-        # If there are no hits for a keyword, remove it from the chart
-        for j in list(sortedDictOfKeywords):
-            if sortedDictOfKeywords.get(j) == 0:
-                sortedDictOfKeywords.pop(j)
-
-        # Chart formatting
-        title = "Count for PDF " + str(i) + "\nPage count (PDF): " + str(numOfPages)
-        try:
-            _save_pie(os.path.join(outputDirectory, str(i) + '-PIE.png'), list(count), list(label), title)
-            _save_bar(os.path.join(outputDirectory, str(i) + '-BAR.png'), list(count), list(label), title,
-                      'Word Count')
-        except Exception as e:
-            error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-            logic_error(error)
-            return
-
-        dictOfKeywords = dictOfKeywords.fromkeys(dictOfKeywords, 0)
-
-    # If there are no hits for a keyword, remove it from the final chart
-    for i in list(totalDictOfKeywords):
-        if totalDictOfKeywords.get(i) == 0:
-            totalDictOfKeywords.pop(i)
-
-    # Sort from smallest to largest for readability
-    sortedTotalDictOfKeywords = collections.OrderedDict(
-        sorted(totalDictOfKeywords.items(), key=lambda kv: (kv[1], kv[0])))
-    totalCount = sortedTotalDictOfKeywords.values()
-    totalLabels = sortedTotalDictOfKeywords.keys()
-
-    # Chart formatting
-    try:
-        _save_pie(os.path.join(outputDirectory, 'totalPie.png'), list(totalCount), list(totalLabels),
-                  'Total word count for every PDF')
-        _save_bar(os.path.join(outputDirectory, 'totalBar.png'), list(totalCount), list(totalLabels),
-                  'Total word count for every PDF', 'Total Word Count')
-    except Exception as e:
-        error = "ERROR: " + str(e) + ".\nCheck output directory and retry."
-        logic_error(error)
-        return
-
+    total_pie, total_bar = os.path.join(output_dir, "totalPie.png"), os.path.join(output_dir, "totalBar.png")
+    _save_charts(total_pie, total_bar, totals, "Total word count for every PDF", "Total Word Count")
+    hits = sum(totals.values())
+    log.info("keywords: %d of %d PDF(s) searched, %d hit(s)", read, len(pdfs), hits)
     if on_progress:
-        on_progress(filesRead, len(pdfsInDirectory), "")
-    return {"files": filesRead, "total": len(pdfsInDirectory), "hits": sum(totalDictOfKeywords.values()),
-            "charts": [os.path.join(outputDirectory, 'totalBar.png'),
-                       os.path.join(outputDirectory, 'totalPie.png')]}
-
-    logic_message("Processing Complete")
+        on_progress(read + len(skipped), len(pdfs), "")
+    return {"files": read, "total": len(pdfs), "hits": hits, "charts": [total_bar, total_pie], "skipped": skipped}
