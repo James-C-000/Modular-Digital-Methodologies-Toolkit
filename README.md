@@ -137,7 +137,7 @@ Automated cross-platform builds are handled by GitHub Actions (`.github/workflow
 
 MDMT is licensed under the MIT License — see [`LICENSE`](LICENSE).
 
-The distributed apps contain no GPL code: FFmpeg is built LGPL-only for releases, and Ghostscript (AGPL) is never bundled.
+FFmpeg is built LGPL-only for releases, and Ghostscript (AGPL) is never bundled. The apps do contain some GPL-licensed libraries that their components depend on: the GCC runtime libraries (libgomp, libgfortran and, on Linux, libstdc++), which are GPL-3 with the GCC Runtime Library Exception, permitting their use with software under any license; and, in the Linux build, whichever libraries Tesseract links against on the build system, which may include libjbig (GPL-2.0-or-later). Each build's `licenses` folder lists every bundled library with its own license.
 
 This project uses several open-source libraries, each with their own licenses. The full text of each bundled library's license is in [`THIRD_PARTY_LICENSES`](THIRD_PARTY_LICENSES). See the Help/About page within the application for a per-library attribution table with license types and project links.
 
