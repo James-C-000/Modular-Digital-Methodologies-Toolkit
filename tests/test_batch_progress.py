@@ -104,7 +104,7 @@ def test_co_words(tmp_path):
 
 def test_relationships(tmp_path, monkeypatch):
     from NLP import relationship_extraction as rel
-    monkeypatch.setattr(rel, "extract_entities_and_relationships", lambda text, types: [])
+    monkeypatch.setattr(rel, "extract_entities_and_relationships", lambda text, types, *rest: [])
     _files(tmp_path, ["a.txt", "b.txt", "c.txt"])
     rec = Recorder(stop_after=2)
     result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 0, ["PER"],
@@ -113,15 +113,16 @@ def test_relationships(tmp_path, monkeypatch):
 
 
 def test_relationships_skip_text_extracted_by_an_earlier_run(tmp_path, monkeypatch):
+    from common.text_files import document_text
     from NLP import relationship_extraction as rel
-    seen = []
-    monkeypatch.setattr(rel, "extract_text_from_file", lambda p: seen.append(os.path.basename(p)) or "text")
-    monkeypatch.setattr(rel, "extract_entities_and_relationships", lambda text, types: [])
+    monkeypatch.setattr(rel, "extract_entities_and_relationships", lambda text, types, *rest: [])
     shutil.copy(os.path.join(FIXTURES, "text_sample.pdf"), tmp_path / "letter.pdf")
-    (tmp_path / "letter_text.txt").write_text("written by the previous run", encoding="utf-8")
+    # Saved by an earlier run on Windows (CRLF line ends): the PDF's own text.
+    (tmp_path / "letter_text.txt").write_bytes(
+        document_text(str(tmp_path / "letter.pdf")).replace("\n", "\r\n").encode("utf-8"))
     (tmp_path / "notes_text.txt").write_text("a user's own file, no matching PDF", encoding="utf-8")
-    rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 0, ["PER"])
-    assert sorted(seen) == ["letter.pdf", "notes_text.txt"]
+    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 0, ["PER"])
+    assert result["processed_files"] == ["letter.pdf", "notes_text.txt"]
 
 
 def test_ner_writes_one_highlight_per_document_next_to_it(tmp_path, monkeypatch):

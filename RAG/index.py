@@ -11,11 +11,15 @@ starts a separate index.  Files:
 ``update()`` re-chunks and re-embeds only documents that are new or whose
 content changed (a size/mtime change triggers a hash check, so a merely
 touched file is not re-embedded), and drops removed documents.  Files are
-replaced atomically, the manifest last.  BM25 is rebuilt in memory on load.
+replaced atomically, the manifest last; on load, an index whose manifest does
+not describe its chunks (a crash between the two) is rebuilt.  BM25 is rebuilt
+in memory on load.  Searches see the index before or after an update, never
+half of each.
 """
 import hashlib
 import json
 import os
+import threading
 from dataclasses import asdict, dataclass, field
 
 import numpy as np
@@ -55,6 +59,20 @@ def _sha256(path: str) -> str:
     return h.hexdigest()
 
 
+def _manifest_matches(manifest: dict, chunks: list) -> bool:
+    """True if every file's chunk range in *manifest* holds that file's chunks, and nothing else is there."""
+    covered = 0
+    try:
+        for rel, info in manifest.get("files", {}).items():
+            start, count = info["chunks"]
+            if start < 0 or start + count > len(chunks) or any(c.file != rel for c in chunks[start:start + count]):
+                return False
+            covered += count
+    except (KeyError, TypeError, ValueError):
+        return False
+    return covered == len(chunks)
+
+
 def _atomic_write(path: str, write):
     tmp = path + ".tmp"
     with open(tmp, "wb") as f:
@@ -76,7 +94,8 @@ class CorpusIndex:
         self.manifest = {"files": {}}
         self.chunks: list[Chunk] = []
         self.embeddings = np.zeros((0, embedder.dim), np.float32)
-        self._bm25 = None
+        self._bm25 = None             # (the chunks it was built from, BM25)
+        self._lock = threading.Lock()  # chunks and embeddings change together
         self._load()
 
     # ------------------------------------------------------------ storage ----
@@ -90,7 +109,8 @@ class CorpusIndex:
             embeddings = np.load(os.path.join(self.path, "embeddings.npy"))
         except (OSError, ValueError, TypeError):
             return  # no index yet, or unreadable: rebuilt by update()
-        if manifest.get("format") == FORMAT_VERSION and len(chunks) == embeddings.shape[0]:
+        if (manifest.get("format") == FORMAT_VERSION and len(chunks) == embeddings.shape[0]
+                and _manifest_matches(manifest, chunks)):
             self.manifest, self.chunks, self.embeddings = manifest, chunks, embeddings.astype(np.float32)
             self._bm25 = None
 
@@ -109,23 +129,37 @@ class CorpusIndex:
     # ------------------------------------------------------------- update ----
 
     def update(self, on_progress=None) -> UpdateReport:
-        """Bring the index in line with the folder; returns what changed."""
+        """Bring the index in line with the folder; returns what changed.
+
+        Raises FileNotFoundError if the folder is gone (an unplugged drive, say)
+        rather than emptying the index.
+        """
+        if not os.path.isdir(self.corpus_dir):
+            raise FileNotFoundError(f"The documents folder was not found: {self.corpus_dir}")
         report = UpdateReport()
         old_files = self.manifest.get("files", {})
+        unreadable = []
         current = {os.path.relpath(p, self.corpus_dir).replace(os.sep, "/"): p
-                   for p in find_documents(self.corpus_dir)}
+                   for p in find_documents(self.corpus_dir, unreadable)}
+        report.failed += [(os.path.relpath(folder, self.corpus_dir).replace(os.sep, "/"),
+                           f"folder could not be opened ({why})") for folder, why in unreadable]
 
         keep, todo = {}, []
         for rel, path in current.items():
-            st = os.stat(path)
             old = old_files.get(rel)
-            if old and old["size"] == st.st_size and old["mtime_ns"] == st.st_mtime_ns:
-                keep[rel] = old
-            elif old and old["size"] == st.st_size and old["sha256"] == _sha256(path):
-                keep[rel] = dict(old, mtime_ns=st.st_mtime_ns)  # touched, same content
-            else:
-                todo.append(rel)
-                (report.changed if old else report.added).append(rel)
+            try:
+                st = os.stat(path)
+                if old and old["size"] == st.st_size and old["mtime_ns"] == st.st_mtime_ns:
+                    keep[rel] = old
+                    continue
+                if old and old["size"] == st.st_size and old["sha256"] == _sha256(path):
+                    keep[rel] = dict(old, mtime_ns=st.st_mtime_ns)  # touched, same content
+                    continue
+            except OSError as e:   # a broken link, or no permission to read it
+                report.failed.append((rel, e.strerror or str(e)))
+                continue
+            todo.append(rel)
+            (report.changed if old else report.added).append(rel)
         report.removed = sorted(set(old_files) - set(current))
         report.unchanged = len(keep)
 
@@ -147,6 +181,10 @@ class CorpusIndex:
             if on_progress:
                 on_progress(done, total, rel)
             try:
+                # Taken before reading: a file saved again while it is indexed then
+                # no longer matches, so the next update reads it again.
+                st = os.stat(path)
+                info = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": _sha256(path)}
                 chunks = chunk_document(rel, load_document(path), self.embedder.count_tokens,
                                         self.max_tokens, self.overlap_tokens)
                 vectors = self.embedder.embed_passages([c.text for c in chunks])
@@ -158,9 +196,7 @@ class CorpusIndex:
                     report.changed.remove(rel)
                 done += 1
                 continue
-            st = os.stat(path)
-            new_files[rel] = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": _sha256(path),
-                              "chunks": [0, len(chunks)]}
+            new_files[rel] = dict(info, chunks=[0, len(chunks)])
             fresh_chunks.append(chunks)
             fresh_vectors.append(vectors)
             done += 1
@@ -178,29 +214,41 @@ class CorpusIndex:
             offset += len(chunks)
             new_chunks.extend(chunks)
         vectors = [kept_vectors] + [v for v in fresh_vectors if len(v)]
-        self.embeddings = np.concatenate(vectors).astype(np.float32) if vectors else kept_vectors
-        self.chunks = new_chunks
-        self.manifest = {"files": files}
-        self._bm25 = None
-        report.chunks = len(self.chunks)
+        embeddings = np.concatenate(vectors).astype(np.float32) if vectors else kept_vectors
+        with self._lock:
+            self.embeddings, self.chunks = embeddings, new_chunks
+            self.manifest = {"files": files}
+            self._bm25 = None
+        report.chunks = len(new_chunks)
         self._save()
         return report
 
     # ------------------------------------------------------------- search ----
 
+    def _bm25_for(self, chunks: list) -> BM25:
+        """BM25 over *chunks*, built once per version of the index."""
+        cached = self._bm25
+        if cached is not None and cached[0] is chunks:
+            return cached[1]
+        bm25 = BM25([bm25_tokens(c.text) for c in chunks])
+        with self._lock:
+            if self.chunks is chunks:   # not if an update replaced them meanwhile
+                self._bm25 = (chunks, bm25)
+        return bm25
+
     @property
     def bm25(self) -> BM25:
-        if self._bm25 is None:
-            self._bm25 = BM25([bm25_tokens(c.text) for c in self.chunks])
-        return self._bm25
+        return self._bm25_for(self.chunks)
 
     def search(self, query: str, k: int = 25, k_dense: int = 50, k_bm25: int = 50) -> list[Hit]:
         """Hybrid retrieval: dense + BM25 fused with Reciprocal Rank Fusion."""
-        if not self.chunks:
+        with self._lock:
+            chunks, embeddings = self.chunks, self.embeddings
+        if not chunks:
             return []
-        dense = [i for i, _s in dense_top(self.embeddings, self.embedder.embed_query(query), k_dense)]
-        lexical = [i for i, _s in self.bm25.top(bm25_tokens(query), k_bm25)]
+        dense = [i for i, _s in dense_top(embeddings, self.embedder.embed_query(query), k_dense)]
+        lexical = [i for i, _s in self._bm25_for(chunks).top(bm25_tokens(query), k_bm25)]
         dense_rank = {doc: r for r, doc in enumerate(dense, 1)}
         bm25_rank = {doc: r for r, doc in enumerate(lexical, 1)}
-        return [Hit(self.chunks[i], i, score, dense_rank.get(i), bm25_rank.get(i))
+        return [Hit(chunks[i], i, score, dense_rank.get(i), bm25_rank.get(i))
                 for i, score in rrf_fuse([dense, lexical])[:k]]

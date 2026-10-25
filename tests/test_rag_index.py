@@ -118,3 +118,66 @@ def test_progress_callback(corpus, tmp_path):
     seen = []
     _index(corpus, tmp_path, FakeEmbedder()).update(on_progress=lambda done, total, name: seen.append((done, total)))
     assert seen[-1][0] == seen[-1][1] == 2
+
+
+def test_a_file_saved_while_it_is_indexed_is_read_again_next_time(corpus, tmp_path):
+    """The size/date/hash recorded after embedding matched the new file, so its old chunks stayed forever."""
+    class Rewriting(FakeEmbedder):
+        def embed_passages(self, texts, batch_size=16):
+            if any("Lisbon" in t for t in texts):
+                time.sleep(0.01)
+                (corpus / "ships.txt").write_text("Jones commanded the brig in 1790.", encoding="utf-8")
+            return super().embed_passages(texts, batch_size)
+
+    index = _index(corpus, tmp_path, Rewriting())
+    index.update()
+    report = CorpusIndex(str(corpus), FakeEmbedder(), index_root=str(tmp_path / "index")).update()
+    assert report.changed == ["ships.txt"]
+
+
+def test_a_missing_folder_does_not_empty_the_index(corpus, tmp_path):
+    index = _index(corpus, tmp_path, FakeEmbedder())
+    index.update()
+    moved = tmp_path / "unplugged"
+    corpus.rename(moved)
+    with pytest.raises(FileNotFoundError):
+        index.update()
+    assert len(index.chunks) > 0
+    moved.rename(corpus)
+    assert CorpusIndex(str(corpus), FakeEmbedder(), index_root=str(tmp_path / "index")).update().unchanged == 2
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink") or os.name == "nt", reason="needs symlinks")
+def test_a_broken_link_is_reported_not_fatal(corpus, tmp_path):
+    os.symlink(str(tmp_path / "nowhere.txt"), str(corpus / "gone.txt"))
+    report = _index(corpus, tmp_path, FakeEmbedder()).update()
+    assert [rel for rel, _why in report.failed] == ["gone.txt"]
+    assert sorted(report.added) == ["mill.txt", "ships.txt"]
+
+
+def test_an_index_whose_manifest_does_not_match_its_chunks_is_rebuilt(corpus, tmp_path):
+    import json
+    index = _index(corpus, tmp_path, FakeEmbedder())
+    index.update()
+    manifest_path = os.path.join(index.path, "manifest.json")
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest = json.load(f)
+    a, b = sorted(manifest["files"])
+    manifest["files"][a]["chunks"], manifest["files"][b]["chunks"] = (manifest["files"][b]["chunks"],
+                                                                      manifest["files"][a]["chunks"])
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+    reloaded = CorpusIndex(str(corpus), FakeEmbedder(), index_root=str(tmp_path / "index"))
+    assert reloaded.chunks == []   # a crash between writing the chunks and the manifest: start again
+
+
+def test_a_search_never_mixes_two_versions_of_the_index(corpus, tmp_path):
+    index = _index(corpus, tmp_path, FakeEmbedder())
+    index.update()
+    old_chunks = index.chunks
+    (corpus / "extra.txt").write_text("A third document about the harbour master.", encoding="utf-8")
+    index.update()
+    index._bm25_for(old_chunks)   # a search that began before the update finishes building BM25 late
+    assert index._bm25 is None or index._bm25[0] is index.chunks   # ... and does not install it
+    hits = index.search("harbour master")
+    assert hits and all(hit.chunk is index.chunks[hit.index] for hit in hits)

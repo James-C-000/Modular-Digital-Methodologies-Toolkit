@@ -4,9 +4,12 @@ The running instance records its pid, port and access token in a lock file in
 the app data folder (readable only by the user).  A second launch finds it,
 checks that the process is alive and the server answers, and opens a new
 browser tab on the existing instance instead of starting another server.
+The file is created exclusively (claim_lock), so of two launches at once
+only one starts a server; the other waits for it to answer.
 """
 import json
 import os
+import time
 import urllib.request
 
 LOCK_NAME = "instance.json"
@@ -17,9 +20,25 @@ def lock_path() -> str:
     return os.path.join(get_app_data_dir(), LOCK_NAME)
 
 
-def write_lock(path: str, port: int, token: str):
+def claim_lock(path: str, port: int, token: str) -> bool:
+    """Create the lock file for this process; False if it exists (another instance, or a stale file)."""
+    try:
+        write_lock(path, port, token, exclusive=True)
+    except FileExistsError:
+        return False
+    return True
+
+
+def remove_lock(path: str):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def write_lock(path: str, port: int, token: str, exclusive: bool = False):
     data = json.dumps({"pid": os.getpid(), "port": port, "token": token})
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    flags = os.O_WRONLY | os.O_CREAT | (os.O_EXCL if exclusive else os.O_TRUNC)
     fd = os.open(path, flags, 0o600)
     try:
         os.write(fd, data.encode("utf-8"))
@@ -57,11 +76,28 @@ def _alive(pid: int) -> bool:
         return False
 
 
-def running_instance_url(path: str) -> str | None:
-    """Launch URL (with token) of a live MDMT instance, or None."""
-    data = read_lock(path)
-    if data is None or not _alive(int(data["pid"])):
-        return None
+def running_instance_url(path: str, wait: float = 0.0) -> str | None:
+    """Launch URL (with token) of a live MDMT instance, or None.
+
+    With *wait*, keeps trying that long while the instance is alive but its
+    server does not answer yet (it is starting), or its lock file is still
+    being written.
+    """
+    deadline = time.monotonic() + wait
+    while True:
+        data = read_lock(path)
+        if data is not None and _alive(int(data["pid"])):
+            url = _answering_url(data)
+            if url:
+                return url
+        elif data is not None or not os.path.exists(path):
+            return None   # the process is gone, or there is no lock
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.25)
+
+
+def _answering_url(data: dict) -> str | None:
     base = f"http://127.0.0.1:{int(data['port'])}"
     request = urllib.request.Request(f"{base}/_mdmt/ping", headers={"X-MDMT-Token": data["token"]})
     try:

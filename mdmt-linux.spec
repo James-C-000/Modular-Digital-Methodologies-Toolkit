@@ -5,7 +5,9 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
-from spec_common import LGPL_SOURCE_MODULES, UPX, common_binaries, common_datas, common_hiddenimports  # noqa: E402
+from spec_common import (  # noqa: E402
+    LGPL_SOURCE_MODULES, UPX, common_binaries, common_datas, common_hiddenimports, licenses_datas,
+)
 
 datas = common_datas()
 binaries = common_binaries()
@@ -19,6 +21,7 @@ tesseract_bin = shutil.which('tesseract')
 if not tesseract_bin:
     raise SystemExit('tesseract not found: install tesseract-ocr before building')
 binaries.append((tesseract_bin, 'tesseract_bin'))
+tesseract_libs = []
 ldd_out = subprocess.check_output(['ldd', tesseract_bin], text=True)
 for line in ldd_out.splitlines():
     parts = line.strip().split()
@@ -26,6 +29,7 @@ for line in ldd_out.splitlines():
     if '=>' in line and len(parts) >= 3 and parts[2].startswith('/'):
         if not os.path.basename(parts[2]).startswith(_SYSTEM_LIB_PREFIXES):
             binaries.append((parts[2], 'tesseract_bin'))
+            tesseract_libs.append(parts[2])
 
 # Seed tessdata (eng, osd, configs/); copied into the user's managed tessdata
 # dir on first run by OCR.tessdata.
@@ -45,6 +49,9 @@ for td in tessdata_candidates:
         break
 else:
     raise SystemExit('eng.traineddata not found: install tesseract-ocr-eng before building')
+
+# Every bundled component's own licence files, Tesseract's libraries included.
+datas += licenses_datas(workpath, 'linux', [tesseract_bin] + tesseract_libs)
 
 # Hidden imports — PyInstaller can't discover these via static analysis.
 # (No pywebview on Linux: MDMT runs in the user's browser.)

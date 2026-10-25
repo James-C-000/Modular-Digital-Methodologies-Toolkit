@@ -16,7 +16,6 @@ The Host check also applies in native-window mode (no token there: pywebview
 loads the page itself).
 """
 import secrets
-from http.cookies import SimpleCookie
 from urllib.parse import parse_qsl, urlencode
 
 COOKIE = "mdmt_token"
@@ -31,6 +30,11 @@ _FORBIDDEN_PAGE = (
 
 def new_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def _matches(value: str, token: str) -> bool:
+    """Constant-time comparison that also takes non-ASCII input (compare_digest refuses such strings)."""
+    return secrets.compare_digest(value.encode("utf-8", "surrogateescape"), token.encode("utf-8"))
 
 
 class LocalAccessMiddleware:
@@ -54,7 +58,7 @@ class LocalAccessMiddleware:
             return await self.app(scope, receive, send)
 
         query = dict(parse_qsl(scope.get("query_string", b"").decode("latin-1")))
-        if scope["type"] == "http" and secrets.compare_digest(query.get("token", ""), self.token):
+        if scope["type"] == "http" and _matches(query.get("token", ""), self.token):
             rest = urlencode({k: v for k, v in query.items() if k != "token"})
             location = scope.get("path", "/") + (f"?{rest}" if rest else "")
             cookie = f"{COOKIE}={self.token}; Path=/; HttpOnly; SameSite=Strict"
@@ -67,14 +71,15 @@ class LocalAccessMiddleware:
         return await self._reject(scope, receive, send, 403, _FORBIDDEN_PAGE)
 
     def _cookie_ok(self, headers) -> bool:
+        # Browsers send every cookie for 127.0.0.1, whatever the port, so other local web apps'
+        # cookies come too.  http.cookies stops at the first one it cannot parse (a JSON value, a
+        # space), which would hide ours; the header is split by hand instead.
         raw = headers.get(b"cookie", b"").decode("latin-1")
-        if not raw:
-            return False
-        try:
-            morsel = SimpleCookie(raw).get(COOKIE)
-        except Exception:
-            return False
-        return morsel is not None and secrets.compare_digest(morsel.value, self.token)
+        for pair in raw.split(";"):
+            name, sep, value = pair.strip().partition("=")
+            if sep and name == COOKIE and _matches(value.strip().strip('"'), self.token):
+                return True
+        return False
 
     @staticmethod
     async def _reject(scope, receive, send, status: int, body: bytes):

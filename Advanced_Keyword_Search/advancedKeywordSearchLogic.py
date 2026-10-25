@@ -31,15 +31,17 @@ import unicodedata
 
 from matplotlib.figure import Figure
 
-from common.paths import find_files, unique_safe_filenames
+from common.paths import find_files, unique_safe_filenames, unreadable_entries
 from common.pdf_text import extract_pages
+from common.spreadsheet import safe_row
 from common.text_files import read_text
 
 log = logging.getLogger(__name__)
 
 # CSVs are opened by researchers in Excel: UTF-8 with a BOM so non-Latin text
 # displays correctly, and newline="" so the csv module controls line endings
-# (otherwise Windows gets a blank line after every row).
+# (otherwise Windows gets a blank line after every row).  Cells that Excel would
+# take for a formula ("-5 degrees") get a leading apostrophe (common.spreadsheet).
 CSV_ENCODING = "utf-8-sig"
 OVERVIEW_CSV = "Data_Overview.csv"
 
@@ -312,12 +314,12 @@ def _save_charts(pie: str, bar: str, counts: dict, title: str, xlabel: str) -> d
 
 def _append_rows(path: str, rows):
     with open(path, "a", encoding=CSV_ENCODING, newline="") as f:
-        csv.writer(f).writerows(rows)
+        csv.writer(f).writerows(safe_row(row) for row in rows)
 
 
 def _write_new_csv(path: str, header):
     with open(path, "w", encoding=CSV_ENCODING, newline="") as f:
-        csv.writer(f).writerow(header)
+        csv.writer(f).writerow(safe_row(header))
 
 
 def search_directory(input_dir, output_dir, keywords="", keyword_file="", filters="", filter_file="",
@@ -343,7 +345,8 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
         raise NotADirectoryError(f"{input_dir} is not a valid directory.")
     log.debug("keyword search: context=%s basic=%s in=%s out=%s keyword_file=%s filter_file=%s",
               context_words, basic, input_dir, output_dir, keyword_file, filter_file)
-    pdfs = find_files(input_dir, [".pdf"])
+    unreadable = []
+    pdfs = find_files(input_dir, [".pdf"], unreadable=unreadable)
     clean = _text_filter(basic, filters, filter_file)
     compared, keyword_notes = _keywords(_load_keywords(keywords, keyword_file), clean)
     keyword_list = list(compared)
@@ -360,7 +363,7 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
 
     totals = dict.fromkeys(keyword_list, 0)
     modes = {hyphens_separate for _parts, hyphens_separate in compared.values()}
-    read, done, skipped, warnings = 0, 0, [], []
+    read, done, skipped, warnings = 0, 0, unreadable_entries(unreadable, input_dir), []
     for i, path in enumerate(pdfs):
         if cancel is not None and cancel.is_set():
             break

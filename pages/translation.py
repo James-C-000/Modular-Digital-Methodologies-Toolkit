@@ -68,7 +68,8 @@ def translation_page():
             usable = sorted(s for s in {a for a, _b in installed} | {b for _a, b in installed}
                             if s != tgt and ot.route(s, tgt, available=installed))
             if usable:
-                hint("Auto-detect will choose among: " + ", ".join(names.get(s, s) for s in usable))
+                hint("Auto-detect translates files written in: " + ", ".join(names.get(s, s) for s in usable)
+                     + ". Files in other languages are listed with the results, untranslated.")
             else:
                 ui.label(f"No installed model translates into {names[tgt]}. Choose the source language to"
                          " download the right model.").classes("text-caption text-warning")

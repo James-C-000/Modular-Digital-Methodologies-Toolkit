@@ -8,11 +8,13 @@ from urllib.parse import quote
 import networkx as nx
 from matplotlib.figure import Figure
 
-from common.paths import find_files, output_stems
-from common.text_files import document_text
+from common.paths import find_files, output_stems, unreadable_entries
+from common.text_files import SavedTextCheck, document_text
 from NLP.text_utils import stopwords, words
 
 log = logging.getLogger(__name__)
+
+MAX_EDGE_WIDTH = 8
 
 
 def preprocess_text(text, stop_set=frozenset()):
@@ -51,8 +53,12 @@ def visualize_network(cooccurrence, output_path, top_n=30):
     fig = Figure(figsize=(10, 8))
     ax = fig.subplots()
     pos = nx.spring_layout(G, k=0.5, seed=42)
+    # Line widths from 1 to MAX_EDGE_WIDTH points by frequency: raw counts (thousands
+    # in a long document) drew lines so wide that they covered the graph.
     weights = [G[u][v]["weight"] for u, v in G.edges()]
-    nx.draw(G, pos, ax=ax, with_labels=True, node_color="skyblue", edge_color="gray", width=weights, font_size=10)
+    heaviest = max(weights, default=1)
+    widths = [1 + (MAX_EDGE_WIDTH - 1) * w / heaviest for w in weights]
+    nx.draw(G, pos, ax=ax, with_labels=True, node_color="skyblue", edge_color="gray", width=widths, font_size=10)
     ax.set_title("Co-word Network")
     fig.savefig(output_path)
 
@@ -124,9 +130,11 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
 <h1>Co-word Analysis Summary</h1>
 """
     # Process each PDF or TXT file in the directory.
-    paths = find_files(directory, [".pdf", ".txt"])
+    unreadable = []
+    paths = find_files(directory, [".pdf", ".txt"], unreadable=unreadable)
     stems = output_stems(paths)
     read, images, skipped = 0, [], []
+    saved_texts = SavedTextCheck()
     for i, file_path in enumerate(paths):
         if cancel is not None and cancel.is_set():
             break
@@ -140,6 +148,11 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
         except Exception as e:
             log.warning("co-words: cannot read %s: %s", file_path, e)
             skipped.append({"input": rel, "message": f"could not be read ({e})"})
+            continue
+        saved_texts.remember(file_path, text)
+        if saved_texts.is_saved_text(file_path, text):
+            skipped.append({"input": rel, "message": "the text Relationships saved from the PDF next to it,"
+                                                     " which was analysed itself"})
             continue
         if not text.strip():
             skipped.append({"input": rel, "message": "no text (scanned PDF? run OCR first)"})
@@ -175,6 +188,7 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
     log.info("co-words: %d of %d file(s) analysed, summary %s", read, len(paths), summary_file)
     if on_progress:
         on_progress(read + len(skipped), len(paths), "")
+    skipped = unreadable_entries(unreadable, directory) + skipped
     return {"files": read, "total": len(paths), "summary": summary_file, "images": images, "skipped": skipped}
 
 

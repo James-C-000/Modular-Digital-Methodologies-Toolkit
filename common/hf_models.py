@@ -80,8 +80,15 @@ def download_snapshot(repo_id: str, revision: str, files, dest: str, on_progress
     every file has arrived, so an interrupted download never looks installed.
     ``on_progress(done_bytes, total_bytes_or_None)`` is called while it runs
     (bytes on disk, including huggingface_hub's .incomplete files).
-    Returns *dest*.  Already-complete downloads are left alone.
+    Returns *dest*.  Already-complete downloads are left alone; a second
+    download of *dest* waits for the first, then finds it complete.
     """
+    from common.downloads import destination_lock
+    with destination_lock(dest):
+        return _download_snapshot(repo_id, revision, files, dest, on_progress)
+
+
+def _download_snapshot(repo_id, revision, files, dest, on_progress):
     from huggingface_hub import snapshot_download
 
     if is_snapshot_complete(dest, files):
@@ -123,12 +130,14 @@ def download_snapshot(repo_id: str, revision: str, files, dest: str, on_progress
 
 def download_file(repo_id: str, revision: str, filename: str, target: str, on_progress=None) -> str:
     """Download one file of *repo_id* at *revision* to the path *target* (atomically)."""
-    if os.path.isfile(target):
-        return target
-    staging = target + ".download"
-    try:
-        download_snapshot(repo_id, revision, [filename], staging, on_progress)
-        os.replace(os.path.join(staging, filename), target)
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
+    from common.downloads import destination_lock
+    with destination_lock(target):
+        if os.path.isfile(target):
+            return target
+        staging = target + ".download"
+        try:
+            download_snapshot(repo_id, revision, [filename], staging, on_progress)
+            os.replace(os.path.join(staging, filename), target)
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
     return target

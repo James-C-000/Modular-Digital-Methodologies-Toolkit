@@ -77,3 +77,22 @@ def test_output_folder_may_be_created_later(tmp_path):
     (tmp_path / "in").mkdir()
     assert output_folder_problem(str(tmp_path / "in"), str(tmp_path / "new" / "deep"), True) is None
     assert os.path.exists(tmp_path / "in")
+
+
+@pytest.mark.skipif(sys.platform == "win32" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+                    reason="needs POSIX permissions (and not root)")
+def test_folders_that_cannot_be_opened_are_reported(tmp_path):
+    from common.paths import unreadable_entries
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    (locked / "a.pdf").write_bytes(b"")
+    (tmp_path / "b.pdf").write_bytes(b"")
+    locked.chmod(0)
+    try:
+        unreadable = []
+        found = find_files(str(tmp_path), [".pdf"], unreadable=unreadable)
+        assert [os.path.basename(p) for p in found] == ["b.pdf"]
+        entries = unreadable_entries(unreadable, str(tmp_path))
+        assert [e["input"] for e in entries] == ["locked"] and "could not be opened" in entries[0]["message"]
+    finally:
+        locked.chmod(0o755)

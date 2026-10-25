@@ -45,6 +45,7 @@ def relationships_page():
         elif result.get("message"):
             ui.label(result["message"]).classes("text-body2 text-warning")
         skipped_files(result.get("skipped", []))
+        skipped_files(result.get("warnings", []), icon="warning_amber", color="text-warning")
 
     def start():
         problem = folder_problem(src.value)

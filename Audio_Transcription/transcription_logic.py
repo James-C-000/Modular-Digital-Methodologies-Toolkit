@@ -10,7 +10,7 @@ Models are downloaded on demand (Downloads page) into
 """
 import os
 
-from common.paths import find_files
+from common.paths import find_files, unreadable_entries
 
 AUDIO_FORMATS = (".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm", ".flac", ".ogg")
 
@@ -133,12 +133,13 @@ def transcribe_directory(
         from config import get_whisper_models_dir
         download_root = get_whisper_models_dir()
 
-    audio_files = find_files(directory, AUDIO_FORMATS)
+    unreadable = []
+    audio_files = find_files(directory, AUDIO_FORMATS, unreadable=unreadable)
+    results = [dict(entry, status="error") for entry in unreadable_entries(unreadable, directory)]
     if not audio_files:
-        return []
+        return results
 
     model = load_model(model_name, download_root)
-    results = []
 
     for i, audio_path in enumerate(audio_files):
         if cancel is not None and cancel.is_set():
@@ -150,6 +151,6 @@ def transcribe_directory(
         results.append(result)
 
     if on_progress:
-        on_progress(len(results), len(audio_files), "")
+        on_progress(len(results) - len(unreadable), len(audio_files), "")
 
     return results

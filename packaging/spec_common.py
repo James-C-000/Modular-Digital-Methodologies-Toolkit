@@ -57,6 +57,12 @@ def common_datas() -> list:
     return datas
 
 
+def licenses_datas(workpath: str, platform: str, libraries=(), tesseract_dir: str | None = None) -> list:
+    """The bundle's licences/ folder: every bundled component's own licence files (packaging/collect_licenses.py)."""
+    from collect_licenses import collect_licenses
+    return [(collect_licenses(os.path.join(workpath, "licenses"), platform, libraries, tesseract_dir), "licenses")]
+
+
 def common_binaries() -> list:
     binaries = []
     # llama-cpp-python loads libllama/ggml with ctypes, invisible to analysis.

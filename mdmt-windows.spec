@@ -6,7 +6,9 @@ import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
-from spec_common import LGPL_SOURCE_MODULES, UPX, VERSION, common_binaries, common_datas, common_hiddenimports  # noqa: E402
+from spec_common import (  # noqa: E402
+    LGPL_SOURCE_MODULES, UPX, VERSION, common_binaries, common_datas, common_hiddenimports, licenses_datas,
+)
 
 datas = common_datas()
 binaries = common_binaries()
@@ -30,12 +32,17 @@ for dll in os.listdir(tess_dir):
 # Seed tessdata (eng, osd, configs/); copied into the user's managed tessdata
 # dir on first run by OCR.tessdata.
 tessdata = os.path.join(tess_dir, 'tessdata')
+if not os.path.isfile(os.path.join(tessdata, 'eng.traineddata')):
+    raise SystemExit(f'eng.traineddata not found in {tessdata}: reinstall Tesseract-OCR before building')
 for name in ('eng.traineddata', 'osd.traineddata', 'pdf.ttf'):
     if os.path.isfile(os.path.join(tessdata, name)):
         datas.append((os.path.join(tessdata, name), 'tessdata'))
 for sub in ('configs', 'tessconfigs'):
     if os.path.isdir(os.path.join(tessdata, sub)):
         datas.append((os.path.join(tessdata, sub), os.path.join('tessdata', sub)))
+
+# Every bundled component's own licence files, and those in the Tesseract-OCR installation.
+datas += licenses_datas(workpath, 'windows', tesseract_dir=tess_dir)
 
 # --- Windows version resource (Explorer > Properties > Details) ---
 _v = tuple(int(p) for p in VERSION.split('.')) + (0,) * (4 - len(VERSION.split('.')))

@@ -38,6 +38,24 @@ def format_context(chunks) -> str:
 
 
 _CITATION = re.compile(r"\[(\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+(?:\s*[-–]\s*\d+)?)*)\]")
+# Bracketed numbers above this are not document numbers but text: "the letter dated [1854]".
+MAX_CITATION = 99
+
+
+def _cited_numbers(match) -> list[int] | None:
+    """The numbers a [n] / [n, m] / [n-m] mark cites, or None if it is not a citation."""
+    numbers = []
+    for part in re.split(r"\s*,\s*", match.group(1)):
+        if re.search(r"[-–]", part):
+            a, b = (int(x) for x in re.split(r"\s*[-–]\s*", part))
+            numbers.extend(range(a, b + 1) if b >= a and b - a < 50 else [a, b])
+        else:
+            numbers.append(int(part))
+    return None if any(n > MAX_CITATION for n in numbers) else numbers
+
+
+def _citations(text: str):
+    return (m for m in _CITATION.finditer(text) if _cited_numbers(m) is not None)
 
 
 def parse_citations(answer: str, n_sources: int):
@@ -48,13 +66,9 @@ def parse_citations(answer: str, n_sources: int):
     cited, dropped = [], []
 
     def replace(match):
-        numbers = []
-        for part in re.split(r"\s*,\s*", match.group(1)):
-            if re.search(r"[-–]", part):
-                a, b = (int(x) for x in re.split(r"\s*[-–]\s*", part))
-                numbers.extend(range(a, b + 1) if b >= a and b - a < 50 else [a, b])
-            else:
-                numbers.append(int(part))
+        numbers = _cited_numbers(match)
+        if numbers is None:
+            return match.group(0)
         keep = []
         for n in numbers:
             if 1 <= n <= n_sources:
@@ -114,7 +128,7 @@ def is_not_found(answer: str) -> bool:
     if _STOCK_REPLY.match(text) or NOT_FOUND.lower() in text.lower():
         return True
     first = _FIRST_SENTENCE.match(text).group(0)
-    return bool(_REFUSAL.search(first)) and not _CITATION.search(first)
+    return bool(_REFUSAL.search(first)) and next(_citations(first), None) is None
 
 
 def not_found_remainder(answer: str) -> str:
@@ -125,7 +139,8 @@ def not_found_remainder(answer: str) -> str:
 
 
 def _strip_citations(text: str) -> str:
-    return re.sub(r"\s*" + _CITATION.pattern, "", text)
+    return re.sub(r"\s*" + _CITATION.pattern,
+                  lambda m: m.group(0) if _cited_numbers(m) is None else "", text)
 
 
 def history_window(history, budget_tokens: int, count_tokens) -> list:

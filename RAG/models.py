@@ -164,7 +164,9 @@ class Reranker:
         path = download(RERANKER, root)
         self.tokenizer = Tokenizer.from_file(os.path.join(path, "tokenizer.json"))
         self.tokenizer.no_padding()
-        self.tokenizer.enable_truncation(RERANKER["max_tokens"], strategy="only_second")
+        # longest_first shortens the passage as usual, but also a question longer
+        # than the limit ("only_second" raises a truncation error for those).
+        self.tokenizer.enable_truncation(RERANKER["max_tokens"], strategy="longest_first")
         self.session = _session(os.path.join(path, "onnx", "model_uint8.onnx"), threads)
         self.inputs = {i.name for i in self.session.get_inputs()}
         self._lock = threading.Lock()

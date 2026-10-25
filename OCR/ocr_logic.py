@@ -11,11 +11,15 @@ import sys
 
 import ocrmypdf
 import ocrmypdf.subprocess
+import ocrmypdf.subprocess._run
 
-from common.paths import find_files
+from common.paths import find_files, unreadable_entries
 from common.proc import hide_console_windows_in
 
-hide_console_windows_in(ocrmypdf.subprocess)
+# ocrmypdf.subprocess is a package; the module that calls subprocess.run/Popen
+# (bound at import) is its _run.  tests/test_proc.py checks it still is.
+OCRMYPDF_SUBPROCESS_MODULE = ocrmypdf.subprocess._run
+hide_console_windows_in(OCRMYPDF_SUBPROCESS_MODULE)
 
 GHOSTSCRIPT_DOWNLOAD_URL = "https://ghostscript.com/releases/gsdnld.html"
 
@@ -195,6 +199,13 @@ def build_ocr_params(
     return params
 
 
+_EXIT_MESSAGES = {
+    ocrmypdf.ExitCode.pdfa_conversion_failed:
+        "the output was saved, but it is not valid PDF/A (Ghostscript could not convert it)",
+    ocrmypdf.ExitCode.invalid_output_pdf: "the output was saved, but it failed the PDF validity check",
+}
+
+
 def run_ocr_file(
     pdf_path: str,
     out_path: str,
@@ -217,10 +228,14 @@ def run_ocr_file(
         sidecar_path=sidecar_path,
     )
     try:
-        ocrmypdf.ocr(pdf_path, out_path, progress_bar=False, **params)
-        return {"status": "success", "input": pdf_path}
+        code = ocrmypdf.ocr(pdf_path, out_path, progress_bar=False, **params)
     except Exception as e:
         return {"status": "error", "input": pdf_path, "message": str(e)}
+    # Some problems are reported by the return value, not an exception, with the output written anyway.
+    if code not in (None, ocrmypdf.ExitCode.ok):
+        message = _EXIT_MESSAGES.get(code, f"ocrmypdf reported a problem ({getattr(code, 'name', code)})")
+        return {"status": "error", "input": pdf_path, "message": message}
+    return {"status": "success", "input": pdf_path}
 
 
 def run_ocr_batch(
@@ -247,7 +262,8 @@ def run_ocr_batch(
     if not language_codes:
         return []
 
-    pdfs = find_files(input_dir, [".pdf"])
+    unreadable = []
+    pdfs = find_files(input_dir, [".pdf"], unreadable=unreadable)
     results = []
 
     for i, pdf_path in enumerate(pdfs):
@@ -277,4 +293,4 @@ def run_ocr_batch(
 
     if on_progress:
         on_progress(len(results), len(pdfs), "")
-    return results
+    return [dict(entry, status="error") for entry in unreadable_entries(unreadable, input_dir)] + results

@@ -52,3 +52,12 @@ def test_chunk_metadata_points_back_into_the_source():
     assert [(c.file, c.page, c.ordinal) for c in chunks] == [("ledger.pdf", 1, 0), ("ledger.pdf", 2, 1)]
     for c, section in zip(chunks, sections):
         assert section.text[c.start:c.end] == c.text
+
+
+def test_a_run_without_spaces_longer_than_a_chunk_is_cut_to_fit():
+    """Unpunctuated Chinese or a long URL was one chunk of up to 2,400 tokens (the embedder reads 512)."""
+    chars = lambda text: len(text)   # one token per character  # noqa: E731
+    text = "前" * 130 + " https://example.org/" + "x" * 70
+    spans = split_text(text, chars, max_tokens=50, overlap_tokens=0)
+    assert all(chars(text[s:e]) <= 50 for s, e in spans)
+    assert "".join(text[s:e] for s, e in spans).replace(" ", "") == text.replace(" ", "")

@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04   # as build.yml
             name: linux
           - os: macos-15
             name: macos
@@ -66,7 +66,7 @@ jobs:
   # The tests that need llama-cpp-python (such as the check that every argument
   # MDMT passes exists in it), against the release build of the pinned version.
   llama-cpp:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Same flags and cache key as build.yml's Linux job, so they share the wheel.
       CMAKE_ARGS: -DGGML_NATIVE=OFF
@@ -88,7 +88,7 @@ jobs:
 
   # A small retrieval regression on the eval corpus (no reranker, no LLM).
   retrieval-eval:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       XDG_DATA_HOME: ${{ github.workspace }}/.appdata
     steps:

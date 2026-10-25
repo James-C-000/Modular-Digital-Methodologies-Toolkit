@@ -32,6 +32,8 @@ log = logging.getLogger("mdmt.rag")
 # questions, so 32768 is the recommended context length for thinking mode.
 ANSWER_TOKENS = 768
 THINKING_CONTEXT = 32768
+REWRITE_TOKENS = 96      # the standalone query for a follow-up question
+MIN_ANSWER_TOKENS = 128  # an answer needs at least this much room
 
 
 @dataclass
@@ -92,7 +94,11 @@ def cut_off_advice(answer, settings) -> str | None:
 
 
 class Busy(RuntimeError):
-    """Raised when a question is asked while another is still being answered."""
+    """Raised when a question is asked, or the index updated, while RAGBot is busy with either."""
+
+
+class PromptTooLong(ValueError):
+    """The question alone does not fit the context window."""
 
 
 class RagSession:
@@ -127,7 +133,13 @@ class RagSession:
     # ------------------------------------------------------------ indexing ----
 
     def build_index(self, on_progress=None):
-        return self.index.update(on_progress)
+        """Update the index (Busy while a question is being answered: it searches the index)."""
+        if not self._busy.acquire(blocking=False):
+            raise Busy("RAGBot is answering a question; update the index when it has finished")
+        try:
+            return self.index.update(on_progress)
+        finally:
+            self._busy.release()
 
     @property
     def reranker(self):
@@ -148,23 +160,43 @@ class RagSession:
 
     def standalone_query(self, question: str) -> str:
         """Rewrite a follow-up into a self-contained query (first questions pass through)."""
-        if not self.history:
-            return question
-        prompt = self.llm.render(rewrite_messages(question, self.history), enable_thinking=False)
-        rewritten = split_thinking(self.llm.complete(prompt, max_tokens=96))[1].strip().strip('"').strip()
+        history = self.history[-3:]   # rewrite_messages' default max_turns
+        while history:
+            prompt = self.llm.render(rewrite_messages(question, history), enable_thinking=False)
+            if self.llm.count_tokens(prompt) + REWRITE_TOKENS <= self.settings.n_ctx:
+                break
+            history = history[1:]   # the oldest turn first
+        else:
+            return question         # no room for the conversation: search for the question as asked
+        rewritten = split_thinking(self.llm.complete(prompt, max_tokens=REWRITE_TOKENS))[1].strip().strip('"').strip()
         return rewritten.splitlines()[0] if rewritten else question
 
     # ------------------------------------------------------------- answers ----
 
     def _fit_context(self, question, context, history):
-        """Drop the lowest-ranked chunks until the prompt fits the context window."""
-        budget = self.settings.n_ctx - self.settings.max_answer_tokens - 64
+        """Drop the lowest-ranked chunks, then the oldest turns, until the prompt fits the context window.
+
+        Room for the reply is kept, at most half the window (a short window
+        could not otherwise hold even the question).  Raises PromptTooLong if
+        the question with one chunk does not fit the window at all.
+        """
+        reserve = min(self.settings.max_answer_tokens, self.settings.n_ctx // 2)
+        budget = self.settings.n_ctx - reserve - 64
         while True:
             prompt = self.llm.render(answer_messages(question, [c.chunk for c in context], history),
                                      self.settings.enable_thinking)
-            if self.llm.count_tokens(prompt) <= budget or len(context) <= 1:
+            used = self.llm.count_tokens(prompt)
+            if used <= budget:
                 return prompt, context
-            context = context[:-1]
+            if len(context) > 1:
+                context = context[:-1]
+            elif history:
+                history = history[1:]
+            elif used + MIN_ANSWER_TOKENS <= self.settings.n_ctx:
+                return prompt, context
+            else:
+                raise PromptTooLong(f"The question is too long for the Context length ({self.settings.n_ctx}"
+                                    " tokens): shorten it, or increase the Context length with Change setup.")
 
     def ask(self, question: str, on_token=None, stop_event=None) -> Answer:
         """Answer *question*.  on_token(kind, text) streams 'thinking'/'answer' text."""

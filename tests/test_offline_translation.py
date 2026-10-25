@@ -120,3 +120,60 @@ def test_bpe_package_and_pivot(models_root):
     # fr -> pl has no direct package: pivots through English.
     assert ot.route("fr", "pl", models_root) == [("fr", "en"), ("en", "pl")]
     assert "kot" in ot.translate_text("Le chat dort sur la chaise.", "fr", "pl", models_root).lower()
+
+
+def test_a_pdf_and_a_text_file_of_one_name_get_separate_translations(tmp_path, monkeypatch):
+    import shutil
+    monkeypatch.setattr(ot, "installed_pairs", lambda models_root=None: {("en", "fr")})
+    monkeypatch.setattr(ot, "get_translator", lambda a, b, models_root=None: _Upper())
+    fixture = os.path.join(os.path.dirname(__file__), "fixtures", "text_sample.pdf")
+    shutil.copy(fixture, tmp_path / "report.pdf")
+    (tmp_path / "report.txt").write_text("The clerk wrote the register.", encoding="utf-8")
+    results = ot.translate_directory(str(tmp_path), "en", "fr")
+    outputs = sorted(os.path.basename(r["output"]) for r in results if r["status"] == "success")
+    assert outputs == ["report_2_translated.txt", "report_translated.txt"]
+    assert (tmp_path / "report_2_translated.txt").read_text(encoding="utf-8") == "THE CLERK WROTE THE REGISTER."
+
+
+def test_auto_detect_reports_a_language_without_a_model_instead_of_guessing(tmp_path, monkeypatch):
+    """Only fr->en installed: a German file came out unchanged as "English", or through the French model."""
+    monkeypatch.setattr(ot, "installed_pairs", lambda models_root=None: {("fr", "en")})
+    monkeypatch.setattr(ot, "get_translator", lambda a, b, models_root=None: _Upper())
+    (tmp_path / "brief.txt").write_text(
+        "Der Notar hat den Kaufvertrag in Anwesenheit der beiden unterzeichnenden Zeugen aufgesetzt.",
+        encoding="utf-8")
+    (tmp_path / "letter.txt").write_text(
+        "The notary drew up the deed of sale in the presence of the two undersigned witnesses.", encoding="utf-8")
+    results = {os.path.basename(r["input"]): r for r in ot.translate_directory(str(tmp_path), None, "en")}
+    assert results["brief.txt"]["status"] == "error" and results["brief.txt"]["language"] == "de"
+    assert "no installed model for de -> en" in results["brief.txt"]["message"]
+    assert results["letter.txt"]["status"] == "skipped"     # already English
+    assert not (tmp_path / "brief_translated.txt").exists() and not (tmp_path / "letter_translated.txt").exists()
+
+
+def test_sentencepiece_decoding_keeps_underscores():
+    class Pieces:
+        def decode_pieces(self, tokens):
+            return "".join(tokens).replace("▁", " ").strip()
+
+    sp = ot._SentencePiece.__new__(ot._SentencePiece)
+    sp.sp = Pieces()
+    assert sp.decode(["▁see", "▁file_name", "▁and", "▁j_smith@uni.edu"]) == "see file_name and j_smith@uni.edu"
+
+
+class _Tagged:
+    def __init__(self, tag):
+        self.tag = tag
+
+    def translate(self, sentences):
+        return [f"[{self.tag}]{s}" for s in sentences]
+
+    def count_tokens(self, text):
+        return len(text.split())
+
+
+def test_translating_through_english_keeps_headings_and_blank_lines(monkeypatch):
+    monkeypatch.setattr(ot, "installed_pairs", lambda models_root=None: {("fr", "en"), ("en", "de")})
+    monkeypatch.setattr(ot, "get_translator", lambda a, b, models_root=None: _Tagged(a + b))
+    out = ot.translate_text("Chapitre 1\n\nIl pleuvait.\nLa nuit tombait.", "fr", "de")
+    assert out == "[ende][fren]Chapitre 1\n\n[ende][fren]Il pleuvait.\n[ende][fren]La nuit tombait."

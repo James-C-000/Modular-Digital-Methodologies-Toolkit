@@ -38,6 +38,7 @@ log = logging.getLogger("mdmt")
 
 
 TITLE = f"MDMT {__version__} - Modular Digital Methodologies Toolkit"
+LOCK_WAIT_SECONDS = 20   # how long a second launch waits for a starting instance to answer
 
 
 @app.get('/_mdmt/ping')
@@ -201,18 +202,26 @@ def _run_in_browser():
     from common.local_server import LocalAccessMiddleware, new_token
 
     lock = instance.lock_path()
-    existing = instance.running_instance_url(lock)
-    if existing:
-        log.info("MDMT is already running; opening a new tab")
-        print("MDMT is already running; opening it in your browser.", flush=True)
-        if os.environ.get("MDMT_NO_BROWSER") != "1":
-            open_external(existing)
-        return
-
     port, token = _free_port(), new_token()
+    # Claimed exclusively: of two launches at once (a double click), one starts the
+    # server and the other opens a tab on it once it answers.
+    claimed = instance.claim_lock(lock, port=port, token=token)
+    if not claimed:
+        existing = instance.running_instance_url(lock, wait=LOCK_WAIT_SECONDS)
+        if existing:
+            log.info("MDMT is already running; opening a new tab")
+            print("MDMT is already running; opening it in your browser.", flush=True)
+            if os.environ.get("MDMT_NO_BROWSER") != "1":
+                open_external(existing)
+            return
+        instance.remove_lock(lock)   # left by an MDMT that crashed
+        claimed = instance.claim_lock(lock, port=port, token=token)
+    if not claimed:
+        log.warning("another MDMT claimed the instance lock at the same time; starting anyway")
+        instance.write_lock(lock, port=port, token=token)
+
     url = f"http://127.0.0.1:{port}/?token={token}"
     app.add_middleware(LocalAccessMiddleware, port=port, token=token)
-    instance.write_lock(lock, port=port, token=token)
     atexit.register(instance.clear_lock, lock)
     app.on_shutdown(lambda: instance.clear_lock(lock))
     if os.environ.get("MDMT_NO_BROWSER") != "1":

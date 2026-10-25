@@ -34,7 +34,7 @@ MDMT is a desktop application that provides researchers, scholars, and digital h
 | macOS 15 (Sequoia) or newer, Apple Silicon | `mdmt-macos-arm64.zip` | No Intel Mac build. |
 | Linux, x86-64 | `mdmt-linux-x86_64.tar.gz` | Built on Ubuntu 24.04; needs a similarly recent distribution. |
 
-Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. It runs twice: on the build, and on the release archive after unpacking it as a user would. You can run `mdmt --self-test` yourself; it also reports a download that was extracted without its symbolic links. Note that it downloads about 460 MB of models into MDMT's data folder if they are not there yet (Whisper tiny, the NER model, French→English translation and the retrieval model), the same ones the tools would download on first use. The native window and file dialogs are not covered by CI.
+Every release build is exercised in CI on its own operating system by `mdmt --self-test`, which runs OCR, transcription, llama.cpp and plotting through the frozen app and checks that the bundled binaries and libraries, not the build machine's, are the ones in use. It runs on the release archive after unpacking it as a user would (on Windows twice: also launched detached, like a double-click in Explorer); the build itself is checked by `packaging/check_bundle_libs.py`, which confirms that no bundled binary needs a library from outside the bundle. You can run `mdmt --self-test` yourself; it also reports a download that was extracted without its symbolic links. Note that it downloads about 460 MB of models into MDMT's data folder if they are not there yet (Whisper tiny, the NER model, French→English translation and the retrieval model), the same ones the tools would download on first use. The native window and file dialogs are not covered by CI.
 
 ## Installing the prebuilt apps
 
@@ -44,7 +44,7 @@ The apps are **not code-signed or notarized**: MDMT is an independent open-sourc
 
 - **macOS:** open `MDMT.app` once and dismiss the warning, then go to **System Settings → Privacy & Security**, click **Open Anyway** next to the message about MDMT (available for about an hour after the attempt), and confirm with your password. Since macOS 15, Control-click → Open no longer bypasses this check. Alternatively, run `xattr -dr com.apple.quarantine /path/to/MDMT.app` in Terminal.
 - **Windows:** if SmartScreen shows "Windows protected your PC", click **More info → Run anyway**, then run `mdmt.exe` from the extracted folder.
-- **Linux:** run `mdmt/mdmt` from the extracted folder. MDMT opens in your web browser (on Linux it runs as a private local web app rather than in its own window); use **Quit MDMT** in the sidebar to stop it. To add it to your application menu, run `./install-desktop-entry.sh` in the extracted folder.
+- **Linux:** run `mdmt/mdmt` from the extracted folder. MDMT opens in your web browser (on Linux it runs as a private local web app rather than in its own window); use **Quit MDMT** in the sidebar to stop it. To add it to your application menu, run `mdmt/install-desktop-entry.sh` (`mdmt/install-desktop-entry.sh --uninstall` removes it).
 
 On Linux, MDMT only listens on 127.0.0.1 and every launch uses a fresh random access token, so other users and web pages cannot reach it. Starting MDMT again while it is running opens a new tab on the existing instance.
 
@@ -131,7 +131,7 @@ Release builds also replace PyPI's PyAV wheel, whose bundled FFmpeg is linked wi
 
 All specs use `--onedir` mode to avoid multi-GB extraction on each launch. `packaging/check_bundle_libs.py` verifies that no bundled binary depends on a library outside the bundle.
 
-Automated cross-platform builds are handled by GitHub Actions (`.github/workflows/build.yml`): each platform is built, checked and self-tested on its own runner, and a release is created when a version tag is pushed. `tests.yml` runs the test suite on all three platforms for every push.
+Automated cross-platform builds are handled by GitHub Actions (`.github/workflows/build.yml`): each platform is built, checked and self-tested on its own runner, and a release is created when a version tag is pushed. Pushes to master that change the build's dependencies also run it, which refreshes the caches that release builds reuse. `tests.yml` runs the test suite on all three platforms for every push.
 
 ## License
 

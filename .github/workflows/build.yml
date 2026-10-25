@@ -1,11 +1,23 @@
 name: Build & Release
 
-# Full frozen builds: on version tags (which also publish a release) and on
-# demand. Every build runs the frozen app's --self-test on its own OS.
+# Full frozen builds: on version tags (which also publish a release), on
+# demand, and on pushes to master that change what the build caches (FFmpeg,
+# PyAV, llama-cpp-python).  A tag's run can restore only caches saved on the
+# default branch (or by that tag), so without the master runs every release
+# rebuilt them all.  Path filters do not apply to tags.  Every build runs the
+# frozen app's --self-test on its own OS.
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - master
+    paths:
+      - packaging/build_ffmpeg_lgpl.sh
+      - requirements/lock-*.txt
+      - requirements/llama.txt
+      - .github/workflows/build.yml
+      - .github/actions/**
   workflow_dispatch:
 
 permissions:
@@ -17,7 +29,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Pinned: the build machine's glibc is the oldest the Linux app runs on
+          # (README: "Built on Ubuntu 24.04"), so it must not move with ubuntu-latest.
+          - os: ubuntu-24.04
             name: linux
             artifact: mdmt-linux-x86_64
           - os: macos-15
@@ -56,7 +70,10 @@ jobs:
 
       - name: Install system dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install tesseract --no-progress -y
+        run: |
+          choco install tesseract --no-progress -y
+          # On PATH, so the end-to-end OCR tests run instead of skipping (as in tests.yml).
+          echo "C:\\Program Files\\Tesseract-OCR" >> "$GITHUB_PATH"
 
       - name: Report UPX availability (specs set upx=False)
         run: |
@@ -73,7 +90,8 @@ jobs:
       # native (LGPL) code only, and PyAV compiled against it.
 
       # FFmpeg depends only on its build script and PyAV only on that and the
-      # pinned av version, so other dependency changes reuse both caches.
+      # pinned av version, so other dependency changes reuse both caches (saved
+      # by the master runs, see "on:" above).
       - name: Read pinned PyAV version
         id: av
         run: |
@@ -198,7 +216,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cp packaging/linux/install-desktop-entry.sh dist/mdmt/
-          cp MDMT_logo.png dist/mdmt/mdmt.png
+          # 512 x 512: install-desktop-entry.sh puts it in the icon theme's 512x512 folder.
+          python -c "from PIL import Image; Image.open('MDMT_logo.png').convert('RGBA').resize((512, 512), Image.LANCZOS).save('dist/mdmt/mdmt.png')"
           cd dist && tar --owner=0 --group=0 -czf "../$ARCHIVE" mdmt/
 
       - name: Package (macOS)

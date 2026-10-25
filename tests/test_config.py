@@ -94,3 +94,25 @@ def test_save_replaces_the_file_atomically(tmp_path, monkeypatch):
         config.save()
     assert json.loads(path.read_text(encoding="utf-8")) == {}      # the old file is intact
     assert [p.name for p in tmp_path.iterdir()] == ["config.json"]   # no temporary left behind
+
+
+def test_a_config_that_cannot_be_read_for_a_moment_is_kept(tmp_path, monkeypatch):
+    """A lock held by another program is not damage: the file stays, and is not saved over."""
+    import builtins
+    path = tmp_path / "config.json"
+    path.write_text('{"defaults": {"ocr_input_dir": "/scans"}}', encoding="utf-8")
+    real_open = builtins.open
+
+    def locked(file, *args, **kwargs):
+        if str(file) == str(path):
+            raise PermissionError(13, "in use by another process")
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", locked)
+    config = AppConfig(str(path))
+    monkeypatch.setattr(builtins, "open", real_open)
+    assert config.get("defaults.ocr_input_dir") is None
+    config.set("ui.dark_mode", True)
+    config.save()
+    assert json.loads(path.read_text(encoding="utf-8")) == {"defaults": {"ocr_input_dir": "/scans"}}
+    assert not list(tmp_path.glob("config.json.corrupt-*"))

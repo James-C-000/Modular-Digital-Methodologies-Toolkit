@@ -70,3 +70,40 @@ def test_setup_is_idempotent(no_streams, monkeypatch):
     logs.setup_logging(str(no_streams))
     assert isinstance(sys.stderr, logs._LogStream)
     assert sum(getattr(h, "_mdmt", False) for h in logging.getLogger().handlers) == 1
+
+
+def test_a_log_file_that_cannot_be_rotated_keeps_logging(no_streams, monkeypatch):
+    """On Windows the rename fails while another program has mdmt.log open.  logging then reported the
+    error on stderr -- the log stream itself -- and every later log call raised RecursionError."""
+    _setup(monkeypatch, no_streams)
+    handler = next(h for h in logging.getLogger().handlers if getattr(h, "_mdmt", False))
+    logging.getLogger("mdmt").info("x" * 100)
+    calls = []
+
+    def locked(source, dest):
+        calls.append(source)
+        raise PermissionError(32, "The process cannot access the file because it is being used")
+
+    monkeypatch.setattr(handler, "rotate", locked)
+    monkeypatch.setattr(handler, "maxBytes", 10)
+    logging.getLogger("mdmt.jobs").info("job started")
+    logging.getLogger("mdmt.jobs").info("job finished")
+    assert len(calls) == 1                     # tried once, then again only minutes later
+    text = _read(no_streams)
+    assert "job started" in text and "job finished" in text
+
+
+def test_text_written_to_stderr_while_logging_is_dropped_not_recursed(no_streams, monkeypatch):
+    _setup(monkeypatch, no_streams)
+
+    class Echo(logging.Handler):   # a handler that writes to stderr, which is our log stream
+        def emit(self, record):
+            sys.stderr.write(f"echo: {record.getMessage()}\n")
+
+    echo = Echo()
+    logging.getLogger("stderr").addHandler(echo)
+    try:
+        sys.stderr.write("from stderr\n")
+    finally:
+        logging.getLogger("stderr").removeHandler(echo)
+    assert "from stderr" in _read(no_streams)

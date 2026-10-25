@@ -96,3 +96,19 @@ class TestStopwords:
 
     def test_custom_stopwords(self):
         assert parse_custom_stopwords("Mill, river\nThe  parish;;") == {"mill", "river", "the", "parish"}
+
+
+def test_words_keep_combining_marks():
+    """Python's \\w misses vowel signs and viramas: "हिन्दी" became its consonants."""
+    from NLP.text_utils import words
+    assert words("हिन्दी भाषा") == ["हिन्दी", "भाषा"]
+    assert words("ที่บ้าน ไม่ได้") == ["ที่บ้าน", "ไม่ได้"]
+    assert words("كَتَبَ الوَلَدُ") == ["كَتَبَ", "الوَلَدُ"]
+    assert words("Cafe\u0301 au lait") == ["caf\u00e9", "au", "lait"]
+    assert words("\u304b\u3099\u304d") == ["\u304c", "\u304d"]   # NFC: the dakuten joins its kana
+
+
+def test_danda_and_arabic_question_mark_end_sentences():
+    from NLP.text_utils import sentences
+    assert sentences("राम दिल्ली गया। सीता मुंबई गई।") == ["राम दिल्ली गया।", "सीता मुंबई गई।"]
+    assert sentences("هل ذهبت؟ نعم ذهبت.") == ["هل ذهبت؟", "نعم ذهبت."]

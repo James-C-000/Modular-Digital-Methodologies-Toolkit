@@ -129,9 +129,39 @@ def test_one_question_at_a_time(docs, tmp_path):
 
 
 def test_context_is_trimmed_to_fit_the_window(docs, tmp_path):
-    session = _session(docs, tmp_path, n_ctx=800)  # 768 answer tokens leave almost no room
+    # Half of a short window is kept for the answer: 418 - 209 - 64 = 145 leaves room
+    # for the prompt with one passage (138 words) but not two (149).
+    session = _session(docs, tmp_path, n_ctx=418)
     answer = session.ask("Where?")
     assert len(answer.context) == 1
+
+
+def test_old_turns_are_dropped_when_even_one_passage_does_not_fit(docs, tmp_path):
+    """At a small Context length the history (up to 1500 tokens) once pushed the prompt past the window."""
+    llm = FakeLlm()
+    session = _session(docs, tmp_path, llm=llm, n_ctx=418)
+    session.history = [("Who wrote the ledger?", "word " * 300), ("And when?", "In 1751.")]
+    answer = session.ask("Where?")
+    assert len(answer.context) == 1
+    assert "word word" not in llm.prompts[-1] and "In 1751." in llm.prompts[-1]   # the oldest turn went first
+    assert llm.count_tokens(llm.prompts[-1]) + llm.max_tokens <= 418
+
+
+def test_a_question_too_long_for_the_window_is_refused_clearly(docs, tmp_path):
+    from RAG.session import PromptTooLong
+    session = _session(docs, tmp_path, n_ctx=418)
+    with pytest.raises(PromptTooLong):
+        session.ask("Where " * 400)
+
+
+def test_the_index_is_not_updated_while_a_question_is_answered(docs, tmp_path):
+    session = _session(docs, tmp_path)
+    session._busy.acquire()
+    try:
+        with pytest.raises(Busy):
+            session.build_index()
+    finally:
+        session._busy.release()
 
 
 def test_not_found_turns_stay_out_of_the_conversation(docs, tmp_path):

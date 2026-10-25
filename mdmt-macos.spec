@@ -7,7 +7,9 @@ import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 sys.path.insert(0, os.path.join(SPECPATH, 'packaging'))
-from spec_common import LGPL_SOURCE_MODULES, UPX, VERSION, common_binaries, common_datas, common_hiddenimports  # noqa: E402
+from spec_common import (  # noqa: E402
+    LGPL_SOURCE_MODULES, UPX, VERSION, common_binaries, common_datas, common_hiddenimports, licenses_datas,
+)
 
 datas = common_datas()
 binaries = common_binaries()
@@ -40,6 +42,9 @@ for td in tessdata_candidates:
         break
 else:
     raise SystemExit('eng.traineddata not found in Homebrew tessdata')
+
+# Every bundled component's own licence files, the Homebrew libraries Tesseract loads included.
+datas += licenses_datas(workpath, 'macos', [os.path.realpath(tesseract_bin)])
 
 # --- App icon: .icns generated from the PNG logo at build time ---
 icns_path = os.path.join(workpath, 'MDMT.icns')

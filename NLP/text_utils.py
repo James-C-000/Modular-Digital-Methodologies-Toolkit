@@ -3,13 +3,16 @@
 These replace NLTK's word_tokenize/sent_tokenize and stopword corpus.
 
 Limitations (by design; no statistical models):
-- Words are runs of Unicode letters, optionally joined by an apostrophe or
-  hyphen ("miller's", "well-known").  Numbers are not words.
+- Words are runs of Unicode letters with their combining marks (the vowel
+  signs of Indic scripts, Thai tone marks, Arabic vowel marks, accents typed
+  as separate marks), optionally joined by an apostrophe or hyphen
+  ("miller's", "well-known").  Numbers are not words.
 - Scripts written without spaces are not segmented into words: Chinese and
   Japanese (Han/kana) become one token per character; Thai, Lao, Khmer and
   Burmese stay as whole runs between spaces/punctuation.
-- Sentence splitting is rule-based: it breaks after . ! ? and … followed by
-  whitespace and a capital letter, digit or opening quote/bracket (or a
+- Sentence splitting is rule-based: it breaks after . ! ? … and the
+  Devanagari, Arabic and Urdu full stops and question mark (। ॥ ؟ ۔) followed
+  by whitespace and a capital letter, digit or opening quote/bracket (or a
   letter from a script without case), after 。！？, and at blank lines.  It
   knows common abbreviations and single-letter initials, but unusual
   abbreviations followed by a capitalized name will be split.
@@ -24,7 +27,31 @@ _DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "st
 
 # ---------------------------------------------------------------- words ----
 
-_WORD_RE = re.compile(r"[^\W\d_]+(?:['’\-][^\W\d_]+)*")
+def _mark_ranges() -> str:
+    """Combining marks (Unicode categories Mn, Mc, Me) as a character-class body.
+
+    Python's \\w does not match them, so without them "हिन्दी" fell apart into
+    its consonants.
+    """
+    ranges, start, prev = [], None, None
+    for c in [*range(0x20000), *range(0xE0100, 0xE01F0)]:
+        if unicodedata.category(chr(c))[0] == "M":
+            if start is not None and c == prev + 1:
+                prev = c
+                continue
+            if start is not None:
+                ranges.append((start, prev))
+            start = prev = c
+    if start is not None:
+        ranges.append((start, prev))
+    return "".join(f"\\U{a:08x}-\\U{b:08x}" for a, b in ranges)
+
+
+_MARKS = _mark_ranges()
+_MARK_CHAR = re.compile(f"[{_MARKS}]")
+_LETTER = r"[^\W\d_]"
+_LETTER_OR_MARK = rf"(?:{_LETTER}|[{_MARKS}])"
+_WORD_RE = re.compile(rf"{_LETTER}{_LETTER_OR_MARK}*(?:['’\-]{_LETTER}{_LETTER_OR_MARK}*)*")
 _CJK_CHAR = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿\U00020000-\U0002ffff]")
 
 
@@ -36,10 +63,13 @@ def word_spans(text: str) -> list[tuple[str, int, int]]:
         if not _CJK_CHAR.search(token):
             spans.append((token, start, m.end()))
             continue
-        # Han/kana: one token per character; other letters in the run stay together.
+        # Han/kana: one token per character (with its marks); other letters in the run stay together.
         run_start = None
         for i, ch in enumerate(token):
-            if _CJK_CHAR.match(ch):
+            if run_start is None and spans and spans[-1][2] == start + i and _MARK_CHAR.match(ch):
+                word, s, _e = spans[-1]   # a mark joins the character before it (a decomposed dakuten)
+                spans[-1] = (word + ch, s, start + i + 1)
+            elif _CJK_CHAR.match(ch):
                 if run_start is not None:
                     spans.append((token[run_start:i], start + run_start, start + i))
                     run_start = None
@@ -52,8 +82,8 @@ def word_spans(text: str) -> list[tuple[str, int, int]]:
 
 
 def words(text: str, lowercase: bool = True) -> list[str]:
-    """Word tokens of *text* (lowercased by default)."""
-    tokens = [w for w, _s, _e in word_spans(text)]
+    """Word tokens of *text* (lowercased by default), in NFC form (an "e" followed by a combining accent is "é")."""
+    tokens = [unicodedata.normalize("NFC", w) for w, _s, _e in word_spans(text)]
     return [t.lower() for t in tokens] if lowercase else tokens
 
 
@@ -69,7 +99,7 @@ _ABBREVIATIONS = {
 _OPENERS = "\"'“‘«„(["
 _CLOSERS = "\"'”’»)]"
 # Candidate end: terminators, optional closing quotes/brackets, then whitespace.
-_WESTERN_END = re.compile(r"[.!?…]+[" + re.escape(_CLOSERS) + r"]*(?=\s)")
+_WESTERN_END = re.compile(r"[.!?…।॥؟۔]+[" + re.escape(_CLOSERS) + r"]*(?=\s)")
 _CJK_END = re.compile(r"[。！？]+[」』）”’\"']*")
 _PARAGRAPH = re.compile(r"\n[ \t]*\n\s*")
 # The word (letters, possibly with inner dots: "e.g") just before a '.'.

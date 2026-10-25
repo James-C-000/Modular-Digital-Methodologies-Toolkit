@@ -75,3 +75,33 @@ def test_unreadable_document_raises_a_clear_error(tmp_path):
 def test_docx_table_rows_keep_their_cells_together():
     text = "\n".join(_texts(os.path.join(FIX, "rag_sample.docx")))
     assert "Swift | Bordeaux | claret" in text
+
+
+def _docx(tmp_path, body_xml):
+    import zipfile
+    w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    path = tmp_path / "doc.docx"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", f'<w:document xmlns:w="{w}"><w:body>{body_xml}</w:body></w:document>')
+    return str(path)
+
+
+def _p(text):
+    return f"<w:p><w:r><w:t>{text}</w:t></w:r></w:p>"
+
+
+def test_docx_content_controls_custom_xml_and_nested_tables(tmp_path):
+    body = (_p("Visible paragraph.")
+            + f"<w:sdt><w:sdtContent>{_p('Cover page title.')}</w:sdtContent></w:sdt>"
+            + f"<w:customXml>{_p('Template field.')}</w:customXml>"
+            + "<w:tbl><w:tr><w:tc>" + _p("outer")
+            + "<w:tbl><w:tr><w:tc>" + _p("inner") + "</w:tc></w:tr></w:tbl>"
+            + "</w:tc></w:tr></w:tbl>")
+    text = load_document(_docx(tmp_path, body))[0].text
+    assert text.splitlines() == ["Visible paragraph.", "Cover page title.", "Template field.", "outer inner"]
+
+
+def test_csv_with_a_blank_first_line_and_extra_fields(tmp_path):
+    path = tmp_path / "people.csv"
+    path.write_text("\nname,age\nAnn,3,Leeds\n", encoding="utf-8")
+    assert load_document(str(path))[0].text == "name: Ann | age: 3 | column 3: Leeds"

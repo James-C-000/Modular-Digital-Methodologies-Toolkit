@@ -37,8 +37,12 @@ def _answer_record(question, answer) -> dict:
     }
 
 
-def _print_answer(answer):
-    print(f"\nAssistant: {answer.text}")
+def _print_answer(answer, streamed=False):
+    """Print the answer (unless *streamed*: its text was printed as it came), its notes and sources."""
+    if streamed:
+        print()
+    else:
+        print(f"\nAssistant: {answer.text}")
     if answer.cut_off:
         from RAG.session import THINKING_CONTEXT
         where = "while reasoning, before answering" if answer.cut_off_while_thinking else "before finishing"
@@ -116,8 +120,9 @@ def main(argv=None):
                 report = session.build_index()
                 print(f"Indexed {report.chunks} chunks.")
                 continue
+            print("\nAssistant: ", end="", flush=True)
             _print_answer(session.ask(question, on_token=lambda kind, text: print(
-                text, end="", flush=True) if kind == "answer" else None))
+                text, end="", flush=True) if kind == "answer" else None), streamed=True)
     finally:
         session.close()
 

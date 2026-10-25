@@ -86,8 +86,8 @@ class JobManager:
         return job
 
     def _run(self, job: Job, work):
-        log.info("job %s (%s) started", job.kind, job.id)
         try:
+            log.info("job %s (%s) started", job.kind, job.id)
             job.result = work(job)
             job.status = "cancelled" if job.cancelled else "done"
         except Exception as e:

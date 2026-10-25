@@ -50,10 +50,16 @@ def rag_page():
         if not idle():
             return
         n = ui.notification("Updating the index...", spinner=True, timeout=None)
-        report = await run.io_bound(STATE.session.build_index)
-        n.dismiss()
+        try:
+            report = await run.io_bound(STATE.session.build_index)
+        except Exception as e:   # Busy, the folder gone, the disk full...
+            ui.notify(f"The index was not updated: {e}", type="warning", multi_line=True)
+            return
+        finally:
+            n.dismiss()
+        failed = f" {len(report.failed)} could not be read." if report.failed else ""
         ui.notify(f"Index updated: {len(report.added)} new, {len(report.changed)} changed, "
-                  f"{len(report.removed)} removed files ({report.chunks} chunks).", type="positive")
+                  f"{len(report.removed)} removed files ({report.chunks} chunks).{failed}", type="positive")
 
     def change_setup():
         if idle():

@@ -103,8 +103,75 @@ def test_subfolders_saved_text_and_file_column(tmp_path):
         with open(tmp_path / "relationships.csv", encoding="utf-8-sig", newline="") as f:
             files = {r[6] for r in list(csv.reader(f))[1:]}
         assert files == {os.path.join("box1", "letters.txt"), os.path.join("box2", "letters.txt")}
-        seen.clear()
-        rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
-        assert os.path.join("box1", "scan_text.txt") not in seen      # saved text is not processed again
+        again = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
+        assert os.path.join("box1", "scan_text.txt") not in again["processed_files"]   # saved text: not again
+        assert os.path.join("box1", "scan.pdf") in again["processed_files"]
+        assert again["warnings"] == []                                 # and saved again over its own copy
     finally:
         rel.extract_text_from_file = real
+
+
+def test_a_users_own_name_text_file_is_processed_and_kept(tmp_path):
+    shutil.copy(os.path.join(os.path.dirname(__file__), "fixtures", "text_sample.pdf"), tmp_path / "Scan.PDF")
+    mine = "Ada Lovelace wrote to Charles Babbage about the engine and its numbers."
+    (tmp_path / "Scan_text.txt").write_text(mine, encoding="utf-8")
+    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
+    assert "Scan_text.txt" in result["processed_files"]
+    assert (tmp_path / "Scan_text.txt").read_text(encoding="utf-8") == mine   # not overwritten
+    assert [w["input"] for w in result["warnings"]] == ["Scan.PDF"]
+
+
+def test_saved_text_of_an_upper_case_pdf_is_recognized(tmp_path):
+    shutil.copy(os.path.join(os.path.dirname(__file__), "fixtures", "text_sample.pdf"), tmp_path / "Scan.PDF")
+    rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
+    assert (tmp_path / "Scan_text.txt").is_file()
+    again = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
+    assert again["processed_files"] == ["Scan.PDF"]
+
+
+def test_crowded_passages_are_left_out_and_reported(monkeypatch):
+    class ManyNames:
+        def predict(self, text):
+            return [{"entity_group": "PER", "word": m, "start": text.index(m), "end": text.index(m) + len(m),
+                     "score": 0.9} for m in NAMES]
+
+    NAMES = [f"Person{n:03d}" for n in range(rel.MAX_SENTENCE_ENTITIES + 1)]
+    crowded = []
+    monkeypatch.setattr(rel, "load_model", lambda: ManyNames())
+    rows = rel.extract_entities_and_relationships("Index: " + ", ".join(NAMES) + ".", ["PER"], crowded=crowded)
+    assert rows == [] and len(crowded) == 1
+
+
+def test_chinese_sentences_give_relationships(monkeypatch):
+    class Chinese:
+        def predict(self, text):
+            return [{"entity_group": "PER", "word": n, "start": text.index(n), "end": text.index(n) + len(n),
+                     "score": 0.9} for n in ("孙中山", "蒋介石")]
+
+    monkeypatch.setattr(rel, "load_model", lambda: Chinese())
+    rows = rel.extract_entities_and_relationships("孙中山和蒋介石在北京会见了朋友。", ["PER"])
+    assert [(r[0], r[2], r[3]) for r in rows] == [("孙中山", "和", "蒋介石")]
+
+
+def test_no_relationships_replaces_an_earlier_csv_and_only_new_graphs_are_listed(tmp_path):
+    (tmp_path / "relationships.csv").write_text("old results", encoding="utf-8")
+    (tmp_path / "plain.txt").write_text("Nothing notable happened on the farm this week at all.", encoding="utf-8")
+    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 1, ["PER"])
+    with open(tmp_path / "relationships.csv", encoding="utf-8-sig", newline="") as f:
+        assert list(csv.reader(f)) == [rel.CSV_COLUMNS]
+    (tmp_path / "plain.txt").unlink()
+    (tmp_path / "notes_co_word_network.png").write_bytes(b"not ours")
+    (tmp_path / "letters.txt").write_text(
+        "Ada Lovelace corresponded with Charles Babbage in London about the Royal Society in 1843.",
+        encoding="utf-8")
+    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 1, ["PER", "LOC"])
+    assert sorted(os.path.basename(p) for p in result["images"]) == ["per_network.png", "relationship_network.png"]
+
+
+def test_csv_cells_that_look_like_formulas_are_marked_as_text(tmp_path):
+    (tmp_path / "letters.txt").write_text(
+        "=Ada Lovelace corresponded with Charles Babbage in London about engines.", encoding="utf-8")
+    rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 0, ["PER"])
+    with open(tmp_path / "relationships.csv", encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.reader(f))
+    assert rows[1][5].startswith("'=Ada Lovelace")

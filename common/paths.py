@@ -68,18 +68,25 @@ def output_stems(paths) -> dict:
     return result
 
 
-def find_files(directory: str, extensions, exclude=None, skip_hidden_dirs: bool = False) -> list[str]:
+def find_files(directory: str, extensions, exclude=None, skip_hidden_dirs: bool = False,
+               unreadable: list | None = None) -> list[str]:
     """Files under *directory* and its sub-folders with one of *extensions*, sorted.
 
     Extensions are lower-case with the dot (``".pdf"``) and match any case
     (``SCAN.PDF``); a file named just ``.pdf`` has none.  ``exclude(path)``
     returning True leaves a file out (a tool's own outputs); *skip_hidden_dirs*
     does not descend into ``.git``, ``.index`` and other folders whose name
-    starts with a dot.
+    starts with a dot.  Folders that cannot be opened are skipped; pass a list
+    as *unreadable* to have ``(folder, why)`` appended for each.
     """
     extensions = tuple(extensions)
     found = []
-    for root, dirs, names in os.walk(directory):
+
+    def on_error(error: OSError):
+        if unreadable is not None and os.path.exists(error.filename or ""):
+            unreadable.append((error.filename, error.strerror or str(error)))
+
+    for root, dirs, names in os.walk(directory, onerror=on_error):
         if skip_hidden_dirs:
             dirs[:] = [d for d in dirs if not d.startswith(".")]
         for name in names:
@@ -87,6 +94,12 @@ def find_files(directory: str, extensions, exclude=None, skip_hidden_dirs: bool 
             if os.path.splitext(name)[1].lower() in extensions and not (exclude and exclude(path)):
                 found.append(path)
     return sorted(found)
+
+
+def unreadable_entries(unreadable, base: str) -> list[dict]:
+    """find_files' *unreadable* folders as {"input": path relative to *base*, "message": why} for a job's report."""
+    return [{"input": os.path.relpath(folder, base), "message": f"folder could not be opened ({why})"}
+            for folder, why in unreadable]
 
 
 def same_path(a: str, b: str) -> bool:

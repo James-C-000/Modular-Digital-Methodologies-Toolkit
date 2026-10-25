@@ -134,8 +134,8 @@ def _jobs_list():
 
 
 def _sidebar():
-    config = AppConfig()
-    dark = ui.dark_mode(config.get("ui.dark_mode", False))
+    dark_on = AppConfig().get("ui.dark_mode", False)
+    dark = ui.dark_mode(dark_on)
     with ui.left_drawer(value=True).classes("mdmt-drawer").props("width=230").style("padding: 8px"):
         with ui.row().classes("items-center q-px-sm q-pb-sm cursor-pointer") \
                 .on("click", lambda: ui.navigate.to("/welcome")):
@@ -146,11 +146,11 @@ def _sidebar():
         ui.separator().classes("q-my-sm")
 
         def toggle_dark(e):
+            from pages.components import save   # reads the file again: other settings changed since stay
             dark.set_value(e.value)
-            config.set("ui.dark_mode", e.value)
-            config.save()
+            save("ui.dark_mode", e.value)
 
-        ui.switch("Dark mode", value=config.get("ui.dark_mode", False), on_change=toggle_dark).props("dense")
+        ui.switch("Dark mode", value=dark_on, on_change=toggle_dark).props("dense")
         if not use_native_window():
             # In the browser, closing the tab does not stop the server.
             def quit_mdmt():

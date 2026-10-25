@@ -7,8 +7,10 @@ reranker sees query + passage within its own 512-token limit, so 256-token
 chunks fit both with room to spare while keeping citations specific.
 
 Splitting prefers paragraph breaks, then sentence boundaries
-(NLP.text_utils), then whitespace for a single over-long sentence.
-Overlap is made of whole trailing units (sentences) of the previous chunk.
+(NLP.text_utils), then whitespace for a single over-long sentence, then
+characters for a run without spaces longer than a chunk (unpunctuated
+Chinese, a URL).  Overlap is made of whole trailing units (sentences) of the
+previous chunk.
 """
 import re
 from dataclasses import dataclass
@@ -29,8 +31,24 @@ class Chunk:
     ordinal: int         # position of the chunk within its file
 
 
+def _pieces(text: str, start: int, end: int, count_tokens, max_tokens: int):
+    """(start, end, tokens) of consecutive pieces of text[start:end], each as long as fits *max_tokens*."""
+    pieces = []
+    while start < end:
+        low, high = start + 1, end   # the longest piece that fits; one character always goes
+        while low < high:
+            mid = (low + high + 1) // 2
+            if count_tokens(text[start:mid]) <= max_tokens:
+                low = mid
+            else:
+                high = mid - 1
+        pieces.append((start, low, count_tokens(text[start:low])))
+        start = low
+    return pieces
+
+
 def _units(text: str, count_tokens, max_tokens: int):
-    """(start, end, tokens) of sentences in paragraph order, words for long ones."""
+    """(start, end, tokens) of sentences in paragraph order, words for long ones, and pieces of long words."""
     units = []
     for para in re.finditer(r"\S(?:.*?\S)?(?=\s*\n\s*\n|\s*$)", text, re.S):
         p_start = para.start()
@@ -44,6 +62,12 @@ def _units(text: str, count_tokens, max_tokens: int):
             words = [(m.start() + s, m.end() + s) for m in re.finditer(r"\S+", text[s:e])]
             group = []
             for w in words:
+                if count_tokens(text[w[0]:w[1]]) > max_tokens:
+                    if group:
+                        units.append((group[0][0], group[-1][1], count_tokens(text[group[0][0]:group[-1][1]])))
+                        group = []
+                    units.extend(_pieces(text, w[0], w[1], count_tokens, max_tokens))
+                    continue
                 candidate = group + [w]
                 if group and count_tokens(text[candidate[0][0]:candidate[-1][1]]) > max_tokens:
                     units.append((group[0][0], group[-1][1], count_tokens(text[group[0][0]:group[-1][1]])))

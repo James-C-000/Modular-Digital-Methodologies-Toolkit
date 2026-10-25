@@ -116,12 +116,19 @@ def _safe_extract(archive: zipfile.ZipFile, dest: str):
 
 def download_package(src: str, tgt: str, models_root: str | None = None, on_progress=None) -> str:
     """Download and unpack the src->tgt package atomically; returns its directory."""
-    from common.downloads import download_file
+    from common.downloads import destination_lock
 
     info = package_info(src, tgt)
     if info is None:
         raise KeyError(f"no Argos package for {src} -> {tgt}")
     dest = package_dir(src, tgt, models_root)
+    with destination_lock(dest):
+        return _download_package(info, dest, on_progress)
+
+
+def _download_package(info: dict, dest: str, on_progress) -> str:
+    from common.downloads import download_file
+
     if _is_package(dest):
         return dest
     archive_path = dest + ".argosmodel"
@@ -175,19 +182,24 @@ def index_pairs() -> set:
 # ------------------------------------------------------------ language ID ----
 
 def detect_language(text: str, candidates=None) -> str | None:
-    """Most likely language of *text* (Argos code), optionally among *candidates*."""
+    """Most likely language of *text* (Argos code), or None for text without letters.
+
+    It is the most likely language whether or not it is among *candidates*
+    (installed models): settling for the likeliest candidate would call a
+    German text English when only French and English models are installed.
+    *candidates* only chooses between variants detection cannot tell apart
+    (Brazilian "pb" for "pt" when only "pb" is installed).
+    """
     import py3langid
 
     sample = text[:4000]
     if not sample.strip():
         return None
-    for code, _score in py3langid.rank(sample):
-        code = _LANGID_TO_ARGOS.get(code, code)
-        if candidates is None or code in candidates:
-            return code
-        if code in _VARIANTS and _VARIANTS[code] in candidates:
-            return _VARIANTS[code]
-    return None
+    code, _score = py3langid.classify(sample)
+    code = _LANGID_TO_ARGOS.get(code, code)
+    if candidates is not None and code not in candidates and _VARIANTS.get(code) in candidates:
+        return _VARIANTS[code]
+    return code
 
 
 # ----------------------------------------------------------- tokenizers ----
@@ -201,8 +213,8 @@ class _SentencePiece:
         return self.sp.encode(text, out_type=str)
 
     def decode(self, tokens):
-        # Same post-processing as argostranslate's SentencePieceTokenizer.
-        return self.sp.decode_pieces(tokens).replace("▁", " ").replace("_", " ")
+        # decode_pieces turns the "▁" word marks into spaces; underscores are real text ("file_name").
+        return self.sp.decode_pieces(tokens).replace("▁", " ")
 
 
 class _MosesBpe:
@@ -272,27 +284,37 @@ def get_translator(src: str, tgt: str, models_root: str | None = None) -> Packag
 _LINE_END = re.compile(r"[.!?…:;。！？\"'”’)\]]\s*$")
 
 
-def _paragraphs(text: str) -> list[str]:
-    """Split text into paragraphs, re-joining lines that were hard-wrapped.
+def _blocks(text: str) -> list[tuple[str, str]]:
+    """Paragraphs of *text*, each with the line break(s) that followed it ("\\n\\n" for a blank line).
 
-    A line break is kept when the line ends a sentence (or the text has a blank
-    line); otherwise the line is treated as wrapped, as in most PDF text.
+    Lines that were hard-wrapped are re-joined: a line break is kept when the
+    line ends a sentence (or a blank line follows); otherwise the line is
+    treated as wrapped, as in most PDF text.
     """
-    paragraphs, current = [], []
+    blocks, current = [], []
     for line in text.replace("\r\n", "\n").split("\n"):
         stripped = line.strip()
         if not stripped:
             if current:
-                paragraphs.append(" ".join(current))
+                blocks.append([" ".join(current), "\n"])
                 current = []
+            if blocks:
+                blocks[-1][1] = "\n\n"
             continue
         current.append(stripped)
         if _LINE_END.search(stripped):
-            paragraphs.append(" ".join(current))
+            blocks.append([" ".join(current), "\n"])
             current = []
     if current:
-        paragraphs.append(" ".join(current))
-    return paragraphs
+        blocks.append([" ".join(current), "\n"])
+    if blocks:
+        blocks[-1][1] = ""
+    return [(paragraph, after) for paragraph, after in blocks]
+
+
+def _paragraphs(text: str) -> list[str]:
+    """Split text into paragraphs, re-joining lines that were hard-wrapped (see _blocks)."""
+    return [paragraph for paragraph, _after in _blocks(text)]
 
 
 def _chunks_for(translator: PackageTranslator, sentence: str) -> list[str]:
@@ -313,11 +335,13 @@ def _chunks_for(translator: PackageTranslator, sentence: str) -> list[str]:
 def _translate_with(translator: PackageTranslator, text: str) -> str:
     from NLP.text_utils import sentences as split_sentences
 
+    # Blank lines are kept, so a heading stays apart from the next paragraph also
+    # when the translation is translated again (through English).
     out = []
-    for paragraph in _paragraphs(text):
+    for paragraph, after in _blocks(text):
         units = [chunk for s in split_sentences(paragraph) for chunk in _chunks_for(translator, s)]
-        out.append(" ".join(translator.translate(units)))
-    return "\n".join(out)
+        out.append(" ".join(translator.translate(units)) + after)
+    return "".join(out)
 
 
 def translate_text(text: str, src: str, tgt: str, models_root: str | None = None) -> str:
@@ -336,21 +360,25 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
                         models_root: str | None = None, on_progress=None, cancel=None) -> list[dict]:
     """Translate every .txt and .pdf file under *directory*.
 
-    src=None detects each file's language among those with an installed route.
-    Output: ``name<suffix>.txt`` next to the input (``.txt`` for PDFs too).
-    Files that already end with the suffix are skipped (they are outputs).
-    A set *cancel* event stops the run before the next file.
+    src=None detects each file's language; a file in a language without an
+    installed route is reported, and one already in *tgt* is skipped.
+    Output: ``name<suffix>.txt`` next to the input (``.txt`` for PDFs too;
+    ``name_2<suffix>.txt`` ... when files share a name, as ``report.pdf`` and
+    ``report.txt`` do).  Files that already end with the suffix are skipped
+    (they are outputs).  A set *cancel* event stops the run before the next file.
     """
-    from common.paths import find_files
+    from common.paths import find_files, output_stems, unreadable_entries
     from common.text_files import document_text
 
-    files = find_files(directory, [".txt", ".pdf"],
+    unreadable = []
+    files = find_files(directory, [".txt", ".pdf"], unreadable=unreadable,
                        exclude=lambda path: os.path.splitext(os.path.basename(path))[0].endswith(suffix))
+    stems = output_stems(files)
 
     installed = installed_pairs(models_root)
     sources = {a for a, _b in installed} | {b for _a, b in installed}
     candidates = {s for s in sources if route(s, tgt, models_root, installed) is not None}
-    results = []
+    results = [dict(entry, status="error") for entry in unreadable_entries(unreadable, directory)]
     for i, path in enumerate(files):
         if cancel is not None and cancel.is_set():
             break
@@ -365,18 +393,22 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
                 continue
             lang = src or detect_language(text, candidates)
             if lang is None:
-                result.update(status="error", message="could not detect a language with an installed model")
+                result.update(status="error", message="could not detect the language")
+                results.append(result)
+                continue
+            if lang == tgt:
+                result.update(status="skipped", language=lang, message=f"already in the target language ({lang})")
                 results.append(result)
                 continue
             steps = route(lang, tgt, models_root, installed)
             if steps is None:
+                detected = "" if src else "detected as "
                 result.update(status="error", language=lang,
-                              message=f"no installed model for {lang} -> {tgt}")
+                              message=f"{detected}{lang}: no installed model for {lang} -> {tgt}")
                 results.append(result)
                 continue
             translated = translate_text(text, lang, tgt, models_root)
-            stem = os.path.splitext(path)[0]
-            out_path = f"{stem}{suffix}.txt"
+            out_path = os.path.join(os.path.dirname(path), f"{stems[path]}{suffix}.txt")
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(translated)
             result.update(status="success", language=lang, output=out_path, pivot=len(steps) > 1)
@@ -384,5 +416,5 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
             result.update(status="error", message=str(e))
         results.append(result)
     if on_progress:
-        on_progress(len(results), len(files), "")
+        on_progress(len(results) - len(unreadable), len(files), "")
     return results

@@ -241,6 +241,14 @@ def test_contexts_keep_hyphens_and_minus_signs(tmp_path, monkeypatch):
     assert [r[2] for r in rows["the.csv"]] == ["the mill-race", "degrees and the mill- race"]
 
 
+def test_cells_excel_would_read_as_formulas_are_marked_as_text(tmp_path, monkeypatch):
+    """Excel shows "-5 degrees" as #NAME? and would run "=HYPERLINK(...)": both get a leading apostrophe."""
+    pages = ["-5 degrees today", "@cmd and more"]
+    _summary, rows = _search_pages(tmp_path, monkeypatch, pages, "degrees\ncmd", context_words=3)
+    assert [r[2] for r in rows["degrees.csv"]] == ["'-5 degrees today"]
+    assert [r[2] for r in rows["cmd.csv"]] == ["'@cmd and"]
+
+
 def test_ligatures_and_separate_accents_match_typed_keywords(tmp_path, monkeypatch):
     pages = ["the \ufb01eld o\ufb03ce of the cafe\u0301"]
     summary, rows = _search_pages(tmp_path, monkeypatch, pages, "field\noffice\ncafé\ncafe\u0301", context_words=1)

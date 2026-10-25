@@ -14,6 +14,11 @@ if [ "${1:-}" = "--uninstall" ]; then
   exit 0
 fi
 
+# The Desktop Entry spec quotes Exec arguments in double quotes, inside which
+# " ` $ and \ need a backslash (a backslash becomes four: string values are
+# unescaped once first) and % is written %%.  Folder names may hold any of them.
+EXEC=$(printf '%s' "$HERE/mdmt" | sed -e 's/\\/\\\\\\\\/g' -e 's/["`$]/\\&/g' -e 's/%/%%/g')
+
 mkdir -p "$APPS" "$ICONS"
 cp "$HERE/mdmt.png" "$ICONS/net.jamescaldwell.mdmt.png"
 cat > "$ENTRY" <<DESKTOP
@@ -22,7 +27,7 @@ Type=Application
 Name=MDMT
 GenericName=Digital humanities toolkit
 Comment=Modular Digital Methodologies Toolkit (opens in your web browser)
-Exec="$HERE/mdmt"
+Exec="$EXEC"
 Icon=net.jamescaldwell.mdmt
 Terminal=false
 Categories=Education;Science;Office;

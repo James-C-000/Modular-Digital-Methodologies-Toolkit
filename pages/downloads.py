@@ -28,6 +28,8 @@ def start_downloads(kind: str, title: str, items: list[Asset]):
                 break
             job.meta.update(asset=asset.key, step=i + 1, steps=len(items), name=asset.name)
             job.progress(0, asset.size or 0, asset.name)
+            if asset.installed():   # another download (or RAGBot's setup) fetched it meanwhile
+                continue
             try:
                 asset.download(lambda done, total: job.progress(done, total or 0, asset.name))
             except Exception as e:

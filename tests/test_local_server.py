@@ -117,3 +117,33 @@ class TestInstanceLock:
         path = tmp_path / "instance.json"
         path.write_text("{not json", encoding="utf-8")
         assert instance.read_lock(str(path)) is None
+
+
+@pytest.mark.parametrize("others", ['ajs_user={"id":1}', "theme=dark mode", "name=\xe4", "broken"])
+def test_other_local_apps_cookies_do_not_hide_ours(others):
+    """Browsers send cookies set by any app on 127.0.0.1; one that http.cookies cannot parse came first."""
+    c = _client()
+    # As bytes: the test client refuses non-ASCII header text, which browsers do send.
+    r = c.get("/", headers={"cookie": f"{others}; {COOKIE}={TOKEN}".encode("latin-1")})
+    assert r.status_code == 200 and r.text == "the page"
+    assert c.get("/", headers={"cookie": f"{others}; {COOKIE}=wrong".encode("latin-1")}).status_code == 403
+
+
+def test_a_non_ascii_token_in_the_link_is_refused_not_an_error():
+    assert _client().get("/?token=%C3%A4").status_code == 403
+
+
+class TestClaimingTheLock:
+    def test_only_one_launch_claims_it(self, tmp_path):
+        path = str(tmp_path / "instance.json")
+        assert instance.claim_lock(path, port=PORT, token=TOKEN)
+        assert not instance.claim_lock(path, port=PORT + 1, token="other")
+        assert instance.read_lock(path)["port"] == PORT
+
+    def test_waiting_gives_up_on_a_dead_instance_at_once(self, tmp_path):
+        import time
+        path = tmp_path / "instance.json"
+        path.write_text(json.dumps({"pid": 999_999_999, "port": PORT, "token": TOKEN}), encoding="utf-8")
+        start = time.monotonic()
+        assert instance.running_instance_url(str(path), wait=10) is None
+        assert time.monotonic() - start < 2

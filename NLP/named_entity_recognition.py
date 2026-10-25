@@ -5,8 +5,8 @@ import logging
 import os
 from collections import Counter
 
-from common.paths import find_files, output_stems
-from common.text_files import document_text
+from common.paths import find_files, output_stems, unreadable_entries
+from common.text_files import SavedTextCheck, document_text
 from NLP.ner_onnx import load_model
 
 log = logging.getLogger(__name__)
@@ -113,9 +113,11 @@ def main(directory, on_progress=None, cancel=None):
 
     overall_summary = {}
 
-    paths = find_files(directory, [".pdf", ".txt"])
+    unreadable = []
+    paths = find_files(directory, [".pdf", ".txt"], unreadable=unreadable)
     stems = output_stems(paths)
     read, skipped = 0, []
+    saved_texts = SavedTextCheck()
     for i, file_path in enumerate(paths):
         if cancel is not None and cancel.is_set():
             break
@@ -130,7 +132,11 @@ def main(directory, on_progress=None, cancel=None):
             log.warning("ner: cannot read %s: %s", file_path, e)
             skipped.append({"input": rel, "message": f"could not be read ({e})"})
             continue
-        if not text.strip():
+        saved_texts.remember(file_path, text)
+        if saved_texts.is_saved_text(file_path, text):
+            skipped.append({"input": rel, "message": "the text Relationships saved from the PDF next to it,"
+                                                     " which was analysed itself"})
+        elif not text.strip():
             skipped.append({"input": rel, "message": "no text (scanned PDF? run OCR first)"})
         else:
             read += 1
@@ -168,6 +174,7 @@ def main(directory, on_progress=None, cancel=None):
     log.info("ner: %d of %d file(s) analysed, summary %s", read, len(paths), output_summary_file)
     if on_progress:
         on_progress(read + len(skipped), len(paths), "")
+    skipped = unreadable_entries(unreadable, directory) + skipped
     return {"files": read, "total": len(paths), "summary": output_summary_file, "skipped": skipped}
 
 

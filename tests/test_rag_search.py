@@ -68,3 +68,13 @@ def test_rrf_default_keeps_a_single_list_top_hit_near_the_top():
 
 def test_rrf_fuse_with_one_empty_ranking():
     assert [d for d, _ in rrf_fuse([[5, 6], []])] == [5, 6]
+
+
+def test_the_reranker_accepts_a_question_longer_than_its_limit():
+    """With truncation "only_second" a question over ~510 tokens raised "Truncation error"."""
+    from RAG import models
+    if not models.is_installed(models.RERANKER):
+        pytest.skip("the reranker model is not downloaded")
+    reranker = models.get_reranker()
+    scores = reranker.score("word " * 600, ["A short passage.", "Another passage about the harbour."])
+    assert scores.shape == (2,)

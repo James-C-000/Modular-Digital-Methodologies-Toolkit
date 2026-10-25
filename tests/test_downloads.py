@@ -2,10 +2,11 @@
 import http.server
 import os
 import threading
+import time
 
 import pytest
 
-from common.downloads import download_file, remove_stale_parts
+from common.downloads import STALE_PART_SECONDS, download_file, remove_stale_parts
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -61,5 +62,39 @@ def test_remove_stale_parts(tmp_path):
     (tmp_path / "a.traineddata.part").write_bytes(b"x")
     (tmp_path / "tiny.part").mkdir()
     (tmp_path / "eng.traineddata").write_bytes(b"x")
+    old = time.time() - 2 * STALE_PART_SECONDS
+    for name in ("a.traineddata.part", "tiny.part"):
+        os.utime(tmp_path / name, (old, old))
     remove_stale_parts(str(tmp_path))
     assert os.listdir(tmp_path) == ["eng.traineddata"]
+
+
+def test_remove_stale_parts_keeps_a_download_still_running(tmp_path):
+    """Another MDMT window may be downloading: a .part written to recently stays."""
+    (tmp_path / "fra.traineddata.part").write_bytes(b"x")
+    snapshot = tmp_path / "Qwen.gguf.download"
+    (snapshot / "Qwen.gguf.part" / ".cache").mkdir(parents=True)
+    old = time.time() - 2 * STALE_PART_SECONDS
+    os.utime(snapshot, (old, old))   # the folder is old, but a file inside is being written
+    (snapshot / "Qwen.gguf.part" / ".cache" / "x.incomplete").write_bytes(b"x")
+    remove_stale_parts(str(tmp_path))
+    assert sorted(os.listdir(tmp_path)) == ["Qwen.gguf.download", "fra.traineddata.part"]
+
+
+def test_downloads_to_one_destination_run_one_at_a_time(tmp_path):
+    from common.downloads import destination_lock
+    order, inside = [], threading.Event()
+
+    def first():
+        with destination_lock(str(tmp_path / "a")):
+            inside.set()
+            time.sleep(0.2)
+            order.append("first done")
+
+    t = threading.Thread(target=first)
+    t.start()
+    inside.wait(5)
+    with destination_lock(str(tmp_path / "a")):
+        order.append("second")
+    t.join()
+    assert order == ["first done", "second"]

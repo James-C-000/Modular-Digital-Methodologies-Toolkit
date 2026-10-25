@@ -2,6 +2,7 @@ from RAG.chunking import Chunk
 from RAG.prompting import (
     CITE_REMINDER,
     NOT_FOUND,
+    _strip_citations,
     answer_messages,
     format_context,
     history_window,
@@ -46,6 +47,10 @@ class TestCitations:
         assert text == "See [2]." and cited == [2] and dropped == [9]
 
     def test_brackets_that_are_not_citations_are_left_alone(self):
+        text, cited, dropped = parse_citations("The letter dated [1854] says so [1]. Years [1850-1860].", 3)
+        assert text == "The letter dated [1854] says so [1]. Years [1850-1860]."
+        assert cited == [1] and dropped == []
+        assert _strip_citations("Dated [1854], as cited [2].") == "Dated [1854], as cited."
         text, cited, _ = parse_citations("The year [sic] and a list [a].", 3)
         assert text == "The year [sic] and a list [a]." and cited == []
 

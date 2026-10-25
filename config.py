@@ -1,8 +1,22 @@
 import json
 import os
+import threading
+import time
+
 from platformdirs import user_data_dir
 
 APP_NAME = "mdmt"
+
+
+def _replace(src: str, dst: str, attempts: int = 5):
+    """os.replace, retried briefly: on Windows it fails while another program has *dst* open."""
+    for attempt in range(attempts):
+        try:
+            return os.replace(src, dst)
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.1)
 
 
 def get_app_data_dir() -> str:
@@ -64,24 +78,29 @@ class AppConfig:
     def __init__(self, path: str = None):
         self._path = path or os.path.join(get_app_data_dir(), "config.json")
         self._data = {}
+        self._read_failed = False
         if os.path.exists(self._path):
+            import logging
             try:
                 with open(self._path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 if not isinstance(data, dict):
                     raise ValueError("not a JSON object")
                 self._data = data
-            except (OSError, ValueError) as e:
+            except OSError as e:
+                # Locked by another program for a moment, say: the file may be fine, so it is
+                # neither moved aside nor overwritten by save() with these defaults.
+                self._read_failed = True
+                logging.getLogger("mdmt").warning("settings file could not be read (%s); using defaults", e)
+            except ValueError as e:
                 # A damaged settings file must not stop MDMT from starting:
                 # keep it for inspection and start from defaults.
-                import logging
-                import time
                 backup = f"{self._path}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}"
                 try:
                     os.replace(self._path, backup)
                 except OSError:
                     backup = "(could not be moved)"
-                logging.getLogger("mdmt").warning("settings file unreadable (%s); moved to %s", e, backup)
+                logging.getLogger("mdmt").warning("settings file damaged (%s); moved to %s", e, backup)
 
     def get(self, key: str, default=None):
         """Get a value using dot notation (e.g., 'defaults.ocr_language')."""
@@ -107,13 +126,21 @@ class AppConfig:
         target[keys[-1]] = value
 
     def save(self):
-        """Write config to disk atomically (a crash mid-write leaves the old file)."""
+        """Write config to disk atomically (a crash mid-write leaves the old file).
+
+        Does nothing if the file existed but could not be read: saving would
+        replace every other setting with the defaults.
+        """
+        if self._read_failed:
+            import logging
+            logging.getLogger("mdmt").warning("settings not saved: the settings file could not be read")
+            return
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        tmp = f"{self._path}.{os.getpid()}.tmp"
+        tmp = f"{self._path}.{os.getpid()}.{threading.get_ident()}.tmp"
         try:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, indent=2, ensure_ascii=False)
-            os.replace(tmp, self._path)
+            _replace(tmp, self._path)
         except BaseException:
             try:
                 os.remove(tmp)

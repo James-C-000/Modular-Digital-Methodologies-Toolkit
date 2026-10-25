@@ -154,3 +154,11 @@ def test_output_stems_disambiguate_files_in_the_same_folder():
                           os.path.join("b", "report.txt"), os.path.join("a", "report_2.txt")])
     assert stems == {os.path.join("a", "Report.pdf"): "Report", os.path.join("a", "report.txt"): "report_2",
                      os.path.join("a", "report_2.txt"): "report_2_2", os.path.join("b", "report.txt"): "report"}
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-le", "utf-16-be", "utf-32"])
+def test_read_text_decodes_notepads_unicode(tmp_path, encoding):
+    """Notepad's "Unicode" is UTF-16; Windows-1252 also "decodes" it, into nonsense keywords."""
+    path = tmp_path / "keywords.txt"
+    path.write_bytes("москва\r\nyork\r\n".encode(encoding))
+    assert read_text(str(path)) == "москва\r\nyork\r\n"

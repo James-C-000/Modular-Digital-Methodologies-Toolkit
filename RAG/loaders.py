@@ -53,11 +53,15 @@ def _load_csv(path):
         dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
     except csv.Error:
         dialect = csv.excel
-    rows = list(csv.reader(io.StringIO(text), dialect))
+    rows = [row for row in csv.reader(io.StringIO(text), dialect) if any(v.strip() for v in row)]
     if not rows:
         return []
     header, body = rows[0], rows[1:]
-    lines = [" | ".join(f"{h}: {v}" for h, v in zip(header, row) if v.strip()) for row in body]
+
+    def name(i):   # a column without a heading (more fields than the header row has)
+        return header[i] if i < len(header) and header[i].strip() else f"column {i + 1}"
+
+    lines = [" | ".join(f"{name(i)}: {v}" for i, v in enumerate(row) if v.strip()) for row in body]
     return [Section("\n".join(line for line in lines if line))]
 
 
@@ -81,23 +85,41 @@ def _paragraph_text(para) -> str:
     return "".join(parts).strip()
 
 
+# Elements that only wrap others: content controls (cover pages, tables of
+# contents, template fields), custom XML, tracked insertions.
+_WRAPPERS = {_W + "sdt", _W + "sdtContent", _W + "customXml", _W + "ins", _W + "moveTo", _W + "smartTag"}
+
+
+def _children(element, tags):
+    """Children of *element* with one of *tags*, looking inside wrapper elements."""
+    for child in element:
+        if child.tag in tags:
+            yield child
+        elif child.tag in _WRAPPERS:
+            yield from _children(child, tags)
+
+
+def _blocks_in(container):
+    """Paragraph texts in order; each table row becomes 'cell | cell'."""
+    for block in _children(container, {_W + "p", _W + "tbl"}):
+        if block.tag == _W + "p":
+            text = _paragraph_text(block)
+            if text:
+                yield text
+            continue
+        for row in _children(block, {_W + "tr"}):
+            cells = [" ".join(_blocks_in(cell)) for cell in _children(row, {_W + "tc"})]
+            if any(cells):
+                yield " | ".join(cells)
+
+
 def _docx_blocks(xml_bytes):
     """Paragraph texts in document order; each table row becomes 'cell | cell'."""
     root = ET.fromstring(xml_bytes)
     containers = [root.find(_W + "body")] if root.find(_W + "body") is not None else [root]
     containers += [el for el in root if el.tag in (_W + "footnote", _W + "endnote")]
     for container in containers:
-        for block in container:
-            if block.tag == _W + "p":
-                text = _paragraph_text(block)
-                if text:
-                    yield text
-            elif block.tag == _W + "tbl":
-                for row in block.iter(_W + "tr"):
-                    cells = [" ".join(t for t in (_paragraph_text(p) for p in cell.iter(_W + "p")) if t)
-                             for cell in row.findall(_W + "tc")]
-                    if any(cells):
-                        yield " | ".join(cells)
+        yield from _blocks_in(container)
 
 
 def _load_docx(path):
@@ -156,9 +178,9 @@ SUPPORTED_EXTENSIONS = {
 }
 
 
-def find_documents(directory: str) -> list[str]:
-    """Supported files under *directory*, sorted by relative path."""
-    found = find_files(directory, SUPPORTED_EXTENSIONS, skip_hidden_dirs=True)
+def find_documents(directory: str, unreadable: list | None = None) -> list[str]:
+    """Supported files under *directory*, sorted by relative path (see find_files for *unreadable*)."""
+    found = find_files(directory, SUPPORTED_EXTENSIONS, skip_hidden_dirs=True, unreadable=unreadable)
     return sorted(found, key=lambda p: os.path.relpath(p, directory).lower())
 
 

@@ -2,8 +2,14 @@
 
 Returns text per page so callers can report page numbers.  Scanned PDFs
 without a text layer yield empty strings; run them through OCR first.
+
+PDFium replaces a hyphen (or soft hyphen) that ends a line with "\\x02" and
+drops the line break, so "mill-" / "race" comes out as "mill\\x02race"; it is
+written back as a hyphen and a line break.
 """
 import pypdfium2 as pdfium
+
+_LINE_END_HYPHEN = "\x02"
 
 
 def extract_pages(path: str) -> list[str]:
@@ -19,7 +25,8 @@ def extract_pages(path: str) -> list[str]:
             finally:
                 textpage.close()
                 page.close()
-            pages.append(text.replace("\r\n", "\n").replace("\r", "\n").strip("\x00"))
+            text = text.replace("\r\n", "\n").replace("\r", "\n").strip("\x00")
+            pages.append(text.replace(_LINE_END_HYPHEN, "-\n"))
         return pages
     finally:
         pdf.close()
