@@ -1,6 +1,7 @@
 """Embedding and reranking models for RAG, run with ONNX Runtime + tokenizers.
 
-Chosen in the Phase 3 design (benchmarks: tests/dev/bench_retrieval_runtimes.py):
+Chosen in the Phase 3 design (benchmarked with tests/dev/bench_retrieval_runtimes.py,
+removed after 2.1.1; see git history):
 
 - Embedder: intfloat/multilingual-e5-small (MIT; 94 languages; 384-dim;
   512 tokens).  ~25-40 chunks/s on a 4-core laptop CPU.
