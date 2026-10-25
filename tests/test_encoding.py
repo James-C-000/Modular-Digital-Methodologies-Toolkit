@@ -69,6 +69,8 @@ def test_safe_filename(raw, expected):
 def test_unique_safe_filenames_disambiguates_collisions():
     mapping = unique_safe_filenames(["a/b", "ab", "AB", "c"], ".csv")
     assert mapping == {"a/b": "ab.csv", "ab": "ab_2.csv", "AB": "AB_3.csv", "c": "c.csv"}
+    assert unique_safe_filenames(["data_overview", "c"], ".csv", reserved=["Data_Overview.csv"]) == {
+        "data_overview": "data_overview_2.csv", "c": "c.csv"}
 
 
 def test_windows_shim_reproduces_the_bugs(tmp_path):

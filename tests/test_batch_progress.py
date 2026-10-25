@@ -68,12 +68,14 @@ def test_keyword_search(tmp_path):
     src, out = tmp_path / "pdfs", tmp_path / "out"
     src.mkdir()
     out.mkdir()
-    for n in ("a.pdf", "b.pdf", "c.pdf"):
+    (src / "box").mkdir()
+    for n in ("a.pdf", "b.pdf", os.path.join("box", "a.pdf")):
         shutil.copy(os.path.join(FIXTURES, "text_sample.pdf"), src / n)
     rec = Recorder()
     summary = search_directory(str(src), str(out), "the", on_progress=rec)
     assert summary["files"] == 3 and all(os.path.isfile(c) for c in summary["charts"])
-    assert rec.calls[0] == (0, 3, "a.pdf") and rec.calls[-1] == (3, 3, "")
+    # PDFs with the same name in different folders are told apart.
+    assert rec.calls == [(0, 3, "a.pdf"), (1, 3, "b.pdf"), (2, 3, os.path.join("box", "a.pdf")), (3, 3, "")]
     rec = Recorder(stop_after=1)
     summary = search_directory(str(src), str(out), "the", on_progress=rec, cancel=rec.cancel)
     assert summary["files"] == 1 and summary["total"] == 3

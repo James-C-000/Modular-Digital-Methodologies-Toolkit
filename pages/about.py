@@ -172,8 +172,9 @@ charts.
    ignoring case and punctuation at the edges of words (`york.` and `(york)`
    match `york`); a keyword of several words matches them in sequence.
    Hyphens separate words unless the keyword contains one, so `mill race`
-   also finds `mill-race`. Every match is counted once and gets one row of
-   context in the keyword's CSV.
+   also finds `mill-race`. Ligatures in a PDF's text (`ﬁ`) and accents stored
+   as separate marks match keywords typed normally. Every match is counted
+   once and gets one row of context in the keyword's CSV.
 3. Set the **Context length**: the number of words saved for each match,
    the match included, split evenly before and after it (default: 5, two
    words on each side). With an even number, one more word comes before.
@@ -187,6 +188,8 @@ charts.
 - Otherwise, every **character** listed in the filter file, or typed in the
   filter box, is removed from the text: entering `#*` deletes every `#` and `*`.
   This cleans up OCR noise that splits words.
+- Filters apply to the keywords too: with the basic filter, `o'brien` is
+  searched as `obrien`, so it finds `O'Brien`.
 
 **Loading from files:**
 Instead of typing them, keywords (one per line) and filter characters can be
