@@ -8,7 +8,7 @@ from urllib.parse import quote
 import networkx as nx
 from matplotlib.figure import Figure
 
-from common.paths import output_stems
+from common.paths import find_files, output_stems
 from common.text_files import document_text
 from NLP.text_utils import stopwords, words
 
@@ -124,8 +124,7 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
 <h1>Co-word Analysis Summary</h1>
 """
     # Process each PDF or TXT file in the directory.
-    paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
-                   for file in files if file.lower().endswith((".pdf", ".txt")))
+    paths = find_files(directory, [".pdf", ".txt"])
     stems = output_stems(paths)
     read, images, skipped = 0, [], []
     for i, file_path in enumerate(paths):

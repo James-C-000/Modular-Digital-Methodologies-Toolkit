@@ -341,15 +341,11 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
     Files that already end with the suffix are skipped (they are outputs).
     A set *cancel* event stops the run before the next file.
     """
+    from common.paths import find_files
     from common.text_files import document_text
 
-    files = []
-    for root, _dirs, names in os.walk(directory):
-        for name in names:
-            stem, ext = os.path.splitext(name)
-            if ext.lower() in (".txt", ".pdf") and not stem.endswith(suffix):
-                files.append(os.path.join(root, name))
-    files.sort()
+    files = find_files(directory, [".txt", ".pdf"],
+                       exclude=lambda path: os.path.splitext(os.path.basename(path))[0].endswith(suffix))
 
     installed = installed_pairs(models_root)
     sources = {a for a, _b in installed} | {b for _a, b in installed}

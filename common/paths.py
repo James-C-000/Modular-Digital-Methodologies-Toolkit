@@ -67,6 +67,26 @@ def output_stems(paths) -> dict:
     return result
 
 
+def find_files(directory: str, extensions, exclude=None, skip_hidden_dirs: bool = False) -> list[str]:
+    """Files under *directory* and its sub-folders ending with one of *extensions*, sorted.
+
+    Extensions are lower-case with the dot (``".pdf"``) and match any case
+    (``SCAN.PDF``).  ``exclude(path)`` returning True leaves a file out (a
+    tool's own outputs); *skip_hidden_dirs* does not descend into ``.git``,
+    ``.index`` and other folders whose name starts with a dot.
+    """
+    extensions = tuple(extensions)
+    found = []
+    for root, dirs, names in os.walk(directory):
+        if skip_hidden_dirs:
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for name in names:
+            path = os.path.join(root, name)
+            if name.lower().endswith(extensions) and not (exclude and exclude(path)):
+                found.append(path)
+    return sorted(found)
+
+
 def same_path(a: str, b: str) -> bool:
     """True if two paths refer to the same location (symlinks, case, separators)."""
     return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))

@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
+from common.paths import find_files
 from common.text_files import read_text
 
 
@@ -157,12 +158,7 @@ SUPPORTED_EXTENSIONS = {
 
 def find_documents(directory: str) -> list[str]:
     """Supported files under *directory*, sorted by relative path."""
-    found = []
-    for root, dirs, files in os.walk(directory):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
-        for name in files:
-            if os.path.splitext(name)[1].lower() in SUPPORTED_EXTENSIONS:
-                found.append(os.path.join(root, name))
+    found = find_files(directory, SUPPORTED_EXTENSIONS, skip_hidden_dirs=True)
     return sorted(found, key=lambda p: os.path.relpath(p, directory).lower())
 
 

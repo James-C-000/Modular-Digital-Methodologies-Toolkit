@@ -58,7 +58,7 @@ def relationships_page():
         def work(job):
             from NLP.relationship_extraction import process_files_for_relationships
             job.progress(0, 0, "Loading the NER model...")
-            result = process_files_for_relationships(folder, folder, None, 1 if extract else 0, 1 if draw else 0,
+            result = process_files_for_relationships(folder, folder, 1 if extract else 0, 1 if draw else 0,
                                                      chosen, on_progress=job.progress, cancel=job.cancel_event)
             if result["status"] == "error":
                 raise RuntimeError(result["message"])

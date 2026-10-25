@@ -64,20 +64,18 @@ def test_translate_directory(tmp_path, monkeypatch):
 
 
 def test_keyword_search(tmp_path):
-    from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
+    from Advanced_Keyword_Search.advancedKeywordSearchLogic import search_directory
     src, out = tmp_path / "pdfs", tmp_path / "out"
     src.mkdir()
     out.mkdir()
     for n in ("a.pdf", "b.pdf", "c.pdf"):
         shutil.copy(os.path.join(FIXTURES, "text_sample.pdf"), src / n)
-    errors = []
     rec = Recorder()
-    summary = core_logic("5", 0, str(src), str(out), "", "the", "", "", on_error=errors.append, on_progress=rec)
-    assert not errors and summary["files"] == 3 and all(os.path.isfile(c) for c in summary["charts"])
+    summary = search_directory(str(src), str(out), "the", on_progress=rec)
+    assert summary["files"] == 3 and all(os.path.isfile(c) for c in summary["charts"])
     assert rec.calls[0] == (0, 3, "a.pdf") and rec.calls[-1] == (3, 3, "")
     rec = Recorder(stop_after=1)
-    summary = core_logic("5", 0, str(src), str(out), "", "the", "", "", on_error=errors.append,
-                         on_progress=rec, cancel=rec.cancel)
+    summary = search_directory(str(src), str(out), "the", on_progress=rec, cancel=rec.cancel)
     assert summary["files"] == 1 and summary["total"] == 3
 
 
@@ -107,7 +105,7 @@ def test_relationships(tmp_path, monkeypatch):
     monkeypatch.setattr(rel, "extract_entities_and_relationships", lambda text, types: [])
     _files(tmp_path, ["a.txt", "b.txt", "c.txt"])
     rec = Recorder(stop_after=2)
-    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 0, 0, ["PER"],
+    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 0, ["PER"],
                                                  on_progress=rec, cancel=rec.cancel)
     assert result["file_count"] == 2
 
@@ -120,7 +118,7 @@ def test_relationships_skip_text_extracted_by_an_earlier_run(tmp_path, monkeypat
     shutil.copy(os.path.join(FIXTURES, "text_sample.pdf"), tmp_path / "letter.pdf")
     (tmp_path / "letter_text.txt").write_text("written by the previous run", encoding="utf-8")
     (tmp_path / "notes_text.txt").write_text("a user's own file, no matching PDF", encoding="utf-8")
-    rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 0, 0, ["PER"])
+    rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 0, ["PER"])
     assert sorted(seen) == ["letter.pdf", "notes_text.txt"]
 
 
