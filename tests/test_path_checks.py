@@ -22,6 +22,12 @@ def test_find_files_searches_sub_folders_and_matches_any_case(tmp_path):
     assert find_files(str(tmp_path / "missing"), [".pdf"]) == []
 
 
+def test_find_files_ignores_files_named_just_like_an_extension(tmp_path):
+    _touch(tmp_path, ".pdf", ".md", "sub/.PDF", "a.pdf", ".hidden.pdf")
+    rel = [os.path.relpath(p, tmp_path) for p in find_files(str(tmp_path), [".pdf", ".md"])]
+    assert rel == [".hidden.pdf", "a.pdf"]
+
+
 def test_find_files_exclude_and_hidden_folders(tmp_path):
     _touch(tmp_path, "a.txt", "a_fr.txt", ".index/cache.txt", "sub/.git/x.txt", "sub/b.txt")
     found = find_files(str(tmp_path), [".txt"], exclude=lambda p: p.endswith("_fr.txt"))

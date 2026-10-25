@@ -26,13 +26,14 @@ def safe_filename(name: str, max_length: int = 120) -> str:
     return cleaned
 
 
-def unique_safe_filenames(names, suffix: str = "") -> dict:
+def unique_safe_filenames(names, suffix: str = "", reserved=()) -> dict:
     """Map each name to a distinct safe filename (``name`` -> ``file+suffix``).
 
-    Different names that sanitize to the same file (``a/b`` and ``ab``) get
-    ``_2``, ``_3`` ... appended, compared case-insensitively as on Windows/macOS.
+    Different names that sanitize to the same file (``a/b`` and ``ab``), or to
+    one of the *reserved* filenames written next to them, get ``_2``, ``_3`` ...
+    appended, compared case-insensitively as on Windows/macOS.
     """
-    used = set()
+    used = {name.casefold() for name in reserved}
     result = {}
     for name in names:
         base = safe_filename(name)
@@ -68,12 +69,13 @@ def output_stems(paths) -> dict:
 
 
 def find_files(directory: str, extensions, exclude=None, skip_hidden_dirs: bool = False) -> list[str]:
-    """Files under *directory* and its sub-folders ending with one of *extensions*, sorted.
+    """Files under *directory* and its sub-folders with one of *extensions*, sorted.
 
     Extensions are lower-case with the dot (``".pdf"``) and match any case
-    (``SCAN.PDF``).  ``exclude(path)`` returning True leaves a file out (a
-    tool's own outputs); *skip_hidden_dirs* does not descend into ``.git``,
-    ``.index`` and other folders whose name starts with a dot.
+    (``SCAN.PDF``); a file named just ``.pdf`` has none.  ``exclude(path)``
+    returning True leaves a file out (a tool's own outputs); *skip_hidden_dirs*
+    does not descend into ``.git``, ``.index`` and other folders whose name
+    starts with a dot.
     """
     extensions = tuple(extensions)
     found = []
@@ -82,7 +84,7 @@ def find_files(directory: str, extensions, exclude=None, skip_hidden_dirs: bool 
             dirs[:] = [d for d in dirs if not d.startswith(".")]
         for name in names:
             path = os.path.join(root, name)
-            if name.lower().endswith(extensions) and not (exclude and exclude(path)):
+            if os.path.splitext(name)[1].lower() in extensions and not (exclude and exclude(path)):
                 found.append(path)
     return sorted(found)
 
