@@ -1,0 +1,30 @@
+name: Python and locked dependencies
+description: Python 3.12 with MDMT's locked runtime dependencies (and test/build tools) for one platform.
+
+inputs:
+  platform:
+    description: linux, macos or windows; selects requirements/lock-<platform>.txt and dev-<platform>.txt.
+    required: true
+  dev:
+    description: Also install the test and build tools (requirements/dev-<platform>.txt).
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+        cache-dependency-path: requirements/*-${{ inputs.platform }}.txt
+
+    - name: Install locked Python dependencies
+      shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        DEV: ${{ inputs.dev }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r "requirements/lock-$PLATFORM.txt"
+        if [ "$DEV" = true ]; then pip install -r "requirements/dev-$PLATFORM.txt"; fi

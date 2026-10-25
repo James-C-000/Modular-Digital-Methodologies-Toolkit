@@ -1,4 +1,4 @@
-from OCR.ocr_logic import TESSERACT_LANGUAGES, find_pdfs_in_directory, build_ocr_params
+from OCR.ocr_logic import TESSERACT_LANGUAGES, build_ocr_params
 
 
 def test_tesseract_languages_contains_english():
@@ -8,24 +8,6 @@ def test_tesseract_languages_contains_english():
 
 def test_tesseract_languages_has_all_entries():
     assert len(TESSERACT_LANGUAGES) > 100
-
-
-def test_find_pdfs_in_directory(tmp_path):
-    (tmp_path / "doc1.pdf").write_text("fake pdf")
-    (tmp_path / "doc2.pdf").write_text("fake pdf")
-    (tmp_path / "readme.txt").write_text("not a pdf")
-    sub = tmp_path / "subdir"
-    sub.mkdir()
-    (sub / "doc3.pdf").write_text("fake pdf")
-
-    pdfs = find_pdfs_in_directory(str(tmp_path))
-    assert len(pdfs) == 3
-    assert all(p.endswith(".pdf") for p in pdfs)
-
-
-def test_find_pdfs_empty_directory(tmp_path):
-    pdfs = find_pdfs_in_directory(str(tmp_path))
-    assert pdfs == []
 
 
 def test_build_ocr_params_basic():

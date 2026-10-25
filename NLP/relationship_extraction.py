@@ -17,6 +17,7 @@ import os
 import networkx as nx
 from matplotlib.figure import Figure
 
+from common.paths import find_files
 from common.text_files import document_text as extract_text_from_file
 from NLP.ner_onnx import load_model
 from NLP.text_utils import sentence_spans, word_spans
@@ -120,9 +121,9 @@ def _is_extracted_text(path):
     return stem is not None and os.path.isfile(stem + ".pdf")
 
 
-def process_files_for_relationships(input_dir, output_dir, model_name, extract_text, generate_graph, entity_types,
+def process_files_for_relationships(input_dir, output_dir, extract_text, generate_graph, entity_types,
                                     on_progress=None, cancel=None):
-    """Process files and extract relationships (model_name is unused).
+    """Process files and extract relationships.
 
     on_progress(done, total, current_file) is called before each file; a set
     *cancel* event stops before the next one.  With *extract_text*, the text of
@@ -143,12 +144,7 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
     }
 
     try:
-        files = []
-        for root, _, filenames in os.walk(input_dir):
-            for filename in filenames:
-                path = os.path.join(root, filename)
-                if filename.lower().endswith(('.txt', '.pdf')) and not _is_extracted_text(path):
-                    files.append(path)
+        files = find_files(input_dir, [".txt", ".pdf"], exclude=_is_extracted_text)
 
         if not files:
             results['status'] = 'warning'
@@ -158,7 +154,6 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         os.makedirs(output_dir, exist_ok=True)
         all_relationships = []
 
-        files.sort()
         for i, file_path in enumerate(files):
             if cancel is not None and cancel.is_set():
                 break
@@ -224,7 +219,6 @@ if __name__ == "__main__":
     results = process_files_for_relationships(
         input_dir="./test_docs",
         output_dir="./test_output",
-        model_name=None,
         extract_text=True,
         generate_graph=True,
         entity_types=["PER", "ORG", "LOC"]

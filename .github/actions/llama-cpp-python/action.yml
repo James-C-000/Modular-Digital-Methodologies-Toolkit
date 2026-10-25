@@ -1,0 +1,35 @@
+name: llama-cpp-python
+description: Build llama-cpp-python from source with the job's CMAKE_ARGS (or restore the cached wheel) and install it.
+
+inputs:
+  platform:
+    description: linux, macos or windows; part of the wheel's cache key.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Keyed on the whole of llama.txt and on CMAKE_ARGS, so any change to the
+    # pin or the flags rebuilds.  tests.yml's llama-cpp job and build.yml's
+    # Linux job use the same flags, so they share the wheel.
+    - name: Cache llama-cpp-python wheel
+      id: llama-cache
+      uses: actions/cache@v4
+      with:
+        path: wheels
+        key: llama-cpp-python-${{ inputs.platform }}-py312-${{ hashFiles('requirements/llama.txt') }}-${{ env.CMAKE_ARGS }}
+
+    - name: Build llama-cpp-python wheel
+      if: steps.llama-cache.outputs.cache-hit != 'true'
+      shell: bash
+      # --no-cache-dir: pip's wheel cache ignores CMAKE_ARGS, so it could hand
+      # back a build made with other flags.
+      run: pip wheel --no-deps --no-cache-dir -r requirements/llama.txt -w wheels
+
+    # Import it here so a broken install fails the job instead of letting
+    # the tests skip themselves.
+    - name: Install llama-cpp-python
+      shell: bash
+      run: |
+        pip install --no-deps wheels/llama_cpp_python-*.whl
+        python -c "import llama_cpp; print(llama_cpp.__version__)"

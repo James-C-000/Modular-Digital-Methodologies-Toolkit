@@ -1,10 +1,33 @@
-"""Input/output folder checks used by the pages."""
+"""Input/output folder checks used by the pages, and finding the input files."""
 import os
 import sys
 
 import pytest
 
-from common.paths import folder_problem, is_inside, output_folder_problem, same_path
+from common.paths import find_files, folder_problem, is_inside, output_folder_problem, same_path
+
+
+def _touch(folder, *names):
+    for name in names:
+        path = folder / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+
+
+def test_find_files_searches_sub_folders_and_matches_any_case(tmp_path):
+    _touch(tmp_path, "b.pdf", "A.PDF", "notes.txt", "sub/deeper/c.pdf", "sub/readme.md")
+    rel = [os.path.relpath(p, tmp_path) for p in find_files(str(tmp_path), [".pdf"])]
+    assert rel == ["A.PDF", "b.pdf", os.path.join("sub", "deeper", "c.pdf")]
+    assert len(find_files(str(tmp_path), (".pdf", ".txt"))) == 4
+    assert find_files(str(tmp_path / "missing"), [".pdf"]) == []
+
+
+def test_find_files_exclude_and_hidden_folders(tmp_path):
+    _touch(tmp_path, "a.txt", "a_fr.txt", ".index/cache.txt", "sub/.git/x.txt", "sub/b.txt")
+    found = find_files(str(tmp_path), [".txt"], exclude=lambda p: p.endswith("_fr.txt"))
+    assert len(found) == 4
+    visible = find_files(str(tmp_path), [".txt"], skip_hidden_dirs=True)
+    assert [os.path.relpath(p, tmp_path) for p in visible] == ["a.txt", "a_fr.txt", os.path.join("sub", "b.txt")]
 
 
 def test_same_path_sees_through_dots_and_links(tmp_path):

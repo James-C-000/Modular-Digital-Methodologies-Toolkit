@@ -5,7 +5,7 @@ import logging
 import os
 from collections import Counter
 
-from common.paths import output_stems
+from common.paths import find_files, output_stems
 from common.text_files import document_text
 from NLP.ner_onnx import load_model
 
@@ -113,8 +113,7 @@ def main(directory, on_progress=None, cancel=None):
 
     overall_summary = {}
 
-    paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
-                   for file in files if file.lower().endswith((".pdf", ".txt")))
+    paths = find_files(directory, [".pdf", ".txt"])
     stems = output_stems(paths)
     read, skipped = 0, []
     for i, file_path in enumerate(paths):

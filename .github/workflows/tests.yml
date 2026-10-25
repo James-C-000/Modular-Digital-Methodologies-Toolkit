@@ -34,13 +34,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: requirements/*-${{ matrix.name }}.txt
-
       # Tesseract lets the end-to-end OCR tests run instead of skipping.
       - name: Install Tesseract (Linux)
         if: runner.os == 'Linux'
@@ -56,11 +49,10 @@ jobs:
 
       # llama-cpp-python is not needed by most tests (it is only loaded when a
       # model is), so the slow source build is left to the llama-cpp job.
-      - name: Install locked Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements/lock-${{ matrix.name }}.txt
-          pip install -r requirements/dev-${{ matrix.name }}.txt
+      - name: Python and locked dependencies
+        uses: ./.github/actions/python-deps
+        with:
+          platform: ${{ matrix.name }}
 
       - name: Lint (ruff)
         run: ruff check .
@@ -81,37 +73,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Python and locked dependencies
+        uses: ./.github/actions/python-deps
         with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: requirements/*-linux.txt
+          platform: linux
 
-      - name: Install locked Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements/lock-linux.txt
-          pip install -r requirements/dev-linux.txt
-
-      - name: Cache llama-cpp-python wheel
-        id: llama-cache
-        uses: actions/cache@v4
+      - name: llama-cpp-python
+        uses: ./.github/actions/llama-cpp-python
         with:
-          path: wheels
-          key: llama-cpp-python-linux-py312-${{ hashFiles('requirements/llama.txt') }}-${{ env.CMAKE_ARGS }}
-
-      - name: Build llama-cpp-python wheel
-        if: steps.llama-cache.outputs.cache-hit != 'true'
-        # --no-cache-dir: pip's wheel cache ignores CMAKE_ARGS (see build.yml).
-        run: pip wheel --no-deps --no-cache-dir -r requirements/llama.txt -w wheels
-
-      # Import it here so a broken install fails the job instead of letting
-      # the tests skip themselves.
-      - name: Install llama-cpp-python
-        run: |
-          pip install --no-deps wheels/llama_cpp_python-*.whl
-          python -c "import llama_cpp; print(llama_cpp.__version__)"
+          platform: linux
 
       - name: Run the llama-cpp-python tests
         run: pytest -v -rs tests/test_rag_generation.py
@@ -124,17 +94,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Python and locked dependencies
+        uses: ./.github/actions/python-deps
         with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: requirements/lock-linux.txt
-
-      - name: Install locked Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements/lock-linux.txt
+          platform: linux
+          dev: 'false'
 
       - name: Cache the eval corpus and retrieval model
         uses: actions/cache@v4

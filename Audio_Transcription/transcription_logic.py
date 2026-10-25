@@ -10,6 +10,8 @@ Models are downloaded on demand (Downloads page) into
 """
 import os
 
+from common.paths import find_files
+
 AUDIO_FORMATS = (".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm", ".flac", ".ogg")
 
 # Systran's CTranslate2 conversions of the OpenAI Whisper checkpoints (MIT).
@@ -69,16 +71,6 @@ def load_model(name: str, models_root: str):
 
     path = download_model(name, models_root)
     return WhisperModel(path, device="cpu", compute_type="int8")
-
-
-def find_audio_files(directory: str) -> list[str]:
-    """Walk a directory and return all audio file paths."""
-    audio_files = []
-    for dirpath, _, filenames in os.walk(directory):
-        for filename in filenames:
-            if filename.lower().endswith(AUDIO_FORMATS):
-                audio_files.append(os.path.join(dirpath, filename))
-    return sorted(audio_files)
 
 
 def transcribe_file(model, audio_path: str, output_path: str = None, vad_filter: bool = DEFAULT_VAD) -> dict:
@@ -141,7 +133,7 @@ def transcribe_directory(
         from config import get_whisper_models_dir
         download_root = get_whisper_models_dir()
 
-    audio_files = find_audio_files(directory)
+    audio_files = find_files(directory, AUDIO_FORMATS)
     if not audio_files:
         return []
 

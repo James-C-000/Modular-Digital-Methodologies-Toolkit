@@ -94,11 +94,8 @@ def test_keyword_search_handles_non_latin_keywords_and_writes_excel_csv(tmp_path
     out.mkdir()
     shutil.copyfile(PDF, pdf_dir / "sample.pdf")
     _run_as_if_on_windows(
-        "from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic\n"
-        "errors = []\n"
-        f"core_logic('6', 0, {str(pdf_dir)!r}, {str(out)!r}, '', 'москва\\nkyiv\\ncon', '', '',"
-        " on_error=errors.append, on_message=lambda m: None)\n"
-        "assert not errors, errors\n"
+        "from Advanced_Keyword_Search.advancedKeywordSearchLogic import search_directory\n"
+        f"search_directory({str(pdf_dir)!r}, {str(out)!r}, 'москва\\nkyiv\\ncon', context_words=6)\n"
     )
 
     for name in ("москва.csv", "kyiv.csv", "_con.csv", "Data_Overview.csv"):

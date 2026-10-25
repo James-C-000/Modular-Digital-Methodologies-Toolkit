@@ -59,7 +59,7 @@ def test_folder_run_writes_excel_csv_and_graph(tmp_path):
         "Ada Lovelace corresponded with Charles Babbage in London about the Royal Society in 1843.",
         encoding="utf-8")
     result = rel.process_files_for_relationships(
-        str(tmp_path), str(tmp_path), None, extract_text=0, generate_graph=1,
+        str(tmp_path), str(tmp_path), extract_text=0, generate_graph=1,
         entity_types=["PER", "ORG", "LOC"])
     assert result["status"] == "success", result["message"]
     raw = (tmp_path / "relationships.csv").read_bytes()
@@ -75,7 +75,7 @@ def test_folder_run_writes_excel_csv_and_graph(tmp_path):
 
 def test_no_entities_is_a_warning(tmp_path):
     (tmp_path / "plain.txt").write_text("Nothing notable happened on the farm this week at all.", encoding="utf-8")
-    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 0, 1, ["PER"])
+    result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 0, 1, ["PER"])
     assert result["status"] == "warning"
 
 
@@ -95,7 +95,7 @@ def test_subfolders_saved_text_and_file_column(tmp_path):
 
     rel.extract_text_from_file = reading
     try:
-        result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 1, 0, ["PER"])
+        result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
         assert (tmp_path / "box1" / "scan_text.txt").is_file()          # next to the PDF
         assert not list(tmp_path.rglob("letters_text.txt"))           # only PDFs' text is saved
         assert result["skipped"] == [{"input": os.path.join("box2", "blank.txt"),
@@ -104,7 +104,7 @@ def test_subfolders_saved_text_and_file_column(tmp_path):
             files = {r[6] for r in list(csv.reader(f))[1:]}
         assert files == {os.path.join("box1", "letters.txt"), os.path.join("box2", "letters.txt")}
         seen.clear()
-        rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 1, 0, ["PER"])
+        rel.process_files_for_relationships(str(tmp_path), str(tmp_path), 1, 0, ["PER"])
         assert os.path.join("box1", "scan_text.txt") not in seen      # saved text is not processed again
     finally:
         rel.extract_text_from_file = real

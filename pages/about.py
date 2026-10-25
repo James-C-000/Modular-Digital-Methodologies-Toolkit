@@ -165,17 +165,25 @@ and produces a detailed report with context snippets, frequency counts, and
 charts.
 
 **How to use:**
-1. Choose a **PDF folder** and a separate **Output folder** for the results.
-2. Enter your **Keywords**, one per line.
-3. Set the **Context length**: the total number of words saved around each
-   match, half before it and half after (default: 5).
+1. Choose an **Input folder** containing PDF files (sub-folders are included)
+   and a separate **Output folder** for the results. Charts of PDFs in
+   sub-folders go in the matching sub-folders of the output folder.
+2. Enter your **Keywords**, one per line. They are matched as whole words,
+   ignoring case and punctuation at the edges of words (`york.` and `(york)`
+   match `york`); a keyword of several words matches them in sequence.
+   Hyphens separate words unless the keyword contains one, so `mill race`
+   also finds `mill-race`. Every match is counted once and gets one row of
+   context in the keyword's CSV.
+3. Set the **Context length**: the number of words saved for each match,
+   the match included, split evenly before and after it (default: 5, two
+   words on each side). With an even number, one more word comes before.
 4. Optionally set filters (see below).
 5. Click **Search**.
 
 **Filters** (applied to the text before searching; the first that applies wins):
-- **Basic filter** keeps only letters, digits and spaces (including line
-  breaks), removing punctuation, symbols and OCR noise. Letters of every
-  language are kept with their accents: é, ł, ß, Москва, 北京.
+- **Basic filter** keeps only letters, digits, hyphens and spaces (including
+  line breaks), removing other punctuation, symbols and OCR noise. Letters of
+  every language are kept with their accents: é, ł, ß, Москва, 北京.
 - Otherwise, every **character** listed in the filter file, or typed in the
   filter box, is removed from the text: entering `#*` deletes every `#` and `*`.
   This cleans up OCR noise that splits words.
@@ -188,6 +196,8 @@ loaded from text files in the "Or load keywords and filters from files" section.
 - Use short, specific keywords for more relevant results.
 - The output directory will contain a spreadsheet and charts summarizing the
   keyword analysis.
+- PDFs without a text layer (scans) are listed as skipped: run them through
+  **OCR** first.
         """)
 
     # Named Entity Recognition

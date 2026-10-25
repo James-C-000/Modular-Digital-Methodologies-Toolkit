@@ -4,22 +4,23 @@ from nicegui import ui
 from common.paths import folder_problem, output_folder_problem
 from pages.components import (
     FileField, FolderField, JobPanel, hint, missing_dependency, page_header, remember, run_button, saved,
-    section, start_job,
+    section, skipped_files, start_job,
 )
 
 
 def keywords_page():
     page_header("Keyword Search", "Count keywords and collect their context across a folder of PDFs")
     try:
-        from Advanced_Keyword_Search.advancedKeywordSearchLogic import core_logic
+        from Advanced_Keyword_Search.advancedKeywordSearchLogic import search_directory
     except ImportError as e:
         missing_dependency(e)
         return
 
     with section("Folders"):
-        src = FolderField("PDF folder", "defaults.keywords_input_dir")
+        src = FolderField("Input folder (PDFs, searched recursively)", "defaults.keywords_input_dir")
         dst = FolderField("Output folder", "defaults.keywords_output_dir")
-        hint("Writes one CSV per keyword with its context, an overview CSV, and charts per PDF and in total.")
+        hint("Writes one CSV per keyword with its context, an overview CSV, and charts per PDF and in total."
+             " Charts of PDFs in sub-folders go in the matching sub-folders of the output folder.")
 
     with section("Keywords"):
         keywords_text = remember(ui.textarea("Keywords, one per line", value=saved("defaults.keywords_keywords", ""))
@@ -28,11 +29,11 @@ def keywords_page():
                                      min=1, max=50, precision=0).classes("w-48"), "defaults.keywords_context")
 
     with section("Filters"):
-        basic = remember(ui.checkbox("Basic filter (letters, numbers and spaces only)",
+        basic = remember(ui.checkbox("Basic filter (letters, numbers, hyphens and spaces only)",
                                      value=saved("defaults.keywords_basic_filter", False)),
                          "defaults.keywords_basic_filter")
-        hint("Removes punctuation, symbols and OCR noise before searching. Letters of every language, with their"
-             " accents, are kept.")
+        hint("Removes other punctuation, symbols and OCR noise before searching. Letters of every language, with"
+             " their accents, are kept.")
         filters_text = remember(ui.textarea("Characters to remove, one group per line",
                                             value=saved("defaults.keywords_filters", ""))
                                 .classes("w-full").props("rows=3"), "defaults.keywords_filters")
@@ -48,6 +49,7 @@ def keywords_page():
             ui.label(f"{summary['files']} of {summary['total']} PDF(s) searched.").classes("text-body2")
             if summary.get("hits") == 0:
                 ui.label("None of the keywords were found.").classes("text-body2 text-warning")
+            skipped_files(summary.get("skipped", []))
 
     def start():
         problem = folder_problem(src.value)
@@ -58,14 +60,13 @@ def keywords_page():
             return dst.error(problem)
         if not (keywords_text.value or "").strip() and not keyword_file.value:
             return ui.notify("Enter keywords or choose a keyword file.", type="warning")
-        args = (str(int(context.value or 5)), 1 if basic.value else 0, src.value, dst.value, keyword_file.value,
-                keywords_text.value or "", filter_file.value, filters_text.value or "")
+        folders = (src.value, dst.value)
+        options = dict(keywords=keywords_text.value or "", keyword_file=keyword_file.value,
+                       filters=filters_text.value or "", filter_file=filter_file.value, basic=bool(basic.value),
+                       context_words=int(context.value or 5))
 
         def work(job):
-            errors = []
-            summary = core_logic(*args, on_error=errors.append, on_progress=job.progress, cancel=job.cancel_event)
-            if errors:
-                raise RuntimeError(errors[0].replace("ERROR: ", "").replace("\n", " "))
+            summary = search_directory(*folders, **options, on_progress=job.progress, cancel=job.cancel_event)
             for chart in summary["charts"]:
                 job.add_image(chart)
             return summary

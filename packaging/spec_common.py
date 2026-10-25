@@ -36,7 +36,6 @@ UPX = False
 
 def common_datas() -> list:
     datas = [
-        (os.path.join(ROOT, "Advanced_Keyword_Search", "*.txt"), "Advanced_Keyword_Search"),
         (os.path.join(ROOT, "LICENSE"), "."),
         (os.path.join(ROOT, "THIRD_PARTY_LICENSES"), "."),
         (os.path.join(ROOT, "NLP", "data"), os.path.join("NLP", "data")),

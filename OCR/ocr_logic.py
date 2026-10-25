@@ -12,6 +12,7 @@ import sys
 import ocrmypdf
 import ocrmypdf.subprocess
 
+from common.paths import find_files
 from common.proc import hide_console_windows_in
 
 hide_console_windows_in(ocrmypdf.subprocess)
@@ -170,16 +171,6 @@ def find_ghostscript() -> str | None:
     return shutil.which("gs")
 
 
-def find_pdfs_in_directory(directory: str) -> list[str]:
-    """Recursively find all PDF files in a directory."""
-    pdfs = []
-    for root, _dirs, files in os.walk(directory):
-        for f in files:
-            if f.lower().endswith(".pdf"):
-                pdfs.append(os.path.join(root, f))
-    return sorted(pdfs)
-
-
 def build_ocr_params(
     language_codes: list[str],
     deskew: bool,
@@ -256,7 +247,7 @@ def run_ocr_batch(
     if not language_codes:
         return []
 
-    pdfs = find_pdfs_in_directory(input_dir)
+    pdfs = find_files(input_dir, [".pdf"])
     results = []
 
     for i, pdf_path in enumerate(pdfs):
