@@ -262,10 +262,36 @@ def test_filter_characters_that_unicode_would_rewrite_still_work(tmp_path, monke
     assert summary["hits"] == 1 and rows["acme.csv"][0][2] == "acme sells"
 
 
-def test_spacing_accents_as_latex_pdfs_extract_them_do_not_split_words(tmp_path, monkeypatch):
-    # LaTeX PDFs extract "café" as "caf´e"; NFKC made that "caf ́e", two words.
-    summary, rows = _search_pages(tmp_path, monkeypatch, ["the caf´e opens"], "cafe", basic=True)
-    assert summary["hits"] == 1 and rows["cafe.csv"][0][2] == "the cafe opens"
+def test_filters_match_the_text_as_written_and_as_compared(tmp_path, monkeypatch):
+    # A filtered ligature removed nothing: the text's "ﬁ" was already "fi" when the filter ran.
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["the ﬁeld"], "eld", filters="ﬁ", context_words=2)
+    assert summary["hits"] == 1 and rows["eld.csv"][0][2] == "the eld"
+    # A letter filtered out is also removed where a ligature spells it, in the text as in the keyword.
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["the ﬁeld"], "field", filters="f", context_words=1)
+    assert summary["hits"] == 1 and rows["field.csv"][0][2] == "ield"
+    # An "é" typed as "e" and a separate accent removed every "e".
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["café cafe"], "caf", filters="e\u0301", context_words=1)
+    assert summary["hits"] == 1 and rows["caf.csv"][0][2] == "caf"
+
+
+def test_spacing_accents_as_latex_pdfs_extract_them_join_their_letters(tmp_path, monkeypatch):
+    # LaTeX PDFs extract "café" as "caf´e": NFKC made that two words, and 2.2.2 kept the accent apart from the "e".
+    pages = ["the caf´e of M¨uller and Dvoˇr´ak, it´s said"]
+    keywords = "café\nmüller\ndvořák\nit´s"
+    for options in ({}, {"basic": True}):
+        summary, rows = _search_pages(tmp_path, monkeypatch, pages, keywords, context_words=1, **options)
+        assert summary["hits"] == 4, options
+        assert rows["café.csv"] == [["a.pdf", "1", "café"]] and rows["dvořák.csv"][0][2].rstrip(",") == "dvořák"
+    # "´" also stands in for an apostrophe, so it only joins a vowel: "it´s" is not "itś".
+    summary, rows = _search_pages(tmp_path, monkeypatch, pages, "its", basic=True, context_words=1)
+    assert rows["its.csv"] == [["a.pdf", "1", "its"]]
+
+
+def test_compatibility_forms_of_letters_match_typed_keywords(tmp_path, monkeypatch):
+    # PDFs often extract Arabic as presentation forms; 2.2.2 stopped mapping these (and fullwidth letters).
+    pages = ["\ufee3\ufeae\ufea3\ufe92\ufe8e and ＡＢＣ １２"]
+    summary, rows = _search_pages(tmp_path, monkeypatch, pages, "مرحبا\nabc\n12", context_words=1)
+    assert summary["hits"] == 3 and rows["مرحبا.csv"] == [["a.pdf", "1", "مرحبا"]]
 
 
 def test_keywords_that_compare_alike_are_searched_once_and_reported(tmp_path, monkeypatch):
@@ -285,7 +311,8 @@ def test_keywords_the_filter_makes_alike_are_reported(tmp_path, monkeypatch):
 
 
 def test_a_keyword_the_filter_empties_is_never_found_and_reported(tmp_path, monkeypatch):
-    summary, rows = _search_pages(tmp_path, monkeypatch, ["a + b ++ c ##"], "++\nb\n++\n##", basic=True)
+    # Repeated after another emptied keyword, "++" was searched again as "++ (2)".
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["a + b ++ c ##"], "++\nb\n##\n++\n##", basic=True)
     assert summary["hits"] == 1 and rows["++.csv"] == [] and rows["##.csv"] == [] and "++ (2).csv" not in rows
     assert summary["keyword_notes"] == ['"++" was not searched: the filter leaves nothing of it.',
                                         '"##" was not searched: the filter leaves nothing of it.']
@@ -327,5 +354,26 @@ def test_charts_show_dollar_signs_and_a_chart_failure_skips_only_the_charts(tmp_
 def test_total_charts_that_cannot_be_saved_do_not_fail_the_search(tmp_path, monkeypatch):
     (tmp_path / "out" / "totalPie.png").mkdir(parents=True)   # a folder where the chart should go
     summary, rows = _search_pages(tmp_path, monkeypatch, ["the key"], "key")
-    assert summary["hits"] == 1 and rows["key.csv"] and summary["charts"] == []
-    assert [w["input"] for w in summary["warnings"]] == ["totalPie.png, totalBar.png"]
+    assert summary["hits"] == 1 and rows["key.csv"] and summary["charts"] == [str(tmp_path / "out" / "totalBar.png")]
+    assert [w["input"] for w in summary["warnings"]] == ["totalPie.png"]
+
+
+def test_any_chart_error_loses_only_that_chart_and_leaves_no_old_one(tmp_path, monkeypatch):
+    # Only OSError and ValueError were caught, so Agg's OverflowError stopped the search; and a pie saved
+    # before a failing bar chart, or a chart from an earlier search, stayed on disk while reported as not saved.
+    from Advanced_Keyword_Search import advancedKeywordSearchLogic
+
+    def fail(*_args):
+        raise OverflowError("Exceeded cell block limit")
+
+    monkeypatch.setattr(advancedKeywordSearchLogic, "_save_bar", fail)
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "totalBar.png").write_bytes(b"a chart from an earlier search")
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["the key"], "key")
+    assert summary["hits"] == 1 and rows["key.csv"]
+    assert summary["charts"] == [str(out / "totalPie.png")] and (out / "a.pdf-PIE.png").stat().st_size > 0
+    assert not (out / "totalBar.png").exists() and not (out / "a.pdf-BAR.png").exists()
+    assert summary["warnings"] == [
+        {"input": "a.pdf", "message": "searched, but its bar chart could not be saved (Exceeded cell block limit)"},
+        {"input": "totalBar.png", "message": "could not be saved (Exceeded cell block limit)"}]

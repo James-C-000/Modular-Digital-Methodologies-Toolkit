@@ -5,11 +5,14 @@ page.  Keywords are plain text matched as whole words, ignoring case and
 punctuation at the edges of words ("york." is "york"); a keyword of several
 words matches them in sequence.  Hyphens separate words unless the keyword
 contains one, so "mill race" also finds "mill-race".  The filters apply to the
-keywords as to the text, and both are compared with Latin ligatures spelled
-out (the "\ufb01" in "\ufb01eld" is "fi") and accents stored as separate marks
-joined to their letters.  Keywords that compare alike ("york" and "york.") are
-searched once, and the summary says which were counted together.  Every
-occurrence is counted once and gets one row in the keyword's CSV.
+keywords as to the text, and both are compared with accents stored as separate
+marks joined to their letters (also the spacing accents in "caf\u00b4e", as LaTeX
+PDFs extract "caf\u00e9") and with letters in compatibility forms written plainly:
+ligatures spelled out (the "\ufb01" in "\ufb01eld" is "fi"), Arabic presentation
+forms as the base letters, fullwidth "\uff21" as "A".  Keywords that compare
+alike ("york" and "york.") are searched once, and the summary says which were
+counted together.  Every occurrence is counted once and gets one row in the
+keyword's CSV.
 The output folder receives:
 
 - ``<keyword>.csv``: one row per hit with the PDF, the page and the words
@@ -21,6 +24,7 @@ The output folder receives:
 """
 import csv
 import logging
+import contextlib
 import os
 import re
 import unicodedata
@@ -74,23 +78,53 @@ def _text_filter(basic: bool, filters: str, filter_file: str):
     """A function removing the characters the user filters out of a page's text."""
     if basic:
         return basic_filter
-    if filter_file:
-        remove = _read_file(filter_file, "filter").replace("\r", "").replace("\n", "")
-    else:
-        remove = filters.replace("\n", "")
+    lines = _read_file(filter_file, "filter").replace("\r", "") if filter_file else filters
+    # In NFC form like the text, so an "\u00e9" typed as e and a separate accent removes "\u00e9", not every "e".
+    remove = "".join(unicodedata.normalize("NFC", line) for line in lines.split("\n"))
     table = str.maketrans("", "", remove)
     return lambda text: text.translate(table)
 
 
-# Only the Latin ligatures (U+FB00-FB06, "\ufb01" -> "fi"): full NFKC also rewrites
-# characters people filter out ("\u2122" -> "TM") and splits a spacing accent
-# ("caf\u00b4e", as LaTeX PDFs extract "caf\u00e9") into a space and a mark.
-_LIGATURES = str.maketrans({chr(c): unicodedata.normalize("NFKC", chr(c)) for c in range(0xFB00, 0xFB07)})
+# Letters and digits in compatibility forms, written plainly ("\ufb01" -> "fi", Arabic presentation forms
+# -> the base letters, fullwidth "\uff21" -> "A").  Not full NFKC: that also rewrites symbols people filter
+# out ("\u2122" -> "TM", "\u00b2" -> "2") and splits a spacing accent into a space and a mark.
+_COMPAT = {c: unicodedata.normalize("NFKC", chr(c)) for c in range(0x20000)
+           if unicodedata.decomposition(chr(c)).startswith("<")
+           and unicodedata.category(chr(c)) in {"Lu", "Ll", "Lt", "Lm", "Lo", "Nd"}}
+
+# Spacing accents ("\u00b4" for U+0301) and their combining marks: LaTeX PDFs extract "caf\u00e9" as "caf\u00b4e".
+_ACCENTS = {chr(c): nfkd[1:] for c in range(0x2000) for nfkd in [unicodedata.normalize("NFKD", chr(c))]
+            if len(nfkd) > 1 and nfkd[0] == " " and all(unicodedata.category(m) == "Mn" for m in nfkd[1:])}
+_ACCENTS.update({"\u02c6": "\u0302", "\u02c7": "\u030c"})   # circumflex and caron have no decomposition
+_SPACING_ACCENT = re.compile(f"([{re.escape(''.join(_ACCENTS))}])([^\\W\\d_])")
+
+
+def _join_accent(m) -> str:
+    """A spacing accent and the letter after it as one letter ("\u00b4e" -> "\u00e9"), if there is one.
+
+    "\u00b4" is also typed for an apostrophe ("it\u00b4s"), so it only joins a vowel.
+    """
+    accent, letter = m.groups()
+    joined = unicodedata.normalize("NFC", letter + _ACCENTS[accent])
+    if len(joined) == 1 and (accent != "\u00b4" or letter in "aeiouyAEIOUY"):
+        return joined
+    return m.group()
 
 
 def _normalize(text: str) -> str:
-    """*text* in NFC form (accents joined to their letters) with Latin ligatures spelled out."""
-    return unicodedata.normalize("NFC", text).translate(_LIGATURES)
+    """*text* in NFC form, so with accents joined to their letters, also the spacing accents before them."""
+    return unicodedata.normalize("NFC", _SPACING_ACCENT.sub(_join_accent, text))
+
+
+def _comparable(text: str, clean) -> str:
+    """*text* as compared with the keywords: normalized, filtered (*clean*), compatibility forms written plainly
+    (see _COMPAT) and lower-cased.
+
+    The filter runs before the compatibility forms are rewritten, so that it
+    removes the characters it lists as written ("\ufb01"), and after, so that a
+    letter it lists is removed where a ligature spelled it out too.
+    """
+    return clean(unicodedata.normalize("NFC", clean(_normalize(text)).translate(_COMPAT))).lower()
 
 
 def _bare(word: str) -> str:
@@ -117,15 +151,17 @@ def _keywords(lines: list[str], clean) -> tuple[dict[str, tuple[list[str], bool]
     A keyword is filtered like the text (*clean*), so with the basic filter
     "o'brien" is compared as "obrien".  Of keywords compared alike only the
     first is kept, so no match is counted twice; one the filter empties is
-    kept but never found.  Also returns a note for each of these keywords.
+    kept (once) but never found.  Also returns a note for each of these keywords.
     """
     found, kept, notes = {}, {}, []
     for line in lines:
-        compared = clean(_normalize(line)).lower()
+        compared = _comparable(line, clean)
         hyphens_separate = "-" not in compared
         parts = [bare for _start, _end, bare in _words(compared, hyphens_separate)]
-        key, keyword = (tuple(parts), hyphens_separate), line.lower()
-        if key in kept and (parts or kept[key] == keyword):
+        keyword = line.lower()
+        # Keywords the filter empties all compare as no words, so they are told apart by name.
+        key = (tuple(parts), hyphens_separate) if parts else keyword
+        if key in kept:
             if kept[key] != keyword:
                 notes.append(f'"{keyword}" was counted as "{kept[key]}": they match the same words.')
             continue
@@ -252,21 +288,26 @@ def _plain(text: str) -> str:
     return text.replace("$", r"\$")
 
 
-def _save_charts(pie: str, bar: str, counts: dict, title: str, xlabel: str) -> str | None:
-    """A pie chart and a bar chart of *counts*; why they could not be saved, or None.
+def _save_charts(pie: str, bar: str, counts: dict, title: str, xlabel: str) -> dict[str, str]:
+    """A pie chart and a bar chart of *counts*; why each chart that could not be saved was not, by its path.
 
-    A path too long for Windows, say, loses these charts, not the search.
+    A path too long for Windows, say, loses a chart, not the search.  A chart
+    that is not saved leaves no file at its path, so none from an earlier search.
     """
     values, labels = _chart_data(counts)
     labels, title = [_plain(label) for label in labels], _plain(title)
-    try:
-        os.makedirs(os.path.dirname(pie) or ".", exist_ok=True)
-        _save_pie(pie, values, labels, title)
-        _save_bar(bar, values, labels, title, xlabel)
-    except (OSError, ValueError) as e:   # ValueError: text matplotlib cannot draw
-        log.warning("keywords: cannot save %s: %s", pie, e)
-        return str(e)
-    return None
+    failed = {}
+    for path, save, extra in ((pie, _save_pie, ()), (bar, _save_bar, (xlabel,))):
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            save(path, values, labels, title, *extra)
+        except Exception as e:   # OSError for the path; matplotlib raises ValueError, OverflowError and others
+            log.warning("keywords: cannot save %s: %s", path, e)
+            failed[path] = str(e)
+            with contextlib.suppress(OSError):
+                if os.path.isfile(path):
+                    os.remove(path)
+    return failed
 
 
 def _append_rows(path: str, rows):
@@ -341,7 +382,7 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
 
         counts = dict.fromkeys(keyword_list, 0)
         for page, text in enumerate(pages, start=1):
-            text = clean(_normalize(text)).lower()
+            text = _comparable(text, clean)
             # For each way of treating hyphens: the page's words and where each occurs.
             split = {mode: (words, _index(words)) for mode in modes for words in [_words(text, mode)]}
             for keyword, (parts, hyphens_separate) in compared.items():
@@ -354,18 +395,18 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
                     _append_rows(keyword_csv[keyword], [[rel, page, context] for context in contexts])
 
         _append_rows(overview, [[rel, *counts.values()]])
-        chart = os.path.join(output_dir, rel)
-        problem = _save_charts(chart + "-PIE.png", chart + "-BAR.png", counts,
-                               f"Count for PDF {rel}\nPage count (PDF): {len(pages)}", "Word Count")
-        if problem:
-            warnings.append({"input": rel, "message": f"searched, but its charts could not be saved ({problem})"})
+        pie, bar = os.path.join(output_dir, rel + "-PIE.png"), os.path.join(output_dir, rel + "-BAR.png")
+        failed = _save_charts(pie, bar, counts, f"Count for PDF {rel}\nPage count (PDF): {len(pages)}", "Word Count")
+        if failed:
+            which = "charts" if len(failed) == 2 else "pie chart" if pie in failed else "bar chart"
+            why = "; ".join(dict.fromkeys(failed.values()))   # once when both fail alike
+            warnings.append({"input": rel, "message": f"searched, but its {which} could not be saved ({why})"})
 
     total_pie, total_bar = os.path.join(output_dir, "totalPie.png"), os.path.join(output_dir, "totalBar.png")
-    charts = [total_bar, total_pie]
-    problem = _save_charts(total_pie, total_bar, totals, "Total word count for every PDF", "Total Word Count")
-    if problem:
-        charts = []
-        warnings.append({"input": "totalPie.png, totalBar.png", "message": f"could not be saved ({problem})"})
+    failed = _save_charts(total_pie, total_bar, totals, "Total word count for every PDF", "Total Word Count")
+    charts = [chart for chart in (total_bar, total_pie) if chart not in failed]
+    warnings += [{"input": os.path.basename(chart), "message": f"could not be saved ({why})"}
+                 for chart, why in failed.items()]
     hits = sum(totals.values())
     log.info("keywords: %d of %d PDF(s) searched, %d hit(s)", read, len(pdfs), hits)
     if on_progress:
