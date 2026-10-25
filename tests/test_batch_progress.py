@@ -122,3 +122,19 @@ def test_relationships_skip_text_extracted_by_an_earlier_run(tmp_path, monkeypat
     (tmp_path / "notes_text.txt").write_text("a user's own file, no matching PDF", encoding="utf-8")
     rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 0, 0, ["PER"])
     assert sorted(seen) == ["letter.pdf", "notes_text.txt"]
+
+
+def test_ner_writes_one_highlight_per_document_next_to_it(tmp_path, monkeypatch):
+    from NLP import named_entity_recognition as ner
+    monkeypatch.setattr(ner, "run_ner_on_text", lambda text: [])
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    _files(tmp_path, ["a/report.txt", "b/report.txt", "b/report.pdf"])  # report.pdf is not a real PDF
+    (tmp_path / "b" / "report.txt").write_bytes("Köln".encode("cp1252"))
+    summary = ner.main(str(tmp_path))
+    assert summary["files"] == 2 and summary["total"] == 3
+    assert [s["input"] for s in summary["skipped"]] == [os.path.join("b", "report.pdf")]
+    assert "could not be read" in summary["skipped"][0]["message"]
+    assert "Köln" in (tmp_path / "b" / "report_2_Named_Entity_Recognition_Highlight.html").read_text(encoding="utf-8")
+    assert (tmp_path / "a" / "report_Named_Entity_Recognition_Highlight.html").is_file()
+    assert not list(tmp_path.glob("*_Highlight.html"))

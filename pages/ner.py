@@ -2,7 +2,9 @@
 from nicegui import ui
 
 from common.paths import folder_problem
-from pages.components import FolderField, JobPanel, hint, page_header, run_button, section, start_job
+from pages.components import (
+    FolderField, JobPanel, hint, page_header, run_button, section, skipped_files, start_job,
+)
 
 
 def ner_page():
@@ -12,7 +14,8 @@ def ner_page():
 
     with section("Folder"):
         src = FolderField("Input folder (.txt and .pdf, searched recursively)", "defaults.ner_input_dir")
-        hint("Writes a summary report and one highlighted copy of each document, as HTML, into the input folder.")
+        hint("Writes a highlighted copy of each document, as HTML, next to it, and a summary report into the input"
+             " folder.")
         if not is_model_installed(DEFAULT_NER_MODEL):
             hint(f"The {info['name']} model ({info['size']}) downloads on first use, or from the Downloads page.")
 
@@ -21,6 +24,7 @@ def ner_page():
         if not summary:
             return
         ui.label(f"{summary['files']} of {summary['total']} file(s) analysed.").classes("text-body2")
+        skipped_files(summary.get("skipped", []))
         open_report_button(summary["summary"])
 
     def start():

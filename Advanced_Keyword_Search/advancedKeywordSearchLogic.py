@@ -9,6 +9,7 @@ from matplotlib.figure import Figure
 
 from common.paths import unique_safe_filenames
 from common.pdf_text import extract_pages
+from common.text_files import read_text
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
               contextLength, basicFilterState, PDFDirectory, outputDirectory, keywordFilePath, filterFilePath)
     # Get a list of files in the pdf directory
     try:
-        pdfsInDirectory = sorted(f for f in os.listdir(PDFDirectory) if f.endswith('.pdf'))
+        pdfsInDirectory = sorted(f for f in os.listdir(PDFDirectory) if f.lower().endswith('.pdf'))
     except Exception as e:
         error = "ERROR: " + str(e) + ".\nCheck PDFs and retry."
         logic_error(error)
@@ -81,7 +82,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
     # Get user keywords
     if keywordFilePath != '':
         try:
-            userKeywords = open(keywordFilePath, "r", encoding="utf-8")
+            userKeywords = read_text(keywordFilePath).splitlines()
         except Exception as e:
             error = "ERROR: " + str(e) + ".\nCheck keywords file and retry."
             logic_error(error)
@@ -173,8 +174,7 @@ def core_logic(contextLength, basicFilterState, PDFDirectory, outputDirectory, k
             elif filterFilePath != '':
                 # use the filter file to get filters
                 try:
-                    with open(filterFilePath, 'r', encoding='utf-8') as file:
-                        userFilters = file.read().replace('\n', '')
+                    userFilters = read_text(filterFilePath).replace('\r', '').replace('\n', '')
                     translationTable = allText.maketrans('', '', userFilters)
                     allText = allText.translate(translationTable)
                 except Exception as e:

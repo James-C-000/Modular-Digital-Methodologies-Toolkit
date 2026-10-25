@@ -1,5 +1,3 @@
-import os
-import pytest
 from OCR.ocr_logic import TESSERACT_LANGUAGES, find_pdfs_in_directory, build_ocr_params
 
 

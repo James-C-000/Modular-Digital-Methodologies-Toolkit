@@ -1,5 +1,7 @@
 import csv
+import os
 import re
+import shutil
 
 import pytest
 
@@ -75,3 +77,34 @@ def test_no_entities_is_a_warning(tmp_path):
     (tmp_path / "plain.txt").write_text("Nothing notable happened on the farm this week at all.", encoding="utf-8")
     result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 0, 1, ["PER"])
     assert result["status"] == "warning"
+
+
+def test_subfolders_saved_text_and_file_column(tmp_path):
+    sentence = "Ada Lovelace corresponded with Charles Babbage about engines and numbers."
+    for box in ("box1", "box2"):
+        (tmp_path / box).mkdir()
+        (tmp_path / box / "letters.txt").write_text(sentence, encoding="utf-8")
+    shutil.copy(os.path.join(os.path.dirname(__file__), "fixtures", "text_sample.pdf"), tmp_path / "box1" / "scan.pdf")
+    (tmp_path / "box2" / "blank.txt").write_text("", encoding="utf-8")
+    seen = []
+    real = rel.extract_text_from_file
+
+    def reading(path):
+        seen.append(os.path.relpath(path, tmp_path))
+        return real(path)
+
+    rel.extract_text_from_file = reading
+    try:
+        result = rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 1, 0, ["PER"])
+        assert (tmp_path / "box1" / "scan_text.txt").is_file()          # next to the PDF
+        assert not list(tmp_path.rglob("letters_text.txt"))           # only PDFs' text is saved
+        assert result["skipped"] == [{"input": os.path.join("box2", "blank.txt"),
+                                      "message": "no text (scanned PDF? run OCR first)"}]
+        with open(tmp_path / "relationships.csv", encoding="utf-8-sig", newline="") as f:
+            files = {r[6] for r in list(csv.reader(f))[1:]}
+        assert files == {os.path.join("box1", "letters.txt"), os.path.join("box2", "letters.txt")}
+        seen.clear()
+        rel.process_files_for_relationships(str(tmp_path), str(tmp_path), None, 1, 0, ["PER"])
+        assert os.path.join("box1", "scan_text.txt") not in seen      # saved text is not processed again
+    finally:
+        rel.extract_text_from_file = real

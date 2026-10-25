@@ -178,3 +178,18 @@ async def test_a_saved_short_context_is_raised_when_thinking_is_on(user):
     await user.open("/rag")
     await user.should_see("Context length set to 32768")
     assert config.AppConfig().get("defaults.rag_context_window") == 32768
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("page, kind, result", [
+    ("/cowords", "cowords", {"files": 1, "total": 2, "summary": "", "images": [],
+                             "skipped": [{"input": "box/blank.txt", "message": "no text"}]}),
+    ("/ner", "ner", {"files": 1, "total": 2, "summary": "",
+                     "skipped": [{"input": "box/blank.txt", "message": "no text"}]}),
+    ("/relationships", "relationships", {"status": "success", "relationship_count": 3, "file_count": 1,
+                                         "skipped": [{"input": "box/blank.txt", "message": "no text"}]}),
+])
+async def test_finished_jobs_list_the_files_they_skipped(user, page, kind, result):
+    await user.open(page)
+    JOBS.start(kind, kind, lambda job: result, output_dir="/tmp")
+    await user.should_see("box/blank.txt — no text", retries=30)

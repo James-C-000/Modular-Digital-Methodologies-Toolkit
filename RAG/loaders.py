@@ -14,6 +14,8 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
+from common.text_files import read_text
+
 
 @dataclass(frozen=True)
 class Section:
@@ -21,18 +23,8 @@ class Section:
     page: int | None = None   # 1-based page number for PDFs
 
 
-def _read_text(path: str) -> str:
-    raw = open(path, "rb").read()
-    for encoding in ("utf-8-sig", "cp1252"):
-        try:
-            return raw.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return raw.decode("latin-1")
-
-
 def _load_plain(path):
-    return [Section(_read_text(path))]
+    return [Section(read_text(path))]
 
 
 def _flatten_json(value, prefix=""):
@@ -48,14 +40,14 @@ def _flatten_json(value, prefix=""):
 
 def _load_json(path):
     try:
-        data = json.loads(_read_text(path))
+        data = json.loads(read_text(path))
     except ValueError:
         return _load_plain(path)  # not valid JSON: index it as text
     return [Section("\n".join(_flatten_json(data)))]
 
 
 def _load_csv(path):
-    text = _read_text(path)
+    text = read_text(path)
     try:
         dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
     except csv.Error:
@@ -152,7 +144,7 @@ class _HtmlText(HTMLParser):
 
 def _load_html(path):
     parser = _HtmlText()
-    parser.feed(_read_text(path))
+    parser.feed(read_text(path))
     parser.close()
     return [Section(parser.text())]
 

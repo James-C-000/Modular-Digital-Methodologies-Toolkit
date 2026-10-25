@@ -13,7 +13,8 @@ import tempfile
 
 import pytest
 
-from common.paths import safe_filename, unique_safe_filenames
+from common.paths import output_stems, safe_filename, unique_safe_filenames
+from common.text_files import document_text, read_text
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PDF = os.path.join(ROOT, "tests", "fixtures", "text_sample.pdf")
@@ -130,3 +131,27 @@ def test_transcript_is_written_as_utf8(tmp_path):
         "assert r['status'] == 'success', r\n"
     )
     assert out.read_bytes().decode("utf-8") == "Привет, 世界"
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("Köln".encode("utf-8"), "Köln"),
+    (b"\xef\xbb\xbf" + "Köln".encode("utf-8"), "Köln"),        # BOM from Notepad
+    ("Café – “quoted”".encode("cp1252"), "Café – “quoted”"),    # older Windows programs
+    (b"caf\xe9 \x81", "café \x81"),                              # not valid cp1252 either: Latin-1
+])
+def test_read_text_decodes_legacy_encodings(tmp_path, raw, expected):
+    (tmp_path / "t.txt").write_bytes(raw)
+    assert read_text(str(tmp_path / "t.txt")) == expected
+
+
+def test_document_text_reads_pdfs_and_text_files(tmp_path):
+    (tmp_path / "t.TXT").write_bytes("Köln".encode("cp1252"))
+    assert document_text(str(tmp_path / "t.TXT")) == "Köln"
+    assert document_text(PDF).strip()
+
+
+def test_output_stems_disambiguate_files_in_the_same_folder():
+    stems = output_stems([os.path.join("a", "report.txt"), os.path.join("a", "Report.pdf"),
+                          os.path.join("b", "report.txt"), os.path.join("a", "report_2.txt")])
+    assert stems == {os.path.join("a", "Report.pdf"): "Report", os.path.join("a", "report.txt"): "report_2",
+                     os.path.join("a", "report_2.txt"): "report_2_2", os.path.join("b", "report.txt"): "report"}

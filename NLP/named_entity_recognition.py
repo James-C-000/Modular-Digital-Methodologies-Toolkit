@@ -1,41 +1,15 @@
 #!/usr/bin/env python3
 """Named entity recognition over a folder of PDF/TXT files (see NLP.ner_onnx)."""
 import html
+import logging
 import os
 from collections import Counter
 
-from common.pdf_text import extract_text
+from common.paths import output_stems
+from common.text_files import document_text
 from NLP.ner_onnx import load_model
 
-
-def process_pdf(file_path):
-    """Extract text from a PDF file."""
-    try:
-        return extract_text(file_path)
-    except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        return ""
-
-
-def process_txt(file_path):
-    """Read text from a TXT file."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
-    except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        text = ""
-    return text
-
-
-def process_file(file_path):
-    """Determine the file type and extract its text."""
-    if file_path.lower().endswith(".pdf"):
-        return process_pdf(file_path)
-    elif file_path.lower().endswith(".txt"):
-        return process_txt(file_path)
-    else:
-        return ""
+log = logging.getLogger(__name__)
 
 
 def run_ner_on_text(text):
@@ -122,8 +96,12 @@ def main(directory, on_progress=None, cancel=None):
     HTML files with highlighted entities for each document.
 
     on_progress(done, total, current_file) is called before each file; a set
-    *cancel* event stops before the next one.  Returns {"files": files read,
-    "total": files found, "summary": path of the summary HTML}.
+    *cancel* event stops before the next one.  Returns {"files": files analysed,
+    "total": files found, "summary": path of the summary HTML,
+    "skipped": [{"input": path relative to *directory*, "message": why}]}.
+
+    Each highlighted copy is written next to its document; the summary goes
+    in *directory*.
     """
     if not os.path.isdir(directory):
         raise NotADirectoryError(f"{directory} is not a valid directory.")
@@ -137,17 +115,26 @@ def main(directory, on_progress=None, cancel=None):
 
     paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
                    for file in files if file.lower().endswith((".pdf", ".txt")))
-    read = 0
+    stems = output_stems(paths)
+    read, skipped = 0, []
     for i, file_path in enumerate(paths):
         if cancel is not None and cancel.is_set():
             break
-        file = os.path.basename(file_path)
+        root, file = os.path.split(file_path)
+        rel = os.path.relpath(file_path, directory)
         if on_progress:
             on_progress(i, len(paths), file)
-        read += 1
-        print(f"Processing file: {file_path}")
-        text = process_file(file_path)
-        if text:
+        log.info("ner: %s", file_path)
+        try:
+            text = document_text(file_path)
+        except Exception as e:
+            log.warning("ner: cannot read %s: %s", file_path, e)
+            skipped.append({"input": rel, "message": f"could not be read ({e})"})
+            continue
+        if not text.strip():
+            skipped.append({"input": rel, "message": "no text (scanned PDF? run OCR first)"})
+        else:
+            read += 1
             # Run NER on the entire text by chunking.
             entities = run_ner_on_text(text)
             summary = summarize_entities(entities)
@@ -159,18 +146,13 @@ def main(directory, on_progress=None, cancel=None):
                 overall_summary[label] += counter
 
             # Append file summary to overall summary HTML.
-            summary_html_content += generate_summary_html(file, summary)
+            summary_html_content += generate_summary_html(rel, summary)
 
             # Generate highlighted HTML for the individual document.
             highlight_html = generate_highlight_html(file, text, entities)
-            # Build output file name: replace extension with _highlight.html
-            base_name = os.path.splitext(file)[0]
-            highlight_file = os.path.join(directory, f"{base_name}_Named_Entity_Recognition_Highlight.html")
+            highlight_file = os.path.join(root, f"{stems[file_path]}_Named_Entity_Recognition_Highlight.html")
             with open(highlight_file, "w", encoding="utf-8") as f:
                 f.write(highlight_html)
-            print(f"Saved highlighted HTML to {highlight_file}")
-        else:
-            print(f"No text extracted from {file_path}\n")
 
     # Append overall summary statistics.
     if overall_summary:
@@ -184,10 +166,10 @@ def main(directory, on_progress=None, cancel=None):
     with open(output_summary_file, "w", encoding="utf-8") as f:
         f.write(summary_html_content)
 
-    print(f"NER summary statistics saved to {output_summary_file}")
+    log.info("ner: %d of %d file(s) analysed, summary %s", read, len(paths), output_summary_file)
     if on_progress:
-        on_progress(read, len(paths), "")
-    return {"files": read, "total": len(paths), "summary": output_summary_file}
+        on_progress(read + len(skipped), len(paths), "")
+    return {"files": read, "total": len(paths), "summary": output_summary_file, "skipped": skipped}
 
 
 if __name__ == "__main__":

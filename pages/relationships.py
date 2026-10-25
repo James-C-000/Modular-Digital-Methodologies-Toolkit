@@ -4,7 +4,7 @@ from nicegui import ui
 from common.paths import folder_problem
 from NLP.ner_onnx import DEFAULT_NER_MODEL, NER_MODELS
 from pages.components import (
-    FolderField, JobPanel, hint, page_header, remember, run_button, saved, section, start_job,
+    FolderField, JobPanel, hint, page_header, remember, run_button, saved, section, skipped_files, start_job,
 )
 
 ENTITY_TYPES = {"PER": "PER — people", "ORG": "ORG — organizations",
@@ -44,6 +44,7 @@ def relationships_page():
                 .classes("text-body2")
         elif result.get("message"):
             ui.label(result["message"]).classes("text-body2 text-warning")
+        skipped_files(result.get("skipped", []))
 
     def start():
         problem = folder_problem(src.value)

@@ -341,7 +341,7 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
     Files that already end with the suffix are skipped (they are outputs).
     A set *cancel* event stops the run before the next file.
     """
-    from common.pdf_text import extract_text
+    from common.text_files import document_text
 
     files = []
     for root, _dirs, names in os.walk(directory):
@@ -362,7 +362,7 @@ def translate_directory(directory: str, src: str | None, tgt: str, suffix: str =
             on_progress(i, len(files), os.path.basename(path))
         result = {"input": path}
         try:
-            text = extract_text(path) if path.lower().endswith(".pdf") else open(path, encoding="utf-8").read()
+            text = document_text(path)
             if not text.strip():
                 result.update(status="skipped", message="no text (scanned PDF? run OCR first)")
                 results.append(result)

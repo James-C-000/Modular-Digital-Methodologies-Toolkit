@@ -1,5 +1,4 @@
 """Tests for RAG hardware detection module."""
-import subprocess
 from unittest.mock import patch, MagicMock
 import pytest
 
@@ -117,7 +116,6 @@ class TestNoConsoleWindows:
 
     @patch("RAG.hardware.subprocess.run")
     def test_gpu_probes_pass_no_window_flags_on_windows(self, mock_run, monkeypatch):
-        import sys
         import RAG.hardware as hw
         from common import proc
         monkeypatch.setattr(proc.sys, "platform", "win32")

@@ -11,32 +11,22 @@ tagger to keep only the verbs; MDMT no longer ships a POS tagger.)
 """
 
 import csv
+import logging
 import os
 
 import networkx as nx
 from matplotlib.figure import Figure
 
-from common.pdf_text import extract_text as extract_pdf_text
+from common.text_files import document_text as extract_text_from_file
 from NLP.ner_onnx import load_model
 from NLP.text_utils import sentence_spans, word_spans
+
+log = logging.getLogger(__name__)
 
 DEFAULT_RELATIONSHIP = "is connected to"
 MAX_CONNECTING_WORDS = 8
 MIN_SENTENCE_WORDS = 5
 CSV_COLUMNS = ['Source', 'Source_Type', 'Relationship', 'Target', 'Target_Type', 'Sentence', 'File']
-
-
-def extract_text_from_file(file_path):
-    """Extract text from a text or PDF file"""
-    try:
-        if file_path.lower().endswith('.txt'):
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        elif file_path.lower().endswith('.pdf'):
-            return extract_pdf_text(file_path)
-    except Exception as e:
-        print(f"Error extracting text from {file_path}: {str(e)}")
-    return ""
 
 
 def connecting_words(text, start, end, other_entities):
@@ -72,22 +62,6 @@ def extract_entities_and_relationships(text, entity_types):
                     text[second["start"]:second["end"]], second["entity_group"],
                     sentence,
                 ])
-    return relationships
-
-
-def extract_relationships_from_file(file_path, entity_types):
-    """Extract relationships from a single file"""
-    text = extract_text_from_file(file_path)
-    if not text:
-        return []
-
-    relationships = extract_entities_and_relationships(text, entity_types)
-
-    # Add filename to each relationship
-    filename = os.path.basename(file_path)
-    for relation in relationships:
-        relation.append(filename)
-
     return relationships
 
 
@@ -151,8 +125,12 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
     """Process files and extract relationships (model_name is unused).
 
     on_progress(done, total, current_file) is called before each file; a set
-    *cancel* event stops before the next one.  Text extracted by an earlier run
-    ("<name>_text.txt" beside "<name>.pdf") is not processed again.
+    *cancel* event stops before the next one.  With *extract_text*, the text of
+    each PDF is saved as "<name>_text.txt" in the matching folder under
+    *output_dir* (beside the PDF when output_dir is input_dir); text saved by
+    an earlier run is not processed again.  Files are named by their path
+    relative to *input_dir* in the CSV, 'processed_files' and 'skipped'
+    ({"input": path, "message": why}).
     """
     results = {
         'status': 'success',
@@ -160,6 +138,7 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         'relationship_count': 0,
         'file_count': 0,
         'processed_files': [],
+        'skipped': [],
         'images': [],
     }
 
@@ -183,30 +162,33 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         for i, file_path in enumerate(files):
             if cancel is not None and cancel.is_set():
                 break
+            rel = os.path.relpath(file_path, input_dir)
             if on_progress:
                 on_progress(i, len(files), os.path.basename(file_path))
             try:
                 text = extract_text_from_file(file_path)
-                if not text:
+                if not text.strip():
+                    results['skipped'].append({"input": rel, "message": "no text (scanned PDF? run OCR first)"})
                     continue
 
                 file_relationships = extract_entities_and_relationships(text, entity_types)
                 for relation in file_relationships:
-                    relation.append(os.path.basename(file_path))
+                    relation.append(rel)
                 all_relationships.extend(file_relationships)
 
                 # Save extracted text if requested
-                if extract_text:
-                    base_name = os.path.splitext(os.path.basename(file_path))[0]
-                    text_output_path = os.path.join(output_dir, f"{base_name}_text.txt")
+                if extract_text and file_path.lower().endswith('.pdf'):
+                    text_output_path = os.path.join(output_dir, os.path.splitext(rel)[0] + "_text.txt")
+                    os.makedirs(os.path.dirname(text_output_path), exist_ok=True)
                     with open(text_output_path, 'w', encoding='utf-8') as f:
                         f.write(text)
 
-                results['processed_files'].append(os.path.basename(file_path))
+                results['processed_files'].append(rel)
                 results['file_count'] += 1
 
             except Exception as e:
-                print(f"Error processing file {file_path}: {str(e)}")
+                log.warning("relationships: cannot process %s: %s", file_path, e)
+                results['skipped'].append({"input": rel, "message": f"could not be processed ({e})"})
 
         if all_relationships:
             # utf-8-sig + newline='' so Excel shows non-Latin names and no blank rows.
@@ -232,7 +214,8 @@ def process_files_for_relationships(input_dir, output_dir, model_name, extract_t
         results['message'] = f"An error occurred: {str(e)}"
 
     if on_progress and results['status'] != 'error':
-        on_progress(results['file_count'], results['file_count'], "")
+        done = results['file_count'] + len(results['skipped'])
+        on_progress(done, done, "")
     return results
 
 

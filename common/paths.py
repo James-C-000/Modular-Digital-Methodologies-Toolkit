@@ -46,6 +46,27 @@ def unique_safe_filenames(names, suffix: str = "") -> dict:
     return result
 
 
+def output_stems(paths) -> dict:
+    """Map each input path to the name its output files start with.
+
+    That is the file name without its extension, plus ``_2``, ``_3`` ... when
+    another file in the same folder has the same one (``report.pdf`` and
+    ``report.txt``), compared case-insensitively as on Windows/macOS.
+    """
+    used = set()
+    result = {}
+    for path in sorted(paths):
+        folder, name = os.path.split(path)
+        stem = os.path.splitext(name)[0]
+        candidate, n = stem, 2
+        while (folder, candidate.casefold()) in used:
+            candidate = f"{stem}_{n}"
+            n += 1
+        used.add((folder, candidate.casefold()))
+        result[path] = candidate
+    return result
+
+
 def same_path(a: str, b: str) -> bool:
     """True if two paths refer to the same location (symlinks, case, separators)."""
     return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))

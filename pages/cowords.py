@@ -3,7 +3,7 @@ from nicegui import ui
 
 from common.paths import folder_problem
 from pages.components import (
-    FolderField, JobPanel, hint, page_header, remember, run_button, saved, section, start_job,
+    FolderField, JobPanel, hint, page_header, remember, run_button, saved, section, skipped_files, start_job,
 )
 from pages.ner import open_report_button
 
@@ -14,7 +14,7 @@ def cowords_page():
 
     with section("Folder"):
         src = FolderField("Input folder (.txt and .pdf, searched recursively)", "defaults.cowords_input_dir")
-        hint("Writes a report and a network graph per document, and a summary report, into the input folder.")
+        hint("Writes a report and a network graph next to each document, and a summary report into the input folder.")
 
     with section("Words to ignore"):
         options = {"": "None (keep every word)"}
@@ -32,6 +32,7 @@ def cowords_page():
         summary = job.result or {}
         if summary:
             ui.label(f"{summary['files']} of {summary['total']} file(s) analysed.").classes("text-body2")
+            skipped_files(summary.get("skipped", []))
             open_report_button(summary["summary"])
 
     def start():

@@ -1,42 +1,18 @@
 #!/usr/bin/env python3
 import html
+import logging
 import os
 from collections import Counter
+from urllib.parse import quote
 
 import networkx as nx
 from matplotlib.figure import Figure
 
-from common.pdf_text import extract_text
+from common.paths import output_stems
+from common.text_files import document_text
 from NLP.text_utils import stopwords, words
 
-def process_pdf(file_path):
-    """Extract text from a PDF file."""
-    try:
-        return extract_text(file_path)
-    except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        return ""
-
-
-def process_txt(file_path):
-    """Read text from a TXT file."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
-    except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        text = ""
-    return text
-
-
-def process_file(file_path):
-    """Determine the file type and extract its text."""
-    if file_path.lower().endswith(".pdf"):
-        return process_pdf(file_path)
-    elif file_path.lower().endswith(".txt"):
-        return process_txt(file_path)
-    else:
-        return ""
+log = logging.getLogger(__name__)
 
 
 def preprocess_text(text, stop_set=frozenset()):
@@ -85,6 +61,11 @@ def escape(text):
     return html.escape(text, quote=True)
 
 
+def href(path):
+    """*path* (relative, OS separators) as a URL for a link or image in a report."""
+    return escape(quote(path.replace(os.sep, "/")))
+
+
 def generate_statistics_html(word_counts, cooccurrence, top_words=20, top_pairs=20):
     """
     Generate an HTML snippet with tables for top frequent words and top co-occurring word pairs.
@@ -113,7 +94,7 @@ def generate_document_html(file_name, stats_html, network_img_file, output_path)
 <h1>Co-word Analysis for {escape(file_name)}</h1>
 {stats_html}
 <h2>Co-word Network Graph</h2>
-<img src="{escape(os.path.basename(network_img_file))}" alt="Co-word Network Graph">
+<img src="{href(os.path.basename(network_img_file))}" alt="Co-word Network Graph">
 </body>
 </html>
 """
@@ -125,8 +106,12 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
     """Run co-word analysis on every PDF/TXT file under *directory*.
 
     on_progress(done, total, current_file) is called before each file; a set
-    *cancel* event stops before the next one.  Returns {"files": files read,
-    "total": files found, "summary": summary HTML path, "images": network graphs}.
+    *cancel* event stops before the next one.  Returns {"files": files analysed,
+    "total": files found, "summary": summary HTML path, "images": network graphs,
+    "skipped": [{"input": path relative to *directory*, "message": why}]}.
+
+    Each document's report and graph are written next to it; the summary,
+    in *directory*, links to every report.
 
     stopword_language: ISO 639-1 code from NLP.text_utils.STOPWORD_LANGUAGES,
     or None for no list.  extra_stopwords: additional words to ignore.
@@ -141,25 +126,32 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
     # Process each PDF or TXT file in the directory.
     paths = sorted(os.path.join(root, file) for root, _dirs, files in os.walk(directory)
                    for file in files if file.lower().endswith((".pdf", ".txt")))
-    read, images = 0, []
+    stems = output_stems(paths)
+    read, images, skipped = 0, [], []
     for i, file_path in enumerate(paths):
         if cancel is not None and cancel.is_set():
             break
         root, file = os.path.split(file_path)
+        rel = os.path.relpath(file_path, directory)
         if on_progress:
             on_progress(i, len(paths), file)
-        read += 1
-        print(f"Processing {file_path}...")
-        text = process_file(file_path)
-        if not text.strip():
-            print(f"No text extracted from {file_path}")
+        log.info("co-words: %s", file_path)
+        try:
+            text = document_text(file_path)
+        except Exception as e:
+            log.warning("co-words: cannot read %s: %s", file_path, e)
+            skipped.append({"input": rel, "message": f"could not be read ({e})"})
             continue
+        if not text.strip():
+            skipped.append({"input": rel, "message": "no text (scanned PDF? run OCR first)"})
+            continue
+        read += 1
         tokens = preprocess_text(text, stop_set)
         word_counts = Counter(tokens)
         cooccur = cooccurrence_analysis(tokens)
 
         # Visualize co-word network.
-        base_name = os.path.splitext(file)[0]
+        base_name = stems[file_path]
         network_img_file = os.path.join(root, f"{base_name}_co_word_network.png")
         visualize_network(cooccur, network_img_file)
         images.append(network_img_file)
@@ -170,22 +162,21 @@ def main(directory, stopword_language="en", extra_stopwords=(), on_progress=None
         # Generate individual HTML report for the document.
         html_file = os.path.join(root, f"{base_name}_co_word_analysis.html")
         generate_document_html(file, stats_html, network_img_file, html_file)
-        print(f"Saved Co-word Analysis for {file} to {html_file}")
 
         # Append a summary entry to the overall summary.
-        overall_summary += f"<h2>{escape(file)}</h2>\n"
+        overall_summary += f"<h2>{escape(rel)}</h2>\n"
         overall_summary += stats_html
-        overall_summary += f"<p><a href='{escape(os.path.basename(html_file))}'>Detailed Analysis</a></p>\n"
+        overall_summary += f"<p><a href='{href(os.path.relpath(html_file, directory))}'>Detailed Analysis</a></p>\n"
     overall_summary += "</body></html>"
 
     # Save the overall summary document.
     summary_file = os.path.join(directory, "Co_Word_Analysis_Summary.html")
     with open(summary_file, "w", encoding="utf-8") as f:
         f.write(overall_summary)
-    print(f"Overall Co-word Analysis Summary saved to {summary_file}")
+    log.info("co-words: %d of %d file(s) analysed, summary %s", read, len(paths), summary_file)
     if on_progress:
-        on_progress(read, len(paths), "")
-    return {"files": read, "total": len(paths), "summary": summary_file, "images": images}
+        on_progress(read + len(skipped), len(paths), "")
+    return {"files": read, "total": len(paths), "summary": summary_file, "images": images, "skipped": skipped}
 
 
 if __name__ == "__main__":

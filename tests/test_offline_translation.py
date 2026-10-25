@@ -80,6 +80,15 @@ def test_translate_directory_with_a_stub_model(tmp_path, monkeypatch):
     assert results["vide.txt"]["status"] == "skipped"
 
 
+def test_translate_directory_reads_legacy_encoded_text(tmp_path, monkeypatch):
+    monkeypatch.setattr(ot, "installed_pairs", lambda models_root=None: {("fr", "en")})
+    monkeypatch.setattr(ot, "get_translator", lambda a, b, models_root=None: _Upper())
+    (tmp_path / "lettre.txt").write_bytes("Le notaire a rédigé l'acte.".encode("cp1252"))
+    [result] = ot.translate_directory(str(tmp_path), "fr", "en")
+    assert result["status"] == "success", result
+    assert (tmp_path / "lettre_translated.txt").read_text(encoding="utf-8") == "LE NOTAIRE A RÉDIGÉ L'ACTE."
+
+
 def test_long_sentences_are_split_for_the_model():
     long_sentence = " ".join(["mot"] * 450)
     pieces = ot._chunks_for(_Upper(), long_sentence)

@@ -1,5 +1,4 @@
 import json
-import os
 import pytest
 from config import AppConfig, get_app_data_dir
 
