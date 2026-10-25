@@ -144,6 +144,16 @@ jobs:
             .appdata/mdmt/models/rag
           key: retrieval-eval-${{ hashFiles('eval/corpus.json', 'RAG/models.py') }}
 
+      # Embedding the corpus takes ~2 minutes. The index only changes with the
+      # corpus, the indexing code (RAG/, and the sentence splitter it chunks
+      # with) or the locked libraries (ONNX Runtime, tokenizers), so any change
+      # to those rebuilds it and the eval still tests indexing.
+      - name: Cache the eval index
+        uses: actions/cache@v4
+        with:
+          path: eval/.index
+          key: retrieval-eval-index-${{ hashFiles('eval/corpus.json', 'RAG/*.py', 'NLP/text_utils.py', 'requirements/lock-linux.txt') }}
+
       - name: Fetch the corpus
         run: python -m eval.fetch_corpus
 
