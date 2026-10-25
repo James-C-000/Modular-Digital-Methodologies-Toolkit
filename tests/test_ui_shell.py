@@ -201,3 +201,13 @@ async def test_keyword_search_says_when_nothing_was_found(user):
     JOBS.start("keywords", "keywords", lambda job: {"files": 1, "total": 1, "hits": 0, "charts": []},
                output_dir="/tmp")
     await user.should_see("None of the keywords were found.", retries=30)
+
+
+@pytest.mark.anyio
+async def test_keyword_search_does_not_blame_the_keywords_when_every_pdf_was_skipped(user):
+    await user.open("/keywords")
+    JOBS.start("keywords", "keywords", lambda job: {
+        "files": 0, "total": 1, "hits": 0, "charts": [],
+        "skipped": [{"input": "scan.pdf", "message": "no text (scanned PDF? run OCR first)"}]}, output_dir="/tmp")
+    await user.should_see("scan.pdf — no text (scanned PDF? run OCR first)", retries=30)
+    await user.should_not_see("None of the keywords were found.")

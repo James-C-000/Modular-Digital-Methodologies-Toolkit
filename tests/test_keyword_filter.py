@@ -190,11 +190,12 @@ def test_every_hit_is_counted_once_with_one_context_row(tmp_path):
     # "mill-race" and "mill race;" (punctuation at the edges of words is ignored, inside them it is not).
     counts = {"mill": 5, "mill race": 3, "mill-race": 1, "new york": 3, "c++": 1, "a.b": 1, "the the": 1}
     assert search() == counts
-    assert [r[1:] for r in _rows(out / "mill.csv")][:2] == [["1", "mill opens"], ["1", "page. the mill race"]]
+    assert [r[1:] for r in _rows(out / "mill.csv")][:2] == [["1", "mill opens"], ["1", "page. the mill-race"]]
     assert [r[2] for r in _rows(out / "new york.csv")] == [   # contexts keep the text's punctuation
         "new york new york", "new york new york new york.", "new york new york new york. c++"]
-    # The basic filter keeps hyphens, so "mill-race" still matches; "c++" and "a.b" lose their symbols.
-    assert search(basic=True) == dict(counts, **{"c++": 0, "a.b": 0})
+    # The basic filter keeps hyphens, so "mill-race" still matches; "c++" and "a.b" lose their symbols
+    # in the keywords as in the text, so they are searched as "c" (twice in "c beats c") and "ab".
+    assert search(basic=True) == dict(counts, **{"c++": 2, "a.b": 1})
 
 
 @pytest.mark.parametrize("length, context", [
@@ -208,3 +209,86 @@ def test_context_length_counts_the_keyword_and_splits_evenly(tmp_path, length, c
     _text_pdf(src / "a.pdf", ["one two three key five six seven"])
     search_directory(str(src), str(out), "key", context_words=length)
     assert [r[2] for r in _rows(out / "key.csv")] == [context]
+
+
+def _search_pages(tmp_path, monkeypatch, pages, keywords, **options):
+    """Search one PDF whose pages have the text *pages*; the summary and the rows of each keyword's CSV."""
+    from Advanced_Keyword_Search import advancedKeywordSearchLogic
+    monkeypatch.setattr(advancedKeywordSearchLogic, "extract_pages", lambda path: pages)
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    src.mkdir(exist_ok=True)
+    out.mkdir(exist_ok=True)
+    (src / "a.pdf").write_bytes(b"")
+    summary = search_directory(str(src), str(out), keywords, **options)
+    return summary, {p.name: _rows(p) for p in out.glob("*.csv") if p.name != "Data_Overview.csv"}
+
+
+def test_filters_apply_to_the_keywords_too(tmp_path, monkeypatch):
+    # Filtering only the text turned "o'brien" into "obrien" there and found nothing.
+    pages = ["O'Brien met the U.S. envoy by the mill-race."]
+    summary, rows = _search_pages(tmp_path, monkeypatch, pages, "o'brien\nu.s.\nmill-race", basic=True)
+    assert summary["hits"] == 3
+    assert rows["o'brien.csv"][0][2] == "obrien met the"
+    summary, rows = _search_pages(tmp_path, monkeypatch, pages, "mill-race", filters="-")
+    assert summary["hits"] == 1 and rows["mill-race.csv"][0][2] == "by the millrace."
+
+
+def test_contexts_keep_hyphens_and_minus_signs(tmp_path, monkeypatch):
+    pages = ["the mill-race flooded in 1843-1851 at -5 degrees and the mill-\nrace"]
+    _summary, rows = _search_pages(tmp_path, monkeypatch, pages, "in\nat\ndegrees\nthe", context_words=5)
+    assert [r[2] for r in rows["in.csv"]] == ["race flooded in 1843-1851"]
+    assert [r[2] for r in rows["at.csv"]] == ["1843-1851 at -5 degrees"]
+    assert [r[2] for r in rows["degrees.csv"]] == ["at -5 degrees and the"]
+    assert [r[2] for r in rows["the.csv"]] == ["the mill-race", "degrees and the mill- race"]
+
+
+def test_ligatures_and_separate_accents_match_typed_keywords(tmp_path, monkeypatch):
+    pages = ["the \ufb01eld o\ufb03ce of the cafe\u0301"]
+    summary, rows = _search_pages(tmp_path, monkeypatch, pages, "field\noffice\ncafé\ncafe\u0301", context_words=1)
+    assert summary["hits"] == 3 and sorted(rows) == ["café.csv", "field.csv", "office.csv"]
+    assert rows["café.csv"] == [["a.pdf", "1", "café"]]
+
+
+def test_separate_accents_in_a_real_pdf_match(tmp_path):
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    src.mkdir()
+    out.mkdir()
+    _text_pdf(src / "a.pdf", ["the cafe\u0301 opens"])   # the text layer keeps the accent as a separate mark
+    assert search_directory(str(src), str(out), "café", basic=True)["hits"] == 1
+
+
+def test_keywords_that_compare_alike_are_searched_once(tmp_path, monkeypatch):
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["New York, new york."], "york\nyork.\n(York)\nYORK")
+    assert summary["hits"] == 2 and list(rows) == ["york.csv"]
+    with open(tmp_path / "out" / "Data_Overview.csv", encoding="utf-8-sig", newline="") as f:
+        assert next(csv.reader(f)) == ["Year", "york"]
+
+
+def test_a_keyword_the_filter_empties_is_never_found(tmp_path, monkeypatch):
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["a + b ++ c"], "++\nb", basic=True)
+    assert summary["hits"] == 1 and rows["++.csv"] == []
+
+
+def test_a_keyword_named_like_the_overview_gets_its_own_csv(tmp_path, monkeypatch):
+    # On Windows and macOS "data_overview.csv" is Data_Overview.csv, so the two reports overwrote each other.
+    _summary, rows = _search_pages(tmp_path, monkeypatch, ["see data_overview"], "data_overview")
+    assert rows["data_overview_2.csv"] == [["a.pdf", "1", "see data_overview"]]
+    assert "data_overview.csv" not in rows
+
+
+def test_charts_show_dollar_signs_and_a_chart_failure_skips_only_the_charts(tmp_path):
+    from tests.test_encoding import PDF
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    (src / "box").mkdir(parents=True)
+    out.mkdir()
+    shutil.copy(PDF, src / "price $^$.pdf")          # matplotlib read "$^$" as mathematics and failed
+    shutil.copy(PDF, src / "box" / "letters.pdf")
+    shutil.copy(PDF, src / "z.pdf")
+    (out / "box").write_text("a file where the chart folder should go", encoding="utf-8")
+    summary = search_directory(str(src), str(out), "москва\n$x^$")
+    assert summary["files"] == summary["total"] == 3 and summary["hits"] == 6
+    assert [s["input"] for s in summary["skipped"]] == [os.path.join("box", "letters.pdf")]
+    assert summary["skipped"][0]["message"].startswith("searched, but its charts could not be saved")
+    assert (out / "price $^$.pdf-PIE.png").stat().st_size > 0 and (out / "z.pdf-BAR.png").is_file()
+    assert all(os.path.isfile(c) for c in summary["charts"])
+    assert {r[0] for r in _rows(out / "москва.csv")} == {"price $^$.pdf", os.path.join("box", "letters.pdf"), "z.pdf"}

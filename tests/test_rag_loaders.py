@@ -59,6 +59,7 @@ def test_find_documents_is_recursive_and_filters_extensions(tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "sub" / "note.txt").write_text("hi", encoding="utf-8")
     (tmp_path / "image.png").write_bytes(b"\x89PNG")
+    (tmp_path / ".md").write_text("no extension", encoding="utf-8")
     assert [os.path.relpath(p, tmp_path) for p in find_documents(str(tmp_path))] == [
         os.path.join("sub", "note.txt"), "x.HTML"]
     assert {".txt", ".pdf", ".md", ".json", ".html", ".htm", ".csv", ".docx"} == set(SUPPORTED_EXTENSIONS)

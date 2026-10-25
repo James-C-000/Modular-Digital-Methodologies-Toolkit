@@ -47,7 +47,7 @@ def keywords_page():
         summary = job.result or {}
         if summary:
             ui.label(f"{summary['files']} of {summary['total']} PDF(s) searched.").classes("text-body2")
-            if summary.get("hits") == 0:
+            if summary["files"] and summary.get("hits") == 0:   # not when every PDF was skipped
                 ui.label("None of the keywords were found.").classes("text-body2 text-warning")
             skipped_files(summary.get("skipped", []))
 
