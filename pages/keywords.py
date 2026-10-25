@@ -49,7 +49,10 @@ def keywords_page():
             ui.label(f"{summary['files']} of {summary['total']} PDF(s) searched.").classes("text-body2")
             if summary["files"] and summary.get("hits") == 0:   # not when every PDF was skipped
                 ui.label("None of the keywords were found.").classes("text-body2 text-warning")
+            for note in summary.get("keyword_notes", []):
+                ui.label(note).classes("text-body2 text-warning")
             skipped_files(summary.get("skipped", []))
+            skipped_files(summary.get("warnings", []), icon="warning_amber", color="text-warning")
 
     def start():
         problem = folder_problem(src.value)

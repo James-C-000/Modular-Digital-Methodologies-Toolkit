@@ -81,7 +81,6 @@ def test_pdfs_and_runs_without_hits_still_finish(tmp_path):
                for name in ("sample.pdf-PIE.png", "sample.pdf-BAR.png", "totalPie.png", "totalBar.png"))
 
 
-
 def test_pdf_without_text_is_skipped_not_counted(tmp_path):
     from tests.test_encoding import PDF
     src, out = tmp_path / "pdfs", tmp_path / "out"
@@ -257,16 +256,46 @@ def test_separate_accents_in_a_real_pdf_match(tmp_path):
     assert search_directory(str(src), str(out), "café", basic=True)["hits"] == 1
 
 
-def test_keywords_that_compare_alike_are_searched_once(tmp_path, monkeypatch):
+def test_filter_characters_that_unicode_would_rewrite_still_work(tmp_path, monkeypatch):
+    # Full NFKC normalization turned "™" into "TM" before the filter could remove it.
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["acme™ sells ²"], "acme", filters="™²")
+    assert summary["hits"] == 1 and rows["acme.csv"][0][2] == "acme sells"
+
+
+def test_spacing_accents_as_latex_pdfs_extract_them_do_not_split_words(tmp_path, monkeypatch):
+    # LaTeX PDFs extract "café" as "caf´e"; NFKC made that "caf ́e", two words.
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["the caf´e opens"], "cafe", basic=True)
+    assert summary["hits"] == 1 and rows["cafe.csv"][0][2] == "the cafe opens"
+
+
+def test_keywords_that_compare_alike_are_searched_once_and_reported(tmp_path, monkeypatch):
     summary, rows = _search_pages(tmp_path, monkeypatch, ["New York, new york."], "york\nyork.\n(York)\nYORK")
     assert summary["hits"] == 2 and list(rows) == ["york.csv"]
     with open(tmp_path / "out" / "Data_Overview.csv", encoding="utf-8-sig", newline="") as f:
         assert next(csv.reader(f)) == ["Year", "york"]
+    assert summary["keyword_notes"] == ['"york." was counted as "york": they match the same words.',
+                                        '"(york)" was counted as "york": they match the same words.']
 
 
-def test_a_keyword_the_filter_empties_is_never_found(tmp_path, monkeypatch):
-    summary, rows = _search_pages(tmp_path, monkeypatch, ["a + b ++ c"], "++\nb", basic=True)
-    assert summary["hits"] == 1 and rows["++.csv"] == []
+def test_keywords_the_filter_makes_alike_are_reported(tmp_path, monkeypatch):
+    # With the basic filter "c++" and "c#" are both "c": c# used to vanish without a word.
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["c# and c"], "c++\nc#", basic=True)
+    assert summary["hits"] == 2 and list(rows) == ["c++.csv"]
+    assert summary["keyword_notes"] == ['"c#" was counted as "c++": they match the same words.']
+
+
+def test_a_keyword_the_filter_empties_is_never_found_and_reported(tmp_path, monkeypatch):
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["a + b ++ c ##"], "++\nb\n++\n##", basic=True)
+    assert summary["hits"] == 1 and rows["++.csv"] == [] and rows["##.csv"] == [] and "++ (2).csv" not in rows
+    assert summary["keyword_notes"] == ['"++" was not searched: the filter leaves nothing of it.',
+                                        '"##" was not searched: the filter leaves nothing of it.']
+
+
+def test_keywords_a_case_sensitive_filter_tells_apart_are_both_searched(tmp_path, monkeypatch):
+    # Filtering "Y" makes "York" "ork" but leaves "york": the second keyword used to be dropped.
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["York york"], "York\nyork", filters="Y", context_words=1)
+    assert summary["hits"] == 2 and summary["keyword_notes"] == []
+    assert rows["york.csv"] == [["a.pdf", "1", "ork"]] and rows["york (2).csv"] == [["a.pdf", "1", "york"]]
 
 
 def test_a_keyword_named_like_the_overview_gets_its_own_csv(tmp_path, monkeypatch):
@@ -287,8 +316,16 @@ def test_charts_show_dollar_signs_and_a_chart_failure_skips_only_the_charts(tmp_
     (out / "box").write_text("a file where the chart folder should go", encoding="utf-8")
     summary = search_directory(str(src), str(out), "москва\n$x^$")
     assert summary["files"] == summary["total"] == 3 and summary["hits"] == 6
-    assert [s["input"] for s in summary["skipped"]] == [os.path.join("box", "letters.pdf")]
-    assert summary["skipped"][0]["message"].startswith("searched, but its charts could not be saved")
+    assert summary["skipped"] == []   # searched, so listed as a warning instead
+    assert [w["input"] for w in summary["warnings"]] == [os.path.join("box", "letters.pdf")]
+    assert summary["warnings"][0]["message"].startswith("searched, but its charts could not be saved")
     assert (out / "price $^$.pdf-PIE.png").stat().st_size > 0 and (out / "z.pdf-BAR.png").is_file()
     assert all(os.path.isfile(c) for c in summary["charts"])
     assert {r[0] for r in _rows(out / "москва.csv")} == {"price $^$.pdf", os.path.join("box", "letters.pdf"), "z.pdf"}
+
+
+def test_total_charts_that_cannot_be_saved_do_not_fail_the_search(tmp_path, monkeypatch):
+    (tmp_path / "out" / "totalPie.png").mkdir(parents=True)   # a folder where the chart should go
+    summary, rows = _search_pages(tmp_path, monkeypatch, ["the key"], "key")
+    assert summary["hits"] == 1 and rows["key.csv"] and summary["charts"] == []
+    assert [w["input"] for w in summary["warnings"]] == ["totalPie.png, totalBar.png"]
