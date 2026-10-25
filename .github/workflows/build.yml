@@ -44,13 +44,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: requirements/*-${{ matrix.name }}.txt
-
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -69,11 +62,10 @@ jobs:
         run: |
           command -v upx && upx --version | head -1 || echo "upx is not installed"
 
-      - name: Install locked Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements/lock-${{ matrix.name }}.txt
-          pip install -r requirements/dev-${{ matrix.name }}.txt
+      - name: Python and locked dependencies
+        uses: ./.github/actions/python-deps
+        with:
+          platform: ${{ matrix.name }}
 
       # ---- PyAV against an LGPL-only FFmpeg ---------------------------------
       # PyPI's PyAV wheels bundle FFmpeg linked with GPL libx264/libx265.
@@ -157,23 +149,10 @@ jobs:
           pip install --no-deps --force-reinstall av-wheel/av-*.whl
           python -c "import av; m = av._core.library_meta['libavcodec']; print(av.__version__, av.ffmpeg_version_info, m['license']); assert 'x264' not in m['configuration'] and m['license'].startswith('LGPL')"
 
-      # Keyed on the whole of llama.txt, so any change to the pin rebuilds.
-      # tests.yml's llama-cpp job uses the same key on Linux.
-      - name: Cache llama-cpp-python wheel
-        id: llama-cache
-        uses: actions/cache@v4
+      - name: llama-cpp-python
+        uses: ./.github/actions/llama-cpp-python
         with:
-          path: wheels
-          key: llama-cpp-python-${{ matrix.name }}-py312-${{ hashFiles('requirements/llama.txt') }}-${{ env.CMAKE_ARGS }}
-
-      - name: Build llama-cpp-python wheel
-        if: steps.llama-cache.outputs.cache-hit != 'true'
-        # --no-cache-dir: pip's wheel cache ignores CMAKE_ARGS, so it could hand
-        # back a build made with other flags.
-        run: pip wheel --no-deps --no-cache-dir -r requirements/llama.txt -w wheels
-
-      - name: Install llama-cpp-python
-        run: pip install --no-deps wheels/llama_cpp_python-*.whl
+          platform: ${{ matrix.name }}
 
       - name: Lint (ruff)
         run: ruff check .
