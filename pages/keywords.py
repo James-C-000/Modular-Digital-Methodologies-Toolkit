@@ -29,11 +29,11 @@ def keywords_page():
                                      min=1, max=50, precision=0).classes("w-48"), "defaults.keywords_context")
 
     with section("Filters"):
-        basic = remember(ui.checkbox("Basic filter (letters, numbers and spaces only)",
+        basic = remember(ui.checkbox("Basic filter (letters, numbers, hyphens and spaces only)",
                                      value=saved("defaults.keywords_basic_filter", False)),
                          "defaults.keywords_basic_filter")
-        hint("Removes punctuation, symbols and OCR noise before searching. Letters of every language, with their"
-             " accents, are kept.")
+        hint("Removes other punctuation, symbols and OCR noise before searching. Letters of every language, with"
+             " their accents, are kept.")
         filters_text = remember(ui.textarea("Characters to remove, one group per line",
                                             value=saved("defaults.keywords_filters", ""))
                                 .classes("w-full").props("rows=3"), "defaults.keywords_filters")

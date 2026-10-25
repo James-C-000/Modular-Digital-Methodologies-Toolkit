@@ -18,8 +18,9 @@ def test_keeps_accents_written_as_combining_marks():
     assert basic_filter(decomposed + "!") == decomposed
 
 
-def test_keeps_line_breaks_so_words_do_not_merge():
-    assert basic_filter("the mill-\nrace\tflooded.") == "the mill\nrace\tflooded"
+def test_keeps_line_breaks_and_hyphens_so_words_do_not_merge():
+    assert basic_filter("the mill-\nrace\tflooded.") == "the mill-\nrace\tflooded"
+    assert basic_filter("the mill-race, 1843–1851") == "the mill-race 18431851"   # only the hyphen-minus
 
 
 def test_drops_punctuation_symbols_and_ocr_noise():
@@ -185,12 +186,25 @@ def test_every_hit_is_counted_once_with_one_context_row(tmp_path):
             assert len(_rows(out / name)) == counts[keyword], keyword
         return counts
 
-    # Whole words: "mill" at both ends of the page and inside "mill-race"; "mill race" also
-    # as "mill-race"; "race;" and "york." keep their punctuation, so they do not match.
-    assert search() == {"mill": 5, "mill race": 2, "mill-race": 1, "new york": 2, "c++": 1, "a.b": 1, "the the": 1}
+    # Whole words: "mill" at both ends of the page and inside "mill-race"; "mill race" also as
+    # "mill-race" and "mill race;" (punctuation at the edges of words is ignored, inside them it is not).
+    counts = {"mill": 5, "mill race": 3, "mill-race": 1, "new york": 3, "c++": 1, "a.b": 1, "the the": 1}
+    assert search() == counts
     assert [r[1:] for r in _rows(out / "mill.csv")][:2] == [["1", "mill opens"], ["1", "page. the mill race"]]
-    assert [r[2] for r in _rows(out / "new york.csv")] == ["new york new york", "new york new york new"]
-    # The basic filter removes the punctuation, so "race;" and "york." match; it also deletes
-    # hyphens, joining "mill-race" into "millrace", and "c++" and "a.b" can no longer match.
-    assert search(basic=True) == {"mill": 4, "mill race": 2, "mill-race": 0, "new york": 3, "c++": 0, "a.b": 0,
-                                  "the the": 1}
+    assert [r[2] for r in _rows(out / "new york.csv")] == [   # contexts keep the text's punctuation
+        "new york new york", "new york new york new york.", "new york new york new york. c++"]
+    # The basic filter keeps hyphens, so "mill-race" still matches; "c++" and "a.b" lose their symbols.
+    assert search(basic=True) == dict(counts, **{"c++": 0, "a.b": 0})
+
+
+@pytest.mark.parametrize("length, context", [
+    (1, "key"), (2, "three key"), (3, "three key five"), (4, "two three key five"),
+    (5, "two three key five six"), (6, "one two three key five six"),
+])
+def test_context_length_counts_the_keyword_and_splits_evenly(tmp_path, length, context):
+    src, out = tmp_path / "pdfs", tmp_path / "out"
+    src.mkdir()
+    out.mkdir()
+    _text_pdf(src / "a.pdf", ["one two three key five six seven"])
+    search_directory(str(src), str(out), "key", context_words=length)
+    assert [r[2] for r in _rows(out / "key.csv")] == [context]

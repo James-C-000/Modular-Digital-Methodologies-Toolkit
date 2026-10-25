@@ -1,10 +1,11 @@
 """Keyword search: count keywords in a folder of PDFs and collect their context.
 
 Every PDF under the input folder, sub-folders included, is searched page by
-page.  Keywords are plain text matched as whole words, ignoring case; a
-keyword of several words matches them in sequence.  Hyphens separate words
-unless the keyword contains one, so "mill race" also finds "mill-race".
-Every occurrence is counted once and gets one row in the keyword's CSV.
+page.  Keywords are plain text matched as whole words, ignoring case and
+punctuation at the edges of words ("york." is "york"); a keyword of several
+words matches them in sequence.  Hyphens separate words unless the keyword
+contains one, so "mill race" also finds "mill-race".  Every occurrence is
+counted once and gets one row in the keyword's CSV.
 The output folder receives:
 
 - ``<keyword>.csv``: one row per hit with the PDF, the page and the words
@@ -37,8 +38,12 @@ OVERVIEW_CSV = "Data_Overview.csv"
 
 def basic_filter(text: str) -> str:
     """Keep letters of any script (with their accents, also as combining marks),
-    digits and whitespace; drop punctuation, symbols and OCR noise."""
-    return "".join(ch for ch in text if ch.isspace() or unicodedata.category(ch)[0] in "LMN")
+    digits, hyphens and whitespace; drop other punctuation, symbols and OCR noise.
+
+    Hyphens are kept so that "mill-race" stays two words (and matches a
+    hyphenated keyword) instead of becoming "millrace".
+    """
+    return "".join(ch for ch in text if ch.isspace() or ch == "-" or unicodedata.category(ch)[0] in "LMN")
 
 
 def _read_file(path: str, what: str) -> str:
@@ -75,35 +80,44 @@ def _text_filter(basic: bool, filters: str, filter_file: str):
     return lambda text: text.translate(table)
 
 
-def _split_words(text: str, hyphens_separate: bool) -> list[str]:
-    return [w for w in re.split(r"[-\s]+", text) if w] if hyphens_separate else text.split()
+def _bare(word: str) -> str:
+    """*word* without the punctuation at its edges ("(york)." -> "york"), or as is if that leaves nothing."""
+    start, end = 0, len(word)
+    while start < end and unicodedata.category(word[start])[0] == "P":
+        start += 1
+    while end > start and unicodedata.category(word[end - 1])[0] == "P":
+        end -= 1
+    return word[start:end] or word
 
 
-def _tokens(words: list[str], keyword: str) -> list[str]:
-    """*words* with each occurrence of a keyword of several words joined into one.
+def _split_words(text: str, hyphens_separate: bool) -> tuple[list[str], list[str]]:
+    """The words of *text*, and the same words as compared with keywords (see _bare)."""
+    words = [w for w in re.split(r"[-\s]+", text) if w] if hyphens_separate else text.split()
+    return words, [_bare(w) for w in words]
 
-    Occurrences do not overlap: "the the" occurs once in "the the the".
-    Words that continue on the next page are not joined.
+
+def _contexts(words: list[str], keys: list[str], keyword: str, context_words: int) -> list[str]:
+    """The context of each occurrence of *keyword* in *words* (compared as *keys*).
+
+    A context is *context_words* words, the keyword included (a keyword of
+    several words counts as one): as many before it as after, and one more
+    before when the number is even.  Occurrences do not overlap ("the the"
+    occurs once in "the the the"); words that continue on the next page are
+    not joined.
     """
-    parts = keyword.split()
-    if len(parts) == 1:
-        return words
-    tokens, at = [], 0
+    parts = [_bare(p) for p in keyword.split()]
+    before = context_words // 2
+    after = max(context_words - before - 1, 0)
+    tokens, hits, at = [], [], 0
     while at < len(words):
-        if words[at:at + len(parts)] == parts:
-            tokens.append(keyword)
+        if keys[at:at + len(parts)] == parts:
+            hits.append(len(tokens))
+            tokens.append(" ".join(words[at:at + len(parts)]))
             at += len(parts)
         else:
             tokens.append(words[at])
             at += 1
-    return tokens
-
-
-def _contexts(words: list[str], keyword: str, context_words: int) -> list[str]:
-    """The context of each occurrence of *keyword*: half the words before it, the keyword and the rest after."""
-    half = round(context_words / 2)
-    tokens = _tokens(words, keyword)
-    return [" ".join(tokens[max(0, at - half):at + half]) for at, token in enumerate(tokens) if token == keyword]
+    return [" ".join(tokens[max(0, hit - before):hit + 1 + after]) for hit in hits]
 
 
 def _autopct(values):
@@ -177,7 +191,7 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
     keywords / filters: one per line, or read from *keyword_file* /
     *filter_file* when given (ValueError if there is no keyword).  *basic*
     applies basic_filter() instead of the filters.  Each hit's context is
-    *context_words* words around it.
+    *context_words* words, the keyword included (see _contexts).
 
     on_progress(done, total, current_file) is called before each PDF; a set
     *cancel* event stops before the next one.  Returns {"files": PDFs searched,
@@ -227,12 +241,12 @@ def search_directory(input_dir, output_dir, keywords="", keyword_file="", filter
         counts = dict.fromkeys(keyword_list, 0)
         for page, text in enumerate(pages, start=1):
             text = clean(text).lower()
-            words = {}   # split once per page for each way of treating hyphens
+            split = {}   # once per page for each way of treating hyphens
             for keyword in keyword_list:
                 hyphens_separate = "-" not in keyword
-                if hyphens_separate not in words:
-                    words[hyphens_separate] = _split_words(text, hyphens_separate)
-                contexts = _contexts(words[hyphens_separate], keyword, context_words)
+                if hyphens_separate not in split:
+                    split[hyphens_separate] = _split_words(text, hyphens_separate)
+                contexts = _contexts(*split[hyphens_separate], keyword, context_words)
                 if contexts:
                     counts[keyword] += len(contexts)
                     totals[keyword] += len(contexts)
